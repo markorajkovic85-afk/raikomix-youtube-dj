@@ -193,6 +193,18 @@ const App: React.FC = () => {
               <SearchPanel 
                 onLoadToDeck={(vid, url, deck, title, author) => handleLoadVideo(vid, url, deck, 'youtube', title, author)} 
                 onAddToQueue={handleAddToQueue} 
+                onAddToLibrary={(result) => {
+                  setLibrary(prev => {
+                    const res = addTrackToLibrary(`https://www.youtube.com/watch?v=${result.videoId}`, prev);
+                    if (res.success && res.track) {
+                      showNotification('Added to Library', 'success');
+                      const withTrack = [...prev, res.track];
+                      return updateTrackMetadata(result.videoId, { title: result.title, author: result.channelTitle }, withTrack);
+                    }
+                    if (res.error) showNotification(res.error, 'error');
+                    return prev;
+                  });
+                }}
               />
                 <div className="flex-1 overflow-hidden border-t border-white/5 pt-4 min-h-0">
                 <LibraryPanel 
