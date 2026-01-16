@@ -173,12 +173,23 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     mid.type = 'peaking';
     mid.frequency.value = 1000;
     mid.Q.value = 1;
-.connect(
+    
+    const hi = ctx.createBiquadFilter();
+    hi.type = 'highshelf';
+    hi.frequency.value = 10000;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'allpass';
+
+    const gainNode = ctx.createGain();
+
+    // Connection chain: source -> low -> mid -> hi -> filter -> gain -> destination
+    source.connect(low);
+    low.connect(mid);
+    mid.connect(hi);
+    hi.connect(filter);
 
 
-    const effectNodeRef = useRef<BiquadFilterNode | DelayNode | ConvolverNode | WaveShaperNode | null>(null);
-  const effectWetGainRef = useRef<GainNode | null>(null);
-  const effectDryGainRef = useRef<GainNode | null>(null);  // Create Web Audio effect nodes based on effect type
   const createEffectNode = (ctx: AudioContext, type: EffectType): AudioNode | null => {
     switch(type) {
       case 'ECHO': {
@@ -235,20 +246,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
         return null;
     }
   };
-    const hi = ctx.createBiquadFilter();
-    hi.type = 'highshelf';
-    hi.frequency.value = 10000;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'allpass';
-
-    const gainNode = ctx.createGain();
-
-    // Connection chain: source -> low -> mid -> hi -> filter -> gain -> destination
-    source.connect(low);
-    const DeckuseRef<);
-    mid.connect(hi);
-    hi.connect(filter);
     // Effect routing with wet/dry mix
     if (state.effect !== 'NONE') {
       if (!effectWetGainRef.current) {
