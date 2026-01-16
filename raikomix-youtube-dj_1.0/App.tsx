@@ -189,12 +189,12 @@ const App: React.FC = () => {
 
         <div className="flex-1 flex overflow-hidden relative">
           <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 flex-none ${libraryOpen ? 'w-[420px]' : 'w-0 border-none'}`}>
-            <div className={`p-4 flex flex-col gap-4 h-full min-w-[380px] ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
+             <div className={`p-4 flex flex-col gap-4 h-full min-w-[380px] min-h-0 ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
               <SearchPanel 
                 onLoadToDeck={(vid, url, deck, title, author) => handleLoadVideo(vid, url, deck, 'youtube', title, author)} 
                 onAddToQueue={handleAddToQueue} 
               />
-              <div className="flex-1 overflow-hidden border-t border-white/5 pt-4">
+              <div className="flex-1 overflow-hidden border-t border-white/5 pt-4 min-h-0">
                 <LibraryPanel 
                   library={library} 
                   onAddSingle={url => {
