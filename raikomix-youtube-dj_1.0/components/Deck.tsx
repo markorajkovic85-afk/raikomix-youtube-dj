@@ -565,7 +565,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
               className="absolute inset-0 cursor-pointer z-20 h-full w-full opacity-0"                  style={{ WebkitAppearance: 'slider-vertical', appearance: 'slider-vertical' as any }}
                 />
               </div>)}
-           </div>
+           </div>}
 
            <div className="flex flex-col items-center gap-0.5 pb-2">
              <div className={`text-[9px] font-black mono transition-all ${Math.abs(state.playbackRate - 1.0) < 0.001 ? 'text-[#D0BCFF] scale-110' : 'text-gray-500'}`}>
