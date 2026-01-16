@@ -20,6 +20,7 @@ export interface DeckHandle {
   triggerHotCue: (index: number, clear?: boolean) => void;
   toggleLoop: (beats?: number) => void;
   setPlaybackRate: (rate: number) => void;
+    updateState: (updates: Partial<PlayerState>) => void;
 }
 
 const CUE_COLORS = [
@@ -558,6 +559,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     triggerHotCue: handleHotCue,
     toggleLoop: handleToggleLoop,
     setPlaybackRate: updatePlaybackRate
+        updateState: (updates: Partial<PlayerState>) => setState(s => ({ ...s, ...updates }))
   }), [initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, initAudioEngine]);
 
   useEffect(() => {
