@@ -166,7 +166,7 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-[#1C1B1F] text-white flex overflow-hidden font-['Roboto']" data-theme={theme}>
+       <div className="h-screen bg-[#1C1B1F] text-white flex overflow-hidden font-['Roboto']" data-theme={theme}>
         <nav className="w-16 bg-black/40 border-r border-white/5 flex flex-col items-center py-8 gap-10 shrink-0">
           <button onClick={() => setViewMode('PERFORM')} className={`flex flex-col items-center gap-1 transition-all ${viewMode === 'PERFORM' ? 'text-[#D0BCFF] scale-110' : 'text-gray-600 hover:text-gray-400'}`}>
             <span className="material-icons text-3xl">speed</span>
@@ -187,14 +187,14 @@ const App: React.FC = () => {
           </div>
         </nav>
 
-        <div className="flex-1 flex overflow-hidden relative">
-          <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 flex-none ${libraryOpen ? 'w-[420px]' : 'w-0 border-none'}`}>
-             <div className={`p-4 flex flex-col gap-4 h-full min-w-[380px] min-h-0 ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
+        <div className="flex-1 flex overflow-hidden relative min-h-0">
+          <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 flex-none h-full ${libraryOpen ? 'w-[420px]' : 'w-0 border-none'}`}>
+            <div className={`p-4 flex flex-col gap-4 h-full min-w-[380px] min-h-0 ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
               <SearchPanel 
                 onLoadToDeck={(vid, url, deck, title, author) => handleLoadVideo(vid, url, deck, 'youtube', title, author)} 
                 onAddToQueue={handleAddToQueue} 
               />
-              <div className="flex-1 overflow-hidden border-t border-white/5 pt-4 min-h-0">
+                <div className="flex-1 overflow-hidden border-t border-white/5 pt-4 min-h-0">
                 <LibraryPanel 
                   library={library} 
                   onAddSingle={url => {
@@ -219,7 +219,7 @@ const App: React.FC = () => {
             </div>
           </section>
 
-          <section className="flex-1 flex flex-col p-4 items-center justify-center overflow-auto">
+          <section className="flex-1 flex flex-col p-4 items-center justify-center overflow-auto min-h-0">
             <div className="flex flex-col lg:flex-row gap-6 items-center">
               <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} />
               <Mixer crossfader={crossfader} onCrossfaderChange={setCrossfader} crossfaderCurve={xFaderCurve} onCurveChange={setXFaderCurve} masterVolume={masterVolume} onMasterVolumeChange={setMasterVolume} deckAVolume={deckAVolume} onDeckAVolumeChange={setDeckAVolume} deckBVolume={deckBVolume} onDeckBVolumeChange={setDeckBVolume} deckAPlaying={deckAState?.playing || false} deckBPlaying={deckBState?.playing || false} deckAEq={deckAEq} deckBEq={deckBEq} onDeckAEqChange={(k, v) => setDeckAEq(p => ({...p, [k]: v}))} onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))} />
