@@ -84,13 +84,18 @@ export const extractPlaylistId = (url: string): string | null => {
 /**
  * Fetches all videos from a YouTube playlist using pagination.
  */
+const getYouTubeApiKey = (): string | undefined => {
+  const envKey = (import.meta as any)?.env?.VITE_API_KEY;
+  if (envKey) return envKey;
+  return process.env.API_KEY;
+};
+
 export const fetchPlaylistItems = async (
   playlistId: string,
   onProgress?: (loaded: number, total?: number) => void
 ): Promise<Partial<LibraryTrack>[]> => {
-  // FIX: Using process.env.API_KEY exclusively as mandated by guidelines to avoid ImportMeta errors
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error('API Key missing. Please check your system configuration.');
+ const apiKey = getYouTubeApiKey();
+  if (!apiKey) throw new Error('API Key missing. Please set VITE_API_KEY or API_KEY.');
 
   let allTracks: Partial<LibraryTrack>[] = [];
   let nextPageToken: string | undefined = '';
@@ -160,8 +165,7 @@ export const searchYouTube = async (
   query: string,
   maxResults: number = 15
 ): Promise<YouTubeSearchResult[]> => {
-  // FIX: Using process.env.API_KEY exclusively as mandated by guidelines to avoid ImportMeta errors
-  const apiKey = process.env.API_KEY;
+   const apiKey = getYouTubeApiKey();
   if (!apiKey) return [];
 
   try {
