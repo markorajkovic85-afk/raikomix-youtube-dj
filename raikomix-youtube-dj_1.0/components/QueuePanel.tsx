@@ -1,0 +1,103 @@
+
+import React, { useRef, useState, useEffect } from 'react';
+import { QueueItem, DeckId } from '../types';
+
+interface QueuePanelProps {
+  queue: QueueItem[];
+  onLoadToDeck: (item: QueueItem, deck: DeckId) => void;
+  onRemove: (id: string) => void;
+  onClear: () => void;
+  onReorder: (from: number, to: number) => void;
+}
+
+const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, className }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+
+  useEffect(() => {
+    if (containerRef.current && textRef.current) {
+      setShouldAnimate(textRef.current.scrollWidth > containerRef.current.clientWidth);
+    }
+  }, [text]);
+
+  return (
+    <div ref={containerRef} className="marquee-container w-full">
+      <div 
+        ref={textRef} 
+        className={`${className} marquee-text ${shouldAnimate ? 'animate-marquee' : ''}`}
+      >
+        {text}
+        {shouldAnimate && <span className="ml-12">{text}</span>}
+      </div>
+    </div>
+  );
+};
+
+const QueuePanel: React.FC<QueuePanelProps> = ({ queue, onLoadToDeck, onRemove, onClear }) => {
+  return (
+    <div className="flex flex-col h-full gap-4 elevation-2">
+      <div className="flex items-center justify-between px-2">
+        <h3 className="text-xs font-black uppercase tracking-widest text-gray-500">Play Queue ({queue.length})</h3>
+        {queue.length > 0 && (
+          <button 
+            onClick={onClear}
+            className="text-[10px] font-bold text-red-400/60 hover:text-red-400 uppercase tracking-tighter motion-standard"
+          >
+            Clear All
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto pr-2 space-y-2 scrollbar-hide">
+        {queue.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-50">
+            <span className="material-symbols-outlined text-4xl mb-2">queue_music</span>
+            <p className="text-xs uppercase tracking-widest font-bold">Queue is empty</p>
+          </div>
+        )}
+
+        {queue.map((item, index) => (
+          <div key={item.id} className="m3-card group p-3 flex gap-4 items-center bg-[#1C1B1F]/40 hover:bg-[#2B2930] motion-standard border-dashed elevation-1 hover:elevation-2 overflow-hidden">
+            <span className="text-[10px] font-mono text-gray-600 w-4">{index + 1}</span>
+            <div className="w-12 h-12 bg-black rounded overflow-hidden flex-shrink-0 elevation-1">
+              <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col gap-1 overflow-hidden">
+              <MarqueeText 
+                text={item.title} 
+                className="text-sm font-semibold text-[#E6E1E5] leading-tight" 
+              />
+              <MarqueeText 
+                text={item.author || 'Unknown Artist'} 
+                className="text-[10px] text-gray-400 font-medium" 
+              />
+            </div>
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 motion-standard">
+              <button 
+                onClick={() => onLoadToDeck(item, 'A')}
+                className="px-2 py-1 rounded bg-[#D0BCFF]/10 text-[#D0BCFF] text-[10px] font-black motion-emphasized elevation-1 hover:elevation-2"
+              >
+                A
+              </button>
+              <button 
+                onClick={() => onLoadToDeck(item, 'B')}
+                className="px-2 py-1 rounded bg-[#F2B8B5]/10 text-[#F2B8B5] text-[10px] font-black motion-emphasized elevation-1 hover:elevation-2"
+              >
+                B
+              </button>
+              <button 
+                onClick={() => onRemove(item.id)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-red-400 motion-standard"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default QueuePanel;

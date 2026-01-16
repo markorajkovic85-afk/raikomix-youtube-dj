@@ -1,0 +1,34 @@
+
+:root {
+  /* MD3 Dark Theme (Primary Palette) */
+  --md-sys-color-primary: #D0BCFF;
+  --md-sys-color-on-primary: #381E72;
+  --md-sys-color-primary-container: #4F378B;
+  --md-sys-color-on-primary-container: #EADDFF;
+  
+  --md-sys-color-secondary: #CCC2DC;
+  --md-sys-color-on-secondary: #332D41;
+  --md-sys-color-secondary-container: #4A4458;
+  --md-sys-color-on-secondary-container: #E8DEF8;
+
+  --md-sys-color-surface: #141218;
+  --md-sys-color-surface-container: #1D1B20;
+  --md-sys-color-surface-container-high: #2B2930;
+  --md-sys-color-on-surface: #E6E1E5;
+  --md-sys-color-on-surface-variant: #CAC4D0;
+  
+  --md-sys-color-outline: #938F99;
+  --md-sys-color-error: #F2B8B5;
+
+  /* Performance Constants */
+  --deck-a-glow: 0 0 20px rgba(208, 188, 255, 0.2);
+  --deck-b-glow: 0 0 20px rgba(242, 184, 181, 0.2);
+}
+
+[data-theme='light'] {
+  --md-sys-color-primary: #6750A4;
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-surface: #FEF7FF;
+  --md-sys-color-surface-container: #F3EDF7;
+  --md-sys-color-on-surface: #1C1B1F;
+}

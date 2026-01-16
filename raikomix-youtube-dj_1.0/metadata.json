@@ -1,0 +1,8 @@
+{
+  "name": "RaikoMix YouTube DJ",
+  "description": "Professional-grade two-deck DJ mixer with AI track digging and performance controls.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RaikoMix YouTube DJ</title>
+  <meta name="theme-color" content="#D0BCFF">
+  <meta name="description" content="Professional YouTube DJ mixing console with library management">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/elevation.css">
+  <link rel="stylesheet" href="styles/motion.css">
+  <style>
+    html, body, #root {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background-color: var(--md-sys-color-surface);
+      color: var(--md-sys-color-on-surface);
+      font-family: 'Roboto', sans-serif;
+      overflow: hidden;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    
+    /* M3 Slider Styling */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: transparent;
+      height: 48px;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 4px;
+      background: var(--md-sys-color-surface-variant);
+      border-radius: 2px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      background: var(--md-sys-color-primary);
+      margin-top: -8px;
+      box-shadow: var(--md-sys-elevation-1);
+      cursor: pointer;
+    }
+    
+    /* Marquee Animation */
+    .marquee-container {
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+      display: flex;
+    }
+    .marquee-text {
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .animate-marquee {
+      animation: marquee-scroll 10s linear infinite;
+    }
+    @keyframes marquee-scroll {
+      0% { transform: translateX(0); }
+      20% { transform: translateX(0); }
+      80% { transform: translateX(-50%); }
+      100% { transform: translateX(-50%); }
+    }
+
+    /* Accessibility skip link */
+    .skip-link {
+      position: absolute;
+      top: -40px;
+      left: 0;
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      padding: 8px;
+      z-index: 1000;
+      transition: top 0.2s;
+    }
+    .skip-link:focus {
+      top: 0;
+    }
+
+    /* Keyboard focus ring */
+    *:focus-visible {
+      outline: 3px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+    .material-symbols-outlined.FILL {
+      font-variation-settings: 'FILL' 1;
+    }
+
+    .m3-card {
+      background: var(--md-sys-color-surface-container);
+      border-radius: 16px;
+      padding: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Vertical Text Utility */
+    .vertical-text {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      transform: rotate(180deg);
+    }
+
+    /* Mobile Responsive Overrides */
+    @media (max-width: 1024px) {
+      body {
+        overflow-y: auto;
+      }
+    }
+  </style>
+  <script>
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+  </script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom": "https://esm.sh/react-dom@^19.2.3",
+    "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.36.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
