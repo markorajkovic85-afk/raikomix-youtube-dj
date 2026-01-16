@@ -558,7 +558,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     togglePlay,
     triggerHotCue: handleHotCue,
     toggleLoop: handleToggleLoop,
-    setPlaybackRate: updatePlaybackRate
+    setPlaybackRate: updatePlaybackRate,
         updateState: (updates: Partial<PlayerState>) => setState(s => ({ ...s, ...updates }))
   }), [initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, initAudioEngine]);
 
