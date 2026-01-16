@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, f
 import { GoogleGenAI, Type } from "@google/genai";
 import { DeckId, EffectType, PlayerState, TrackSourceType } from '../types';
 import Waveform from './Waveform';
-import { extractBPMFromTitle } from '../utils/bpmDetection';
+import { detectBpmFromAudioBuffer, extractBPMFromTitle } from '../utils/bpmDetection';
 import { parseYouTubeTitle } from '../utils/youtubeApi';
 
 interface DeckProps {
@@ -227,6 +227,27 @@ const formatTime = useCallback((timeSeconds: number) => {
     }
   };
 
+    const analyzeLocalBpm = async (url: string) => {
+    try {
+      setIsScanning(true);
+      const response = await fetch(url);
+      const arrayBuffer = await response.arrayBuffer();
+      const existingContext = audioCtxRef.current;
+      const tempContext = existingContext ?? new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioBuffer = await tempContext.decodeAudioData(arrayBuffer.slice(0));
+      const bpm = detectBpmFromAudioBuffer(audioBuffer);
+      if (bpm) {
+        setState(s => ({ ...s, bpm }));
+      }
+      if (!existingContext) {
+        await tempContext.close();
+      }
+    } catch (e) {
+      console.warn('Local BPM detection failed:', e);
+    } finally {
+      setIsScanning(false);
+    }
+  };
   const updateMetadata = useCallback((player: any) => {
     if (!player) return;
     const data = player.getVideoData ? player.getVideoData() : {};
@@ -381,6 +402,9 @@ const formatTime = useCallback((timeSeconds: number) => {
           currentTime: 0,
           loopActive: false
         }));
+
+        
+        analyzeLocalBpm(url);
         
         onPlayerReady({
           setVolume: (v: number) => { if(localAudioRef.current) localAudioRef.current.volume = v / 100; },
