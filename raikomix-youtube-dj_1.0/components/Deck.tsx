@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
-import { DeckId, PlayerState, TrackSourceType } from '../types';
+import { DeckId, EffectType, PlayerState, TrackSourceType } from '../types';
 import Waveform from './Waveform';
 import { extractBPMFromTitle } from '../utils/bpmDetection';
 import { parseYouTubeTitle } from '../utils/youtubeApi';
@@ -544,9 +544,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
               </div>
 
               <div className="h-full w-8 relative flex items-center justify-center cursor-ns-resize">
-                <div 
+                <div
                   className="absolute w-10 h-10 bg-[#323038] rounded-md border-2 border-white/20 shadow-[0_8px_16px_rgba(0,0,0,0.6)] flex items-center justify-center transition-all duration-75 pointer-events-none z-10"
-                  style={{ 
+                  style={{
                     top: `${(1.5 - state.playbackRate) * 100}%`,
                     transform: 'translateY(-50%)'
                   }}
@@ -554,18 +554,18 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
                   <div className="w-6 h-[2px] bg-[#D0BCFF] shadow-[0_0_8px_#D0BCFF]" />
                 </div>
 
-                <input 
+                <input
                   type="range"
                   min="0.5"
                   max="1.5"
                   step="0.0001"
                   value={state.playbackRate}
-                  onInput={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value))
-                onChange={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value))}
-              className="absolute inset-0 cursor-pointer z-20 h-full w-full opacity-0"                  style={{ WebkitAppearance: 'slider-vertical', appearance: 'slider-vertical' as any }}
+                   onInput={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value))}
+                  className="absolute inset-0 cursor-pointer z-20 h-full w-full opacity-0"
+                  style={{ WebkitAppearance: 'slider-vertical', appearance: 'slider-vertical' as any }}
                 />
-              </div>)}
-           </div>}
+              </div>
+           </div>
 
            <div className="flex flex-col items-center gap-0.5 pb-2">
              <div className={`text-[9px] font-black mono transition-all ${Math.abs(state.playbackRate - 1.0) < 0.001 ? 'text-[#D0BCFF] scale-110' : 'text-gray-500'}`}>
