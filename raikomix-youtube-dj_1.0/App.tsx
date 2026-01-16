@@ -222,32 +222,8 @@ const App: React.FC = () => {
           <section className="flex-1 flex flex-col p-4 items-center justify-center overflow-auto">
             <div className="flex flex-col lg:flex-row gap-6 items-center">
               <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} />
-        <Mixer
-          crossfader={crossfader}
-          onCrossfaderChange={setCrossfader}
-          crossfaderCurve={xFaderCurve}
-          onCurveChange={setXFaderCurve}
-          masterVolume={masterVolume}
-          onMasterVolumeChange={setMasterVolume}
-          deckAVolume={deckAState?.deckVolume ?? 1}
-          onDeckAVolumeChange={(val) => deckARef.current?.updateState({deckVolume: val})}
-          deckBVolume={deckBState?.deckVolume ?? 1}
-          onDeckBVolumeChange={(val) => deckBRef.current?.updateState({deckVolume: val})}
-          deckAPlaying={deckAState?.isPlaying ?? false}
-          deckBPlaying={deckBState?.isPlaying ?? false}
-          deckAEq={{hi: deckAState?.eq.hi ?? 1, mid: deckAState?.eq.mid ?? 1, low: deckAState?.eq.low ?? 1, filter: deckAState?.eq.filter ?? 0}}
-          deckBEq={{hi: deckBState?.eq.hi ?? 1, mid: deckBState?.eq.mid ?? 1, low: deckBState?.eq.low ?? 1, filter: deckBState?.eq.filter ?? 0}}
-          onDeckAEqChange={(key, val) => deckARef.current?.updateState({eq: {...(deckAState?.eq ?? {hi:1,mid:1,low:1,filter:0}), [key]: val}})}
-          onDeckBEqChange={(key, val) => deckBRef.current?.updateState({eq: {...(deckBState?.eq ?? {hi:1,mid:1,low:1,filter:0}), [key]: val}})}
-          deckAEffect={deckAState?.effect || 'NONE'}
-          onDeckAEffectChange={(effect) => deckARef.current?.updateState({effect})}
-          deckAEffectWet={deckAState?.effectWet || 0.5}
-          onDeckAEffectWetChange={(wet) => deckARef.current?.updateState({effectWet: wet})}
-          deckBEffect={deckBState?.effect || 'NONE'}
-          onDeckBEffectChange={(effect) => deckBRef.current?.updateState({effect})}
-          deckBEffectWet={deckBState?.effectWet || 0.5}
-          onDeckBEffectWetChange={(wet) => deckBRef.current?.updateState({effectWet: wet})}
-        />              <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} />
+              <Mixer crossfader={crossfader} onCrossfaderChange={setCrossfader} crossfaderCurve={xFaderCurve} onCurveChange={setXFaderCurve} masterVolume={masterVolume} onMasterVolumeChange={setMasterVolume} deckAVolume={deckAVolume} onDeckAVolumeChange={setDeckAVolume} deckBVolume={deckBVolume} onDeckBVolumeChange={setDeckBVolume} deckAPlaying={deckAState?.playing || false} deckBPlaying={deckBState?.playing || false} deckAEq={deckAEq} deckBEq={deckBEq} onDeckAEqChange={(k, v) => setDeckAEq(p => ({...p, [k]: v}))} onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))} />
+              <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} />
             </div>
           </section>
 
