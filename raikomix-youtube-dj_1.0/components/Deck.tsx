@@ -560,9 +560,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
                   max="1.5"
                   step="0.0001"
                   value={state.playbackRate}
-                  onInput={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value))}
-                  className="absolute inset-0 opacity-0 cursor-pointer z-20 h-full w-full"
-                  style={{ WebkitAppearance: 'slider-vertical', appearance: 'slider-vertical' as any }}
+                  onInput={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value)
+                onChange={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value))}
+              className="absolute inset-0 cursor-pointer z-20 h-full w-full opacity-0"                  style={{ WebkitAppearance: 'slider-vertical', appearance: 'slider-vertical' as any }}
                 />
               </div>
            </div>
