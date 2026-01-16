@@ -249,8 +249,37 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     const DeckuseRef<);
     mid.connect(hi);
     hi.connect(filter);
-    filter.connect(gainNode);
-    gainNode.connect(ctx.destination);
+    // Effect routing with wet/dry mix
+    if (state.effect !== 'NONE') {
+      if (!effectWetGainRef.current) {
+        effectWetGainRef.current = ctx.createGain();
+        effectDryGainRef.current = ctx.createGain();
+      }
+      
+      if (effectNodeRef.current) {
+        try { effectNodeRef.current.disconnect(); } catch(e) {}
+      }
+      
+      effectNodeRef.current = createEffectNode(ctx, state.effect);
+      
+      if (effectNodeRef.current && effectWetGainRef.current && effectDryGainRef.current) {
+        effectWetGainRef.current.gain.value = state.effectWet;
+        effectDryGainRef.current.gain.value = 1 - state.effectWet;
+        
+        filter.connect(effectDryGainRef.current);
+        filter.connect(effectNodeRef.current);
+        effectNodeRef.current.connect(effectWetGainRef.current);
+        
+        effectDryGainRef.current.connect(gainNode);
+        effectWetGainRef.current.connect(gainNode);
+      }
+    } else {
+      if (effectNodeRef.current) {
+        try { effectNodeRef.current.disconnect(); } catch(e) {}
+        effectNodeRef.current = null;
+      }
+      filter.connect(gainNode);
+    }    gainNode.connect(ctx.destination);
 
     audioCtxRef.current = ctx;
     sourceNodeRef.current = source;
