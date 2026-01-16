@@ -34,14 +34,17 @@ const Knob: React.FC<{
   const [isDragging, setIsDragging] = useState(false);
   const startY = useRef(0);
   const startVal = useRef(0);
+  const activePointerId = useRef<number | null>(null);
   const knobRef = useRef<HTMLDivElement>(null);
   const knobSize = size === 'sm' ? 'w-9 h-9' : 'w-11 h-11';
   const innerSize = size === 'sm' ? 'w-5 h-5' : 'w-6 h-6';
 
-  const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
+ const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    activePointerId.current = e.pointerId;
     setIsDragging(true);
-    const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
-    startY.current = clientY;
+   startY.current = e.clientY;
     startVal.current = value;
     document.body.style.cursor = 'ns-resize';
   };
@@ -61,26 +64,20 @@ const Knob: React.FC<{
     return () => el?.removeEventListener('wheel', handleWheel);
   }, [value, onChange, min, max]);
 
-  useEffect(() => {
-    if (!isDragging) return;
-    const handleMove = (e: MouseEvent | TouchEvent) => {
-      const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY;
-      const deltaY = startY.current - clientY;
-      const sensitivity = 0.007;
-      const newVal = Math.min(max, Math.max(min, startVal.current + deltaY * sensitivity));
-      onChange(newVal);
-    };
-    const handleEnd = () => {
-      setIsDragging(false);
-      document.body.style.cursor = 'default';
-    };
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleEnd);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleEnd);
-    };
-  }, [isDragging, min, max, onChange]);
+   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging || activePointerId.current !== e.pointerId) return;
+    const deltaY = startY.current - e.clientY;
+    const sensitivity = 0.007;
+    const newVal = Math.min(max, Math.max(min, startVal.current + deltaY * sensitivity));
+    onChange(newVal);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointerId.current !== e.pointerId) return;
+    activePointerId.current = null;
+    setIsDragging(false);
+    document.body.style.cursor = 'default';
+  };
 
   const rotation = ((value - min) / (max - min)) * 270 - 135;
   const progress = (value - min) / (max - min);
@@ -89,8 +86,11 @@ const Knob: React.FC<{
     <div className="flex flex-col items-center gap-0 group select-none">
       <div 
         ref={knobRef}
-        className={`relative ${knobSize} flex items-center justify-center cursor-ns-resize transition-transform duration-150 ${isDragging ? 'scale-110' : ''}`}
-        onMouseDown={handleMouseDown}
+        className={`relative ${knobSize} flex items-center justify-center cursor-ns-resize transition-transform duration-150 touch-none ${isDragging ? 'scale-110' : ''}`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onDoubleClick={handleDoubleClick}
       >
         <svg className="w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
@@ -126,6 +126,7 @@ const Fader: React.FC<{
   height?: string
 }> = ({ label, value, onChange, color, height = 'h-28' }) => {
   const faderRef = useRef<HTMLDivElement>(null);
+  const activePointerId = useRef<number | null>(null);
 
   const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
@@ -140,11 +141,35 @@ const Fader: React.FC<{
     return () => el?.removeEventListener('wheel', handleWheel);
   }, [value, onChange]);
 
+  const updateValueFromPointer = (clientY: number) => {
+    const rect = faderRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const next = Math.min(1, Math.max(0, (rect.bottom - clientY) / rect.height));
+    onChange(next);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    activePointerId.current = e.pointerId;
+    updateValueFromPointer(e.clientY);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLInputElement>) => {
+    if (activePointerId.current !== e.pointerId) return;
+    updateValueFromPointer(e.clientY);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLInputElement>) => {
+    if (activePointerId.current !== e.pointerId) return;
+    activePointerId.current = null;
+  };
+
   return (
     <div className="flex flex-col items-center gap-1.5 w-full group relative">
        <div 
          ref={faderRef}
-         className={`${height} w-6 bg-black/40 rounded-lg relative flex items-end p-0.5 border border-white/5 overflow-hidden cursor-ns-resize shadow-inner`}
+            className={`${height} w-6 bg-black/40 rounded-lg relative flex items-end p-0.5 border border-white/5 overflow-hidden cursor-ns-resize shadow-inner touch-none`}
        >
           <div 
             className="w-full rounded transition-all duration-75" 
@@ -160,6 +185,10 @@ const Fader: React.FC<{
              onDoubleClick={() => onChange(0.8)}
              className="absolute inset-0 opacity-0 cursor-pointer z-20"
              style={{ WebkitAppearance: 'slider-vertical', appearance: 'slider-vertical' as any }}
+             onPointerDown={handlePointerDown}
+             onPointerMove={handlePointerMove}
+             onPointerUp={handlePointerUp}
+             onPointerCancel={handlePointerUp}
           />
        </div>
        <label className="text-[7px] font-black uppercase tracking-widest" style={{ color: `${color}99` }}>{label}</label>
@@ -176,6 +205,7 @@ const Mixer: React.FC<MixerProps> = ({
   const [cueA, setCueA] = useState(false);
   const [cueB, setCueB] = useState(false);
   const crossfaderRef = useRef<HTMLDivElement>(null);
+  const crossfaderPointerId = useRef<number | null>(null);
 
   // Mouse wheel support for smooth transitions
   useEffect(() => {
@@ -194,6 +224,36 @@ const Mixer: React.FC<MixerProps> = ({
     el.addEventListener('wheel', handleWheel, { passive: false });
     return () => el.removeEventListener('wheel', handleWheel);
   }, [crossfader, onCrossfaderChange]);
+
+  const updateCrossfaderFromPointer = (clientX: number) => {
+    const rect = crossfaderRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
+    const padding = rootFont;
+    const handleWidth = rootFont * 5;
+    const usable = Math.max(1, rect.width - padding * 2 - handleWidth);
+    const x = Math.min(Math.max(clientX - rect.left - padding - handleWidth / 2, 0), usable);
+    const t = x / usable;
+    const newVal = t * 2 - 1;
+    onCrossfaderChange(newVal);
+  };
+
+  const handleCrossfaderPointerDown = (e: React.PointerEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    crossfaderPointerId.current = e.pointerId;
+    updateCrossfaderFromPointer(e.clientX);
+  };
+
+  const handleCrossfaderPointerMove = (e: React.PointerEvent<HTMLInputElement>) => {
+    if (crossfaderPointerId.current !== e.pointerId) return;
+    updateCrossfaderFromPointer(e.clientX);
+  };
+
+  const handleCrossfaderPointerUp = (e: React.PointerEvent<HTMLInputElement>) => {
+    if (crossfaderPointerId.current !== e.pointerId) return;
+    crossfaderPointerId.current = null;
+  };
 
   return (
     <div className="m3-card h-full flex flex-col bg-[#1D1B20] shadow-2xl border-white/5 w-[280px] shrink-0 p-2 select-none" role="region" aria-label="Mixer Controls">
@@ -284,7 +344,7 @@ const Mixer: React.FC<MixerProps> = ({
         {/* Redesigned Professional Crossfader with tactile feel */}
         <div 
           ref={crossfaderRef}
-          className="bg-black/80 h-14 rounded-xl relative group flex items-center px-4 border border-white/10 shadow-[inset_0_4px_12px_rgba(0,0,0,0.8)] cursor-pointer overflow-hidden transition-all hover:border-white/20"
+              className="bg-black/80 h-14 rounded-xl relative group flex items-center px-4 border border-white/10 shadow-[inset_0_4px_12px_rgba(0,0,0,0.8)] cursor-pointer overflow-hidden transition-all hover:border-white/20 touch-none"
           onDoubleClick={() => onCrossfaderChange(0)}
           title="Scroll to Mix • Double-click to Center (50/0)"
         >
@@ -321,6 +381,10 @@ const Mixer: React.FC<MixerProps> = ({
              type="range" min="-1" max="1" step="0.001" value={crossfader} 
              onChange={(e) => onCrossfaderChange(parseFloat(e.target.value))} 
              className="absolute inset-0 opacity-0 cursor-pointer z-20"
+              onPointerDown={handleCrossfaderPointerDown}
+             onPointerMove={handleCrossfaderPointerMove}
+             onPointerUp={handleCrossfaderPointerUp}
+             onPointerCancel={handleCrossfaderPointerUp}
            />
         </div>
 
