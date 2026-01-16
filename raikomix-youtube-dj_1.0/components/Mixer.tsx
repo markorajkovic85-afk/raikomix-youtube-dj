@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CrossfaderCurve } from '../types';
+import { CrossfaderCurv, EffectTypee } from '../types';
 
 interface MixerProps {
   crossfader: number;
@@ -19,6 +19,14 @@ interface MixerProps {
   deckBEq: { hi: number, mid: number, low: number, filter: number };
   onDeckAEqChange: (key: string, val: number) => void;
   onDeckBEqChange: (key: string, val: number) => void;
+    deckAEffect: EffectType;
+  onDeckAEffectChange: (effect: EffectType) => void;
+  deckAEffectWet: number;
+  onDeckAEffectWetChange: (val: number) => void;
+  deckBEffect: EffectType;
+  onDeckBEffectChange: (effect: EffectType) => void;
+  deckBEffectWet: number;
+  onDeckBEffectWetChange: (val: number) => void;
 }
 
 const Knob: React.FC<{
