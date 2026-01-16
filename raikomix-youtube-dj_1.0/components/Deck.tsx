@@ -527,6 +527,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
           ref={tempoContainerRef}
           className="w-12 bg-black/20 rounded-xl border border-white/5 flex flex-col items-center py-4 gap-2 relative group select-none transition-all hover:border-white/20 active:border-[#D0BCFF]/30"
           onDoubleClick={() => updatePlaybackRate(1.0)}
+      onWheel={(e) => {
+        e.preventDefault();
+        const delta = -e.deltaY * 0.001; // Fine control with mouse wheel
+        updatePlaybackRate(state.playbackRate + delta);
+      }}
           title="Drag to Pitch • Scroll for Fine-Tune • Double-click to Reset"
         >
            <div className="text-[8px] font-black text-gray-500 uppercase tracking-tighter vertical-text h-10 mb-2">Tempo</div>
