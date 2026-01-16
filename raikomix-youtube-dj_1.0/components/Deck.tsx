@@ -57,6 +57,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
   const [isLoading, setIsLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [tapHistory, setTapHistory] = useState<number[]>([]);
+  const [showRemaining, setShowRemaining] = useState(false);
   
   const [state, setState] = useState<PlayerState>({
     playing: false,
@@ -85,6 +86,13 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
   const localAudioRef = useRef<HTMLAudioElement>(null);
   const tempoContainerRef = useRef<HTMLDivElement>(null);
   const containerId = `yt-player-${id}`;
+  
+const formatTime = useCallback((timeSeconds: number) => {
+    const safeSeconds = Math.max(0, Math.floor(timeSeconds));
+    const minutes = Math.floor(safeSeconds / 60);
+    const seconds = safeSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }, []);
 
   // Web Audio API Refs
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -501,7 +509,16 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
           <div className="space-y-1">
             <div className="flex justify-between text-[9px] font-black uppercase text-gray-600 px-1">
               <span>Timeline</span>
-              <span className="mono">{Math.floor(state.currentTime / 60)}:{(state.currentTime % 60).toFixed(0).padStart(2, '0')}</span>
+            <button
+                type="button"
+                onClick={() => setShowRemaining(prev => !prev)}
+                className="mono text-gray-400 hover:text-white transition-colors"
+                title="Toggle time display"
+              >
+                {showRemaining
+                  ? `-${formatTime(state.duration - state.currentTime)}`
+                  : formatTime(state.currentTime)}
+              </button>
             </div>
             <div 
               className="h-6 bg-black/50 rounded-lg relative cursor-pointer overflow-hidden border border-white/10"
