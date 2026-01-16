@@ -103,8 +103,14 @@ const formatTime = useCallback((timeSeconds: number) => {
     hi: BiquadFilterNode;
     filter: BiquadFilterNode;
     gain: GainNode;
+    dryGain: GainNode;
+    wetGain: GainNode;
+    mixGain: GainNode;
+    effectInput: GainNode;
+    effectOutput: GainNode;  
   } | null>(null);
-
+const effectNodesRef = useRef<AudioNode[] | null>(null);
+  
   // Initialize Audio Engine - Safe version that doesn't re-create source node
   const initAudioEngine = useCallback(() => {
     if (sourceNodeRef.current || !localAudioRef.current) return;
@@ -129,19 +135,151 @@ const formatTime = useCallback((timeSeconds: number) => {
     filter.type = 'allpass';
 
     const gainNode = ctx.createGain();
+    const dryGain = ctx.createGain();
+    const wetGain = ctx.createGain();
+    const mixGain = ctx.createGain();
+    const effectInput = ctx.createGain();
+    const effectOutput = ctx.createGain();
 
-    // Connection chain: source -> low -> mid -> hi -> filter -> gain -> destination
+    // Connection chain: source -> low -> mid -> hi -> filter -> dry/wet -> mix -> destination
     source.connect(low);
     low.connect(mid);
     mid.connect(hi);
     hi.connect(filter);
-    filter.connect(gainNode);
+    filter.connect(dryGain);
+    filter.connect(effectInput);
+    dryGain.connect(mixGain);
+    effectOutput.connect(wetGain);
+    wetGain.connect(mixGain);
+    mixGain.connect(gainNode);
     gainNode.connect(ctx.destination);
 
     audioCtxRef.current = ctx;
     sourceNodeRef.current = source;
-    nodesRef.current = { low, mid, hi, filter, gain: gainNode };
+    nodesRef.current = { low, mid, hi, filter, gain: gainNode, dryGain, wetGain, mixGain, effectInput, effectOutput };
   }, []);
+
+  const clearEffectChain = useCallback(() => {
+    if (!nodesRef.current) return;
+    const { effectInput, effectOutput } = nodesRef.current;
+    try {
+      effectInput.disconnect();
+    } catch (e) {}
+    try {
+      effectOutput.disconnect();
+    } catch (e) {}
+    if (effectNodesRef.current) {
+      effectNodesRef.current.forEach(node => {
+        try {
+          node.disconnect();
+        } catch (e) {}
+      });
+    }
+    effectNodesRef.current = null;
+  }, []);
+
+  const buildReverbImpulse = useCallback((ctx: AudioContext) => {
+    const duration = 2;
+    const decay = 2.5;
+    const rate = ctx.sampleRate;
+    const length = rate * duration;
+    const impulse = ctx.createBuffer(2, length, rate);
+    for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
+      const data = impulse.getChannelData(channel);
+      for (let i = 0; i < length; i += 1) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+      }
+    }
+    return impulse;
+  }, []);
+
+  const createEffectChain = useCallback((ctx: AudioContext, effectType: EffectType): AudioNode[] => {
+    switch (effectType) {
+      case 'ECHO': {
+        const delay = ctx.createDelay(1);
+        delay.delayTime.value = 0.25;
+        const feedback = ctx.createGain();
+        feedback.gain.value = 0.4;
+        delay.connect(feedback);
+        feedback.connect(delay);
+        return [delay, feedback];
+      }
+      case 'DELAY': {
+        const delay = ctx.createDelay(1);
+        delay.delayTime.value = 0.15;
+        const feedback = ctx.createGain();
+        feedback.gain.value = 0.25;
+        delay.connect(feedback);
+        feedback.connect(delay);
+        return [delay, feedback];
+      }
+      case 'REVERB': {
+        const convolver = ctx.createConvolver();
+        convolver.buffer = buildReverbImpulse(ctx);
+        return [convolver];
+      }
+      case 'FLANGER': {
+        const delay = ctx.createDelay(0.02);
+        delay.delayTime.value = 0.005;
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.25;
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 0.002;
+        lfo.connect(lfoGain);
+        lfoGain.connect(delay.delayTime);
+        lfo.start();
+        return [delay, lfo, lfoGain];
+      }
+      case 'PHASER': {
+        const allpass = ctx.createBiquadFilter();
+        allpass.type = 'allpass';
+        allpass.frequency.value = 800;
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.2;
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 600;
+        lfo.connect(lfoGain);
+        lfoGain.connect(allpass.frequency);
+        lfo.start();
+        return [allpass, lfo, lfoGain];
+      }
+      case 'CRUSH': {
+        const shaper = ctx.createWaveShaper();
+        const curve = new Float32Array(44100);
+        for (let i = 0; i < curve.length; i += 1) {
+          const x = (i * 2) / curve.length - 1;
+          curve[i] = Math.sign(x) * (1 - Math.exp(-Math.abs(x) * 6));
+        }
+        shaper.curve = curve;
+        shaper.oversample = '4x';
+        return [shaper];
+      }
+      default:
+        return [];
+    }
+  }, [buildReverbImpulse]);
+
+  const applyEffectChain = useCallback((effectType: EffectType | null) => {
+    if (!nodesRef.current || !audioCtxRef.current) return;
+    const { effectInput, effectOutput } = nodesRef.current;
+    clearEffectChain();
+
+    if (!effectType) {
+      effectInput.connect(effectOutput);
+      return;
+    }
+
+    const chain = createEffectChain(audioCtxRef.current, effectType);
+    if (chain.length === 0) {
+      effectInput.connect(effectOutput);
+      return;
+    }
+    effectNodesRef.current = chain;
+    effectInput.connect(chain[0]);
+    chain[chain.length - 1].connect(effectOutput);
+  }, [clearEffectChain, createEffectChain]);
 
   // Sync EQ nodes with props
   useEffect(() => {
@@ -168,6 +306,19 @@ const formatTime = useCallback((timeSeconds: number) => {
     }
   }, [eq]);
 
+ useEffect(() => {
+    if (!nodesRef.current || !audioCtxRef.current) return;
+    const { dryGain, wetGain } = nodesRef.current;
+    const wet = Math.min(1, Math.max(0, effectWet));
+    dryGain.gain.value = 1 - wet;
+    wetGain.gain.value = wet;
+  }, [effectWet]);
+
+  useEffect(() => {
+    if (!nodesRef.current || !audioCtxRef.current) return;
+    applyEffectChain(effect);
+  }, [applyEffectChain, effect]);
+  
   useEffect(() => {
     setState(s => ({
       ...s,
