@@ -189,7 +189,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
   }, []);
 
   const analyzeTrackMetadata = async (title: string, author: string) => {
-    const apiKey = process.env.API_KEY;
+     const apiKey = (import.meta as any)?.env?.VITE_API_KEY || process.env.API_KEY;
     if (!title || title === 'Unknown Track' || !apiKey) return;
     setIsScanning(true);
     try {
