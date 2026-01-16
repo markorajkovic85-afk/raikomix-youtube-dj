@@ -6,7 +6,7 @@ import LibraryPanel from './components/LibraryPanel';
 import QueuePanel from './components/QueuePanel';
 import SearchPanel from './components/SearchPanel';
 import Toast, { ToastType } from './components/Toast';
-import { PlayerState, DeckId, CrossfaderCurve, QueueItem, LibraryTrack, YouTubeSearchResult, TrackSourceType } from './types';
+import { PlayerState, DeckId, CrossfaderCurve, QueueItem, LibraryTrack, YouTubeSearchResult, TrackSourceType, EffectType } from './types';
 import {
   loadLibrary,
   saveLibrary,
@@ -15,6 +15,7 @@ import {
   incrementPlayCount,
   updateTrackMetadata
 } from './utils/libraryStorage';
+import EffectsPanel from './components/EffectsPanel';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTheme } from './hooks/useTheme';
 
@@ -81,6 +82,10 @@ const App: React.FC = () => {
   const [deckBVolume, setDeckBVolume] = useState(0.8);
   const [showHelp, setShowHelp] = useState(false);
   const [toast, setToast] = useState<{ msg: string, type: ToastType } | null>(null);
+  const [deckAEffect, setDeckAEffect] = useState<EffectType | null>(null);
+  const [deckAEffectWet, setDeckAEffectWet] = useState(0.5);
+  const [deckBEffect, setDeckBEffect] = useState<EffectType | null>(null);
+  const [deckBEffectWet, setDeckBEffectWet] = useState(0.5);
 
   const [deckAEq, setDeckAEq] = useState({ hi: 1, mid: 1, low: 1, filter: 0 });
   const [deckBEq, setDeckBEq] = useState({ hi: 1, mid: 1, low: 1, filter: 0 });
@@ -141,6 +146,14 @@ const App: React.FC = () => {
     setDeckAEq({ hi: 1, mid: 1, low: 1, filter: 0 });
     setDeckBEq({ hi: 1, mid: 1, low: 1, filter: 0 });
     showNotification('EQs Reset', 'info');
+  };
+
+  const toggleEffect = (deck: 'A' | 'B', effect: EffectType) => {
+    if (deck === 'A') {
+      setDeckAEffect(prev => (prev === effect ? null : effect));
+    } else {
+      setDeckBEffect(prev => (prev === effect ? null : effect));
+    }
   };
 
   const handleRemoveMultiple = useCallback((ids: string[]) => {
@@ -228,8 +241,27 @@ const App: React.FC = () => {
                   onImportLibrary={setLibrary} 
                 />
               </div>
-            </div>
-          </section>
+            </section>
+          ) : (
+            <section className="bg-black/20 border-r border-white/5 flex flex-col h-full w-[320px] shrink-0">
+              <div className="p-4 flex flex-col gap-4 h-full">
+                <EffectsPanel
+                  activeEffect={deckAEffect}
+                  effectAmount={deckAEffectWet}
+                  onEffectToggle={(effect) => toggleEffect('A', effect)}
+                  onAmountChange={setDeckAEffectWet}
+                  color="#D0BCFF"
+                />
+                <EffectsPanel
+                  activeEffect={deckBEffect}
+                  effectAmount={deckBEffectWet}
+                  onEffectToggle={(effect) => toggleEffect('B', effect)}
+                  onAmountChange={setDeckBEffectWet}
+                  color="#F2B8B5"
+                />
+              </div>
+            </section>
+          )}
 
           <section className="flex-1 flex flex-col p-4 items-center justify-center overflow-auto min-h-0">
             <div className="flex flex-col lg:flex-row gap-6 items-center">
@@ -239,29 +271,33 @@ const App: React.FC = () => {
             </div>
           </section>
 
-          <aside className={`bg-black/10 flex-none border-l border-white/5 flex flex-col transition-all duration-300 overflow-hidden ${queueOpen ? 'w-80 p-4' : 'w-0 p-0 border-none'}`}>
-            <div className={`h-full min-w-[280px] ${!queueOpen ? 'opacity-0 invisible' : 'opacity-100 visible transition-opacity'}`}>
-              <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
-                <span className="text-[10px] font-black uppercase text-gray-500 tracking-[0.2em]">Queue Console</span>
-                <button onClick={() => setQueueOpen(false)} className="text-gray-500 hover:text-white"><span className="material-symbols-outlined text-sm">close</span></button>
-              </div>
-              <QueuePanel 
-                queue={queue} 
-                onLoadToDeck={(i, d) => { handleLoadVideo(i.videoId, i.url, d, i.sourceType || 'youtube', i.title, i.author); setQueue(p => p.filter(q => q.id !== i.id)); }} 
-                onRemove={id => setQueue(p => p.filter(i => i.id !== id))} 
-                onClear={() => setQueue([])} 
-                onReorder={() => {}} 
-              />
-            </div>
-          </aside>
-          
-          {!queueOpen && (
-            <button 
-              onClick={() => setQueueOpen(true)}
-              className="absolute right-0 top-1/2 -translate-y-1/2 bg-[#D0BCFF] text-black w-8 h-20 rounded-l-xl flex items-center justify-center z-50 shadow-xl hover:w-10 transition-all"
-            >
-              <span className="material-icons rotate-180">chevron_left</span>
-            </button>
+             {viewMode === 'LIBRARY' && (
+            <>
+              <aside className={`bg-black/10 flex-none border-l border-white/5 flex flex-col transition-all duration-300 overflow-hidden ${queueOpen ? 'w-80 p-4' : 'w-0 p-0 border-none'}`}>
+                <div className={`h-full min-w-[280px] ${!queueOpen ? 'opacity-0 invisible' : 'opacity-100 visible transition-opacity'}`}>
+                  <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
+                    <span className="text-[10px] font-black uppercase text-gray-500 tracking-[0.2em]">Queue Console</span>
+                    <button onClick={() => setQueueOpen(false)} className="text-gray-500 hover:text-white"><span className="material-symbols-outlined text-sm">close</span></button>
+                  </div>
+                  <QueuePanel 
+                    queue={queue} 
+                    onLoadToDeck={(i, d) => { handleLoadVideo(i.videoId, i.url, d, i.sourceType || 'youtube', i.title, i.author); setQueue(p => p.filter(q => q.id !== i.id)); }} 
+                    onRemove={id => setQueue(p => p.filter(i => i.id !== id))} 
+                    onClear={() => setQueue([])} 
+                    onReorder={() => {}} 
+                  />
+                </div>
+              </aside>
+              
+              {!queueOpen && (
+                <button 
+                  onClick={() => setQueueOpen(true)}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 bg-[#D0BCFF] text-black w-8 h-20 rounded-l-xl flex items-center justify-center z-50 shadow-xl hover:w-10 transition-all"
+                >
+                  <span className="material-icons rotate-180">chevron_left</span>
+                </button>
+              )}
+            </>
           )}
         </div>
 
