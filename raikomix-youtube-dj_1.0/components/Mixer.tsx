@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CrossfaderCurv, EffectTypee } from '../types';
+import { CrossfaderCurve } from '../types';
 
 interface MixerProps {
   crossfader: number;
@@ -19,52 +19,7 @@ interface MixerProps {
   deckBEq: { hi: number, mid: number, low: number, filter: number };
   onDeckAEqChange: (key: string, val: number) => void;
   onDeckBEqChange: (key: string, val: number) => void;
-    deckAEffect: EffectType;
-  onDeckAEffectChange: (effect: EffectType) => void;
-  deckAEffectWet: number;
-  onDeckAEffectWetChange: (val: number) => void;
-  deckBEffect: EffectType;
-  onDeckBEffectChange: (effect: EffectType) => void;
-  deckBEffectWet: number;
-  onDeckBEffectWetChange: (val: number) => void;
 }
-
-const EffectSelector: React.FC<{
-  label: string;
-  value: EffectType;
-  onChange: (effect: EffectType) => void;
-  wetValue: number;
-  onWetChange: (val: number) => void;
-}> = ({ label, value, onChange, wetValue, onWetChange }) => {
-  const effects: EffectType[] = ['NONE', 'ECHO', 'DELAY', 'REVERB', 'FLANGER', 'PHASER', 'CRUSH'];
-  
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as EffectType)}
-        className="bg-[#1D1B20] text-white text-[8px] font-mono px-2 py-1 rounded border border-white/10 hover:border-purple-500/50 transition-colors cursor-pointer"
-      >
-        {effects.map(fx => (
-          <option key={fx} value={fx}>{fx}</option>
-        ))}
-      </select>
-      {value !== 'NONE' && (
-        <Knob 
-          label="WET"
-          value={wetValue}
-          onChange={onWetChange}
-          color="#A855F7"
-          min={0}
-          max={1}
-          defaultValue={0.5}
-          size="sm"
-        />
-      )}
-      <span className="text-[6px] font-black uppercase tracking-tighter text-gray-500">{label}</span>
-    </div>
-  );
-};
 
 const Knob: React.FC<{
   label: string,
@@ -259,17 +214,6 @@ const Mixer: React.FC<MixerProps> = ({
               <Knob label="Color" value={deckAEq.filter} onChange={(v) => onDeckAEqChange('filter', v)} color="#D0BCFF" min={-1} max={1} defaultValue={0} />
             </div>
           </div>
-          
-        {/* Effect Controls */}
-        <div className="flex gap-4 mt-2">
-          <EffectSelector
-            label="DECK A FX"
-            value={deckAEffect}
-            onChange={onDeckAEffectChange}
-            wetValue={deckAEffectWet}
-            onWetChange={onDeckAEffectWetChange}
-          />
-        </div>
 
           <button 
             onClick={() => setCueA(!cueA)}
@@ -310,17 +254,6 @@ const Mixer: React.FC<MixerProps> = ({
               <Knob label="Low" value={deckBEq.low} onChange={(v) => onDeckBEqChange('low', v)} color="#F2B8B5" />
               <Knob label="Color" value={deckBEq.filter} onChange={(v) => onDeckBEqChange('filter', v)} color="#F2B8B5" min={-1} max={1} defaultValue={0} />
             </div>
-            
-        {/* Effect Controls */}
-        <div className="flex gap-4 mt-2">
-          <EffectSelector
-            label="DECK B FX"
-            value={deckBEffect}
-            onChange={onDeckBEffectChange}
-            wetValue={deckBEffectWet}
-            onWetChange={onDeckBEffectWetChange}
-          />
-        </div>
           </div>
 
           <button 
