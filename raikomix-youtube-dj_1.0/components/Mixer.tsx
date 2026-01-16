@@ -259,6 +259,17 @@ const Mixer: React.FC<MixerProps> = ({
               <Knob label="Color" value={deckAEq.filter} onChange={(v) => onDeckAEqChange('filter', v)} color="#D0BCFF" min={-1} max={1} defaultValue={0} />
             </div>
           </div>
+          
+        {/* Effect Controls */}
+        <div className="flex gap-4 mt-2">
+          <EffectSelector
+            label="DECK A FX"
+            value={deckAEffect}
+            onChange={onDeckAEffectChange}
+            wetValue={deckAEffectWet}
+            onWetChange={onDeckAEffectWetChange}
+          />
+        </div>
 
           <button 
             onClick={() => setCueA(!cueA)}
@@ -299,6 +310,17 @@ const Mixer: React.FC<MixerProps> = ({
               <Knob label="Low" value={deckBEq.low} onChange={(v) => onDeckBEqChange('low', v)} color="#F2B8B5" />
               <Knob label="Color" value={deckBEq.filter} onChange={(v) => onDeckBEqChange('filter', v)} color="#F2B8B5" min={-1} max={1} defaultValue={0} />
             </div>
+            
+        {/* Effect Controls */}
+        <div className="flex gap-4 mt-2">
+          <EffectSelector
+            label="DECK B FX"
+            value={deckBEffect}
+            onChange={onDeckBEffectChange}
+            wetValue={deckBEffectWet}
+            onWetChange={onDeckBEffectWetChange}
+          />
+        </div>
           </div>
 
           <button 
