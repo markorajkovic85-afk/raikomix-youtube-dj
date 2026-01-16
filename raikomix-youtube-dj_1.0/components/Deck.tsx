@@ -96,6 +96,67 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     filter: BiquadFilterNode;
     gain: GainNode;
   } | null>(null);
+    const effectNodeRef = useRef<BiquadFilterNode | DelayNode | ConvolverNode | WaveShaperNode | null>(null);
+  const effectWetGainRef = useRef<GainNode | null>(null);
+  const effectDryGainRef = useRef<GainNode | null>(null);
+
+    // Create Web Audio effect nodes based on effect type
+  const createEffectNode = (ctx: AudioContext, type: EffectType): AudioNode | null => {
+    switch(type) {
+      case 'ECHO': {
+        const delay = ctx.createDelay(2);
+        delay.delayTime.value = 0.3;
+        const feedback = ctx.createGain();
+        feedback.gain.value = 0.4;
+        delay.connect(feedback);
+        feedback.connect(delay);
+        return delay;
+      }
+      case 'DELAY': {
+        const delay = ctx.createDelay(2);
+        delay.delayTime.value = 0.5;
+        return delay;
+      }
+      case 'REVERB': {
+        const convolver = ctx.createConvolver();
+        const length = ctx.sampleRate * 2;
+        const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+        for (let channel = 0; channel < 2; channel++) {
+          const channelData = impulse.getChannelData(channel);
+          for (let i = 0; i < length; i++) {
+            channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
+          }
+        }
+        convolver.buffer = impulse;
+        return convolver;
+      }
+      case 'FLANGER': {
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'allpass';
+        filter.frequency.value = 1000;
+        return filter;
+      }
+      case 'PHASER': {
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'allpass';
+        filter.frequency.value = 500;
+        return filter;
+      }
+      case 'CRUSH': {
+        const shaper = ctx.createWaveShaper();
+        const samples = 44100;
+        const curve = new Float32Array(samples);
+        for (let i = 0; i < samples; i++) {
+          const x = (i * 2) / samples - 1;
+          curve[i] = Math.sign(x) * (1 - Math.exp(-Math.abs(x * 5)));
+        }
+        shaper.curve = curve;
+        return shaper;
+      }
+      default:
+        return null;
+    }
+  };
 
   // Initialize Audio Engine - Safe version that doesn't re-create source node
   const initAudioEngine = useCallback(() => {
@@ -112,7 +173,68 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     mid.type = 'peaking';
     mid.frequency.value = 1000;
     mid.Q.value = 1;
+.connect(
 
+
+    const effectNodeRef = useRef<BiquadFilterNode | DelayNode | ConvolverNode | WaveShaperNode | null>(null);
+  const effectWetGainRef = useRef<GainNode | null>(null);
+  const effectDryGainRef = useRef<GainNode | null>(null);  // Create Web Audio effect nodes based on effect type
+  const createEffectNode = (ctx: AudioContext, type: EffectType): AudioNode | null => {
+    switch(type) {
+      case 'ECHO': {
+        const delay = ctx.createDelay(2);
+        delay.delayTime.value = 0.3;
+        const feedback = ctx.createGain();
+        feedback.gain.value = 0.4;
+        delay.connect(feedback);
+        feedback.connect(delay);
+        return delay;
+      }
+      case 'DELAY': {
+        const delay = ctx.createDelay(2);
+        delay.delayTime.value = 0.5;
+        return delay;
+      }
+      case 'REVERB': {
+        const convolver = ctx.createConvolver();
+        const length = ctx.sampleRate * 2;
+        const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+        for (let channel = 0; channel < 2; channel++) {
+          const channelData = impulse.getChannelData(channel);
+          for (let i = 0; i < length; i++) {
+            channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
+          }
+        }
+        convolver.buffer = impulse;
+        return convolver;
+      }
+      case 'FLANGER': {
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'allpass';
+        filter.frequency.value = 1000;
+        return filter;
+      }
+      case 'PHASER': {
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'allpass';
+        filter.frequency.value = 500;
+        return filter;
+      }
+      case 'CRUSH': {
+        const shaper = ctx.createWaveShaper();
+        const samples = 44100;
+        const curve = new Float32Array(samples);
+        for (let i = 0; i < samples; i++) {
+          const x = (i * 2) / samples - 1;
+          curve[i] = Math.sign(x) * (1 - Math.exp(-Math.abs(x * 5)));
+        }
+        shaper.curve = curve;
+        return shaper;
+      }
+      default:
+        return null;
+    }
+  };
     const hi = ctx.createBiquadFilter();
     hi.type = 'highshelf';
     hi.frequency.value = 10000;
@@ -124,7 +246,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
 
     // Connection chain: source -> low -> mid -> hi -> filter -> gain -> destination
     source.connect(low);
-    low.connect(mid);
+    const DeckuseRef<);
     mid.connect(hi);
     hi.connect(filter);
     filter.connect(gainNode);
