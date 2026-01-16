@@ -29,6 +29,43 @@ interface MixerProps {
   onDeckBEffectWetChange: (val: number) => void;
 }
 
+const EffectSelector: React.FC<{
+  label: string;
+  value: EffectType;
+  onChange: (effect: EffectType) => void;
+  wetValue: number;
+  onWetChange: (val: number) => void;
+}> = ({ label, value, onChange, wetValue, onWetChange }) => {
+  const effects: EffectType[] = ['NONE', 'ECHO', 'DELAY', 'REVERB', 'FLANGER', 'PHASER', 'CRUSH'];
+  
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as EffectType)}
+        className="bg-[#1D1B20] text-white text-[8px] font-mono px-2 py-1 rounded border border-white/10 hover:border-purple-500/50 transition-colors cursor-pointer"
+      >
+        {effects.map(fx => (
+          <option key={fx} value={fx}>{fx}</option>
+        ))}
+      </select>
+      {value !== 'NONE' && (
+        <Knob 
+          label="WET"
+          value={wetValue}
+          onChange={onWetChange}
+          color="#A855F7"
+          min={0}
+          max={1}
+          defaultValue={0.5}
+          size="sm"
+        />
+      )}
+      <span className="text-[6px] font-black uppercase tracking-tighter text-gray-500">{label}</span>
+    </div>
+  );
+};
+
 const Knob: React.FC<{
   label: string,
   value: number,
