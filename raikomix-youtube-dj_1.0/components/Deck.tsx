@@ -78,7 +78,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     eqHigh: eq.hi,
     eqMid: eq.mid,
     eqLow: eq.low,
-    filter: eq.filter
+    filter: eq.filter,
         effect: 'NONE',
     effectWet: 0.5
   });
