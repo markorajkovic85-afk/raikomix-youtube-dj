@@ -20,7 +20,6 @@ export interface DeckHandle {
   triggerHotCue: (index: number, clear?: boolean) => void;
   toggleLoop: (beats?: number) => void;
   setPlaybackRate: (rate: number) => void;
-    updateState: (updates: Partial<PlayerState>) => void;
 }
 
 const CUE_COLORS = [
@@ -79,9 +78,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     eqHigh: eq.hi,
     eqMid: eq.mid,
     eqLow: eq.low,
-    filter: eq.filter,
-        effect: 'NONE',
-    effectWet: 0.5
+    filter: eq.filter
   });
 
   const playerRef = useRef<any>(null);
@@ -99,67 +96,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     filter: BiquadFilterNode;
     gain: GainNode;
   } | null>(null);
-    const effectNodeRef = useRef<BiquadFilterNode | DelayNode | ConvolverNode | WaveShaperNode | null>(null);
-  const effectWetGainRef = useRef<GainNode | null>(null);
-  const effectDryGainRef = useRef<GainNode | null>(null);
-
-    // Create Web Audio effect nodes based on effect type
-  const createEffectNode = (ctx: AudioContext, type: EffectType): AudioNode | null => {
-    switch(type) {
-      case 'ECHO': {
-        const delay = ctx.createDelay(2);
-        delay.delayTime.value = 0.3;
-        const feedback = ctx.createGain();
-        feedback.gain.value = 0.4;
-        delay.connect(feedback);
-        feedback.connect(delay);
-        return delay;
-      }
-      case 'DELAY': {
-        const delay = ctx.createDelay(2);
-        delay.delayTime.value = 0.5;
-        return delay;
-      }
-      case 'REVERB': {
-        const convolver = ctx.createConvolver();
-        const length = ctx.sampleRate * 2;
-        const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
-        for (let channel = 0; channel < 2; channel++) {
-          const channelData = impulse.getChannelData(channel);
-          for (let i = 0; i < length; i++) {
-            channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
-          }
-        }
-        convolver.buffer = impulse;
-        return convolver;
-      }
-      case 'FLANGER': {
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'allpass';
-        filter.frequency.value = 1000;
-        return filter;
-      }
-      case 'PHASER': {
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'allpass';
-        filter.frequency.value = 500;
-        return filter;
-      }
-      case 'CRUSH': {
-        const shaper = ctx.createWaveShaper();
-        const samples = 44100;
-        const curve = new Float32Array(samples);
-        for (let i = 0; i < samples; i++) {
-          const x = (i * 2) / samples - 1;
-          curve[i] = Math.sign(x) * (1 - Math.exp(-Math.abs(x * 5)));
-        }
-        shaper.curve = curve;
-        return shaper;
-      }
-      default:
-        return null;
-    }
-  };
 
   // Initialize Audio Engine - Safe version that doesn't re-create source node
   const initAudioEngine = useCallback(() => {
@@ -176,7 +112,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     mid.type = 'peaking';
     mid.frequency.value = 1000;
     mid.Q.value = 1;
-    
+
     const hi = ctx.createBiquadFilter();
     hi.type = 'highshelf';
     hi.frequency.value = 10000;
@@ -191,95 +127,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     low.connect(mid);
     mid.connect(hi);
     hi.connect(filter);
-
-
-  const createEffectNode = (ctx: AudioContext, type: EffectType): AudioNode | null => {
-    switch(type) {
-      case 'ECHO': {
-        const delay = ctx.createDelay(2);
-        delay.delayTime.value = 0.3;
-        const feedback = ctx.createGain();
-        feedback.gain.value = 0.4;
-        delay.connect(feedback);
-        feedback.connect(delay);
-        return delay;
-      }
-      case 'DELAY': {
-        const delay = ctx.createDelay(2);
-        delay.delayTime.value = 0.5;
-        return delay;
-      }
-      case 'REVERB': {
-        const convolver = ctx.createConvolver();
-        const length = ctx.sampleRate * 2;
-        const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
-        for (let channel = 0; channel < 2; channel++) {
-          const channelData = impulse.getChannelData(channel);
-          for (let i = 0; i < length; i++) {
-            channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
-          }
-        }
-        convolver.buffer = impulse;
-        return convolver;
-      }
-      case 'FLANGER': {
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'allpass';
-        filter.frequency.value = 1000;
-        return filter;
-      }
-      case 'PHASER': {
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'allpass';
-        filter.frequency.value = 500;
-        return filter;
-      }
-      case 'CRUSH': {
-        const shaper = ctx.createWaveShaper();
-        const samples = 44100;
-        const curve = new Float32Array(samples);
-        for (let i = 0; i < samples; i++) {
-          const x = (i * 2) / samples - 1;
-          curve[i] = Math.sign(x) * (1 - Math.exp(-Math.abs(x * 5)));
-        }
-        shaper.curve = curve;
-        return shaper;
-      }
-      default:
-        return null;
-    }
-  };
-    // Effect routing with wet/dry mix
-    if (state.effect !== 'NONE') {
-      if (!effectWetGainRef.current) {
-        effectWetGainRef.current = ctx.createGain();
-        effectDryGainRef.current = ctx.createGain();
-      }
-      
-      if (effectNodeRef.current) {
-        try { effectNodeRef.current.disconnect(); } catch(e) {}
-      }
-      
-      effectNodeRef.current = createEffectNode(ctx, state.effect);
-      
-      if (effectNodeRef.current && effectWetGainRef.current && effectDryGainRef.current) {
-        effectWetGainRef.current.gain.value = state.effectWet;
-        effectDryGainRef.current.gain.value = 1 - state.effectWet;
-        
-        filter.connect(effectDryGainRef.current);
-        filter.connect(effectNodeRef.current);
-        effectNodeRef.current.connect(effectWetGainRef.current);
-        
-        effectDryGainRef.current.connect(gainNode);
-        effectWetGainRef.current.connect(gainNode);
-      }
-    } else {
-      if (effectNodeRef.current) {
-        try { effectNodeRef.current.disconnect(); } catch(e) {}
-        effectNodeRef.current = null;
-      }
-      filter.connect(gainNode);
-    }    gainNode.connect(ctx.destination);
+    filter.connect(gainNode);
+    gainNode.connect(ctx.destination);
 
     audioCtxRef.current = ctx;
     sourceNodeRef.current = source;
@@ -558,8 +407,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     togglePlay,
     triggerHotCue: handleHotCue,
     toggleLoop: handleToggleLoop,
-    setPlaybackRate: updatePlaybackRate,
-        updateState: (updates: Partial<PlayerState>) => setState(s => ({ ...s, ...updates }))
+    setPlaybackRate: updatePlaybackRate
   }), [initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, initAudioEngine]);
 
   useEffect(() => {
