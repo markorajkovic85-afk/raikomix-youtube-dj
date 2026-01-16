@@ -1,7 +1,7 @@
 
 export type DeckId = 'A' | 'B';
 export type CrossfaderCurve = 'SMOOTH' | 'CUT' | 'DIP';
-export type EffectType = 'ECHO' | 'DELAY' | 'REVERB' | 'FLANGER' | 'PHASER' | 'CRUSH';
+export type EffectType = 'NONE' | 'ECHO' | 'DELAY' | 'REVERB' | 'FLANGER' | 'PHASER' | 'CRUSH';
 export type TrackSourceType = 'youtube' | 'local';
 
 export interface YouTubeSearchResult {
@@ -32,6 +32,8 @@ export interface PlayerState {
   musicalKey?: string;
   title?: string;
   author?: string;
+  effect: EffectType;
+  effectWet: number;
 }
 
 export interface MixerState {
