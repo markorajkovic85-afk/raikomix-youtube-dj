@@ -258,8 +258,17 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
             <span className="material-symbols-outlined text-4xl mb-2">inventory_2</span>
             <p className="text-[10px] font-black uppercase tracking-widest">Library Empty</p>
           </div>
-        ) : filtered.map(t => (
-          <div key={t.id} className={`group flex gap-3 items-center p-3 rounded-xl border transition-all relative ${selectedTracks.has(t.id) ? 'bg-[#D0BCFF]/10 border-[#D0BCFF]/50' : 'bg-black/20 border-white/5 hover:border-white/20'}`}>
+          ) : filtered.map(t => {
+          const hasBeenPlayed = t.playCount > 0;
+          const isSelected = selectedTracks.has(t.id);
+          const playedOpacity = hasBeenPlayed ? (isSelected ? 'opacity-80' : 'opacity-60 hover:opacity-100') : '';
+          return (
+          <div
+            key={t.id}
+            className={`group flex gap-3 items-center p-3 rounded-xl border transition-all relative ${
+              isSelected ? 'bg-[#D0BCFF]/10 border-[#D0BCFF]/50' : 'bg-black/20 border-white/5 hover:border-white/20'
+            } ${playedOpacity}`}
+          >
             <input type="checkbox" checked={selectedTracks.has(t.id)} onChange={() => toggleSelect(t.id)} className="w-4 h-4 accent-[#D0BCFF] shrink-0" />
             <div className="relative shrink-0">
               <img src={t.thumbnailUrl} alt="" className="w-14 h-10 rounded-lg object-cover shadow-lg" />
@@ -271,6 +280,11 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
               <div className="text-[11px] font-bold text-white truncate leading-tight group-hover:text-[#D0BCFF] transition-colors">{t.title}</div>
               <div className="text-[9px] text-gray-500 truncate uppercase font-bold tracking-tighter">{t.author}</div>
             </div>
+             {hasBeenPlayed && (
+              <span className="text-[8px] font-black uppercase tracking-widest text-gray-500 border border-white/10 rounded-full px-2 py-1">
+                Played
+              </span>
+            )}
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
               <button 
                 onClick={() => onAddToQueue(t)} 
@@ -284,7 +298,8 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
               <button onClick={() => onRemove(t.id)} className="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all" title="Remove"><span className="material-symbols-outlined text-sm">delete</span></button>
             </div>
           </div>
-        ))}
+           );
+        })}
       </div>
 
       {showBulkAdd && (
