@@ -84,8 +84,11 @@ const App: React.FC = () => {
   const [toast, setToast] = useState<{ msg: string, type: ToastType } | null>(null);
   const [deckAEffect, setDeckAEffect] = useState<EffectType | null>(null);
   const [deckAEffectWet, setDeckAEffectWet] = useState(0.5);
+  const [deckAEffectIntensity, setDeckAEffectIntensity] = useState(0.5);
   const [deckBEffect, setDeckBEffect] = useState<EffectType | null>(null);
   const [deckBEffectWet, setDeckBEffectWet] = useState(0.5);
+  const [deckBEffectIntensity, setDeckBEffectIntensity] = useState(0.5);
+  const [fxTarget, setFxTarget] = useState<'A' | 'B' | 'AB'>('A');
 
   const [deckAEq, setDeckAEq] = useState({ hi: 1, mid: 1, low: 1, filter: 0 });
   const [deckBEq, setDeckBEq] = useState({ hi: 1, mid: 1, low: 1, filter: 0 });
@@ -148,13 +151,40 @@ const App: React.FC = () => {
     showNotification('EQs Reset', 'info');
   };
 
-  const toggleEffect = (deck: 'A' | 'B', effect: EffectType) => {
+  const toggleEffect = (deck: 'A' | 'B', effect: EffectType | null) => {
     if (deck === 'A') {
       setDeckAEffect(prev => (prev === effect ? null : effect));
     } else {
       setDeckBEffect(prev => (prev === effect ? null : effect));
     }
   };
+
+  const targetEffect = fxTarget === 'A'
+    ? deckAEffect
+    : fxTarget === 'B'
+      ? deckBEffect
+      : deckAEffect === deckBEffect
+        ? deckAEffect
+        : null;
+  const targetWet = fxTarget === 'A'
+    ? deckAEffectWet
+    : fxTarget === 'B'
+      ? deckBEffectWet
+      : (deckAEffectWet + deckBEffectWet) / 2;
+  const targetIntensity = fxTarget === 'A'
+    ? deckAEffectIntensity
+    : fxTarget === 'B'
+      ? deckBEffectIntensity
+      : (deckAEffectIntensity + deckBEffectIntensity) / 2;
+  const isMixedEffect = fxTarget === 'AB' && deckAEffect !== deckBEffect;
+  const isMixedWet = fxTarget === 'AB' && Math.abs(deckAEffectWet - deckBEffectWet) > 0.01;
+  const isMixedIntensity = fxTarget === 'AB' && Math.abs(deckAEffectIntensity - deckBEffectIntensity) > 0.01;
+  const targetColor = fxTarget === 'A' ? '#D0BCFF' : fxTarget === 'B' ? '#F2B8B5' : '#E5D0F7';
+  const streamingNotice = fxTarget === 'A'
+    ? deckAState?.sourceType === 'youtube'
+    : fxTarget === 'B'
+      ? deckBState?.sourceType === 'youtube'
+      : deckAState?.sourceType === 'youtube' || deckBState?.sourceType === 'youtube';
 
   const handleRemoveMultiple = useCallback((ids: string[]) => {
     setLibrary(prev => prev.filter(track => !ids.includes(track.id)));
@@ -248,18 +278,40 @@ const App: React.FC = () => {
             <section className="bg-black/20 border-r border-white/5 flex flex-col h-full w-[320px] shrink-0">
               <div className="p-4 flex flex-col gap-4 h-full">
                 <EffectsPanel
-                  activeEffect={deckAEffect}
-                  effectAmount={deckAEffectWet}
-                  onEffectToggle={(effect) => toggleEffect('A', effect)}
-                  onAmountChange={setDeckAEffectWet}
-                  color="#D0BCFF"
-                />
-                <EffectsPanel
-                  activeEffect={deckBEffect}
-                  effectAmount={deckBEffectWet}
-                  onEffectToggle={(effect) => toggleEffect('B', effect)}
-                  onAmountChange={setDeckBEffectWet}
-                  color="#F2B8B5"
+                   activeEffect={targetEffect}
+                  effectAmount={targetWet}
+                  effectIntensity={targetIntensity}
+                  onEffectToggle={(effect) => {
+                    if (fxTarget === 'A') toggleEffect('A', effect);
+                    else if (fxTarget === 'B') toggleEffect('B', effect);
+                    else {
+                      toggleEffect('A', effect);
+                      toggleEffect('B', effect);
+                    }
+                  }}
+                  onAmountChange={(amount) => {
+                    if (fxTarget === 'A') setDeckAEffectWet(amount);
+                    else if (fxTarget === 'B') setDeckBEffectWet(amount);
+                    else {
+                      setDeckAEffectWet(amount);
+                      setDeckBEffectWet(amount);
+                    }
+                  }}
+                  onIntensityChange={(amount) => {
+                    if (fxTarget === 'A') setDeckAEffectIntensity(amount);
+                    else if (fxTarget === 'B') setDeckBEffectIntensity(amount);
+                    else {
+                      setDeckAEffectIntensity(amount);
+                      setDeckBEffectIntensity(amount);
+                    }
+                  }}
+                  color={targetColor}
+                  target={fxTarget}
+                  onTargetChange={setFxTarget}
+                  mixedEffect={isMixedEffect}
+                  mixedAmount={isMixedWet}
+                  mixedIntensity={isMixedIntensity}
+                  showStreamingNotice={streamingNotice}
                 />
               </div>
             </section>
@@ -267,9 +319,9 @@ const App: React.FC = () => {
 
           <section className="flex-1 flex flex-col p-4 items-center justify-center overflow-auto min-h-0">
             <div className="flex flex-col lg:flex-row gap-6 items-center">
-             <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} />
+             <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} />
               <Mixer crossfader={crossfader} onCrossfaderChange={setCrossfader} crossfaderCurve={xFaderCurve} onCurveChange={setXFaderCurve} masterVolume={masterVolume} onMasterVolumeChange={setMasterVolume} deckAVolume={deckAVolume} onDeckAVolumeChange={setDeckAVolume} deckBVolume={deckBVolume} onDeckBVolumeChange={setDeckBVolume} deckAPlaying={deckAState?.playing || false} deckBPlaying={deckBState?.playing || false} deckAEq={deckAEq} deckBEq={deckBEq} onDeckAEqChange={(k, v) => setDeckAEq(p => ({...p, [k]: v}))} onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))} />
-               <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} />
+                 <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} />
             </div>
           </section>
 
