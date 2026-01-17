@@ -201,45 +201,47 @@ const App: React.FC = () => {
         </nav>
 
         <div className="flex-1 flex overflow-hidden relative min-h-0">
-          <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 flex-none h-full ${libraryOpen ? 'w-[420px]' : 'w-0 border-none'}`}>
-            <div className={`p-4 flex flex-col gap-4 h-full min-w-[380px] min-h-0 ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
-              <SearchPanel 
-                onLoadToDeck={(vid, url, deck, title, author) => handleLoadVideo(vid, url, deck, 'youtube', title, author)} 
-                onAddToQueue={handleAddToQueue} 
-                onAddToLibrary={(result) => {
-                  setLibrary(prev => {
-                    const res = addTrackToLibrary(`https://www.youtube.com/watch?v=${result.videoId}`, prev);
-                    if (res.success && res.track) {
-                      showNotification('Added to Library', 'success');
-                      const withTrack = [...prev, res.track];
-                      return updateTrackMetadata(result.videoId, { title: result.title, author: result.channelTitle }, withTrack);
-                    }
-                    if (res.error) showNotification(res.error, 'error');
-                    return prev;
-                  });
-                }}
-              />
-                <div className="flex-1 overflow-hidden border-t border-white/5 pt-4 min-h-0">
-                <LibraryPanel 
-                  library={library} 
-                  onAddSingle={url => {
+             {viewMode === 'LIBRARY' ? (
+            <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 flex-none h-full ${libraryOpen ? 'w-[420px]' : 'w-0 border-none'}`}>
+              <div className={`p-4 flex flex-col gap-4 h-full min-w-[380px] min-h-0 ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
+                <SearchPanel 
+                  onLoadToDeck={(vid, url, deck, title, author) => handleLoadVideo(vid, url, deck, 'youtube', title, author)} 
+                  onAddToQueue={handleAddToQueue} 
+                  onAddToLibrary={(result) => {
                     setLibrary(prev => {
-                      const res = addTrackToLibrary(url, prev);
+                      const res = addTrackToLibrary(`https://www.youtube.com/watch?v=${result.videoId}`, prev);
                       if (res.success && res.track) {
-                         showNotification('Added to Library', 'success');
-                         return [...prev, res.track];
+                          showNotification('Added to Library', 'success');
+                        const withTrack = [...prev, res.track];
+                        return updateTrackMetadata(result.videoId, { title: result.title, author: result.channelTitle }, withTrack);
                       }
                       if (res.error) showNotification(res.error, 'error');
                       return prev;
                     });
                   }} 
-                  onRemove={id => setLibrary(p => removeFromLibrary(id, p))} 
-                  onRemoveMultiple={handleRemoveMultiple}
-                  onLoadToDeck={(track, deck) => handleLoadVideo(track.videoId, track.url, deck, track.sourceType, track.title, track.author)} 
-                  onAddToQueue={handleAddToQueue} 
-                  onUpdateMetadata={(v, m) => { setLibrary(updateTrackMetadata(v, m, library)); showNotification('Metadata Saved'); }} 
-                  onImportLibrary={setLibrary} 
                 />
+               <div className="flex-1 overflow-hidden border-t border-white/5 pt-4 min-h-0">
+                  <LibraryPanel 
+                    library={library} 
+                    onAddSingle={url => {
+                      setLibrary(prev => {
+                        const res = addTrackToLibrary(url, prev);
+                        if (res.success && res.track) {
+                          showNotification('Added to Library', 'success');
+                          return [...prev, res.track];
+                        }
+                        if (res.error) showNotification(res.error, 'error');
+                        return prev;
+                      });
+                    }} 
+                    onRemove={id => setLibrary(p => removeFromLibrary(id, p))} 
+                    onRemoveMultiple={handleRemoveMultiple}
+                    onLoadToDeck={(track, deck) => handleLoadVideo(track.videoId, track.url, deck, track.sourceType, track.title, track.author)} 
+                    onAddToQueue={handleAddToQueue} 
+                    onUpdateMetadata={(v, m) => { setLibrary(updateTrackMetadata(v, m, library)); showNotification('Metadata Saved'); }} 
+                    onImportLibrary={setLibrary} 
+                  />
+                </div> 
               </div>
             </section>
           ) : (
