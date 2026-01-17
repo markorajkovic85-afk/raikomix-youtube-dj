@@ -66,7 +66,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 const App: React.FC = () => {
-  const [viewMode, setViewMode] = useState<'PERFORM' | 'LIBRARY'>('PERFORM');
+  const [viewMode, setViewMode] = useState<'PERFORM' | 'LIBRARY'>('LIBRARY');
   const [libraryOpen, setLibraryOpen] = useState(true);
   const [queueOpen, setQueueOpen] = useState(true);
   const [library, setLibrary] = useState<LibraryTrack[]>(() => loadLibrary());
