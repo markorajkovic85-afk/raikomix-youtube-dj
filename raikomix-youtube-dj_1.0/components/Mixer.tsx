@@ -15,6 +15,10 @@ interface MixerProps {
   onDeckBVolumeChange: (val: number) => void;
   deckAPlaying: boolean;
   deckBPlaying: boolean;
+  deckATrim: number;
+  deckBTrim: number;
+  onDeckATrimChange: (val: number) => void;
+  onDeckBTrimChange: (val: number) => void;
   deckAEq: { hi: number, mid: number, low: number, filter: number };
   deckBEq: { hi: number, mid: number, low: number, filter: number };
   onDeckAEqChange: (key: string, val: number) => void;
@@ -199,7 +203,7 @@ const Fader: React.FC<{
 const Mixer: React.FC<MixerProps> = ({ 
   crossfader, onCrossfaderChange, crossfaderCurve, onCurveChange,
   masterVolume, onMasterVolumeChange, deckAVolume, onDeckAVolumeChange, deckBVolume, onDeckBVolumeChange,
-  deckAPlaying, deckBPlaying,
+  deckAPlaying, deckBPlaying, deckATrim, deckBTrim, onDeckATrimChange, onDeckBTrimChange,
   deckAEq, deckBEq, onDeckAEqChange, onDeckBEqChange
 }) => {
   const [cueA, setCueA] = useState(false);
@@ -265,7 +269,7 @@ const Mixer: React.FC<MixerProps> = ({
         {/* Channel A Section */}
         <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl flex-1 border border-white/5">
           <div className="flex flex-col items-center gap-1.5 w-full">
-            <Knob label="Trim" value={1} onChange={() => {}} color="#D0BCFF" size="sm" defaultValue={1} />
+           <Knob label="Trim" value={deckATrim} onChange={onDeckATrimChange} color="#D0BCFF" size="sm" defaultValue={1} />
             <div className="w-full h-px bg-white/5" />
             <div className="flex flex-col gap-1.5">
               <Knob label="Hi" value={deckAEq.hi} onChange={(v) => onDeckAEqChange('hi', v)} color="#D0BCFF" />
@@ -306,7 +310,7 @@ const Mixer: React.FC<MixerProps> = ({
         {/* Channel B Section */}
         <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl flex-1 border border-white/5">
           <div className="flex flex-col items-center gap-1.5 w-full">
-            <Knob label="Trim" value={1} onChange={() => {}} color="#F2B8B5" size="sm" defaultValue={1} />
+            <Knob label="Trim" value={deckBTrim} onChange={onDeckBTrimChange} color="#F2B8B5" size="sm" defaultValue={1} />
             <div className="w-full h-px bg-white/5" />
             <div className="flex flex-col gap-1.5">
               <Knob label="Hi" value={deckBEq.hi} onChange={(v) => onDeckBEqChange('hi', v)} color="#F2B8B5" />
