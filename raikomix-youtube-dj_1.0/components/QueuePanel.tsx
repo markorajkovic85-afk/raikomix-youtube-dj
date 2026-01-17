@@ -1,6 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { QueueItem, DeckId } from '../types';
+import { exportQueue } from '../utils/queueStorage';
 
 interface QueuePanelProps {
   queue: QueueItem[];
@@ -40,12 +41,21 @@ const QueuePanel: React.FC<QueuePanelProps> = ({ queue, onLoadToDeck, onRemove, 
       <div className="flex items-center justify-between px-2">
         <h3 className="text-xs font-black uppercase tracking-widest text-gray-500">Play Queue ({queue.length})</h3>
         {queue.length > 0 && (
-          <button 
-            onClick={onClear}
-            className="text-[10px] font-bold text-red-400/60 hover:text-red-400 uppercase tracking-tighter motion-standard"
-          >
-            Clear All
-          </button>
+         <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportQueue(queue)}
+              className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white"
+              title="Export Queue JSON"
+            >
+              <span className="material-symbols-outlined text-sm">download</span>
+            </button>
+            <button 
+              onClick={onClear}
+              className="text-[10px] font-bold text-red-400/60 hover:text-red-400 uppercase tracking-tighter motion-standard"
+            >
+              Clear All
+            </button>
+          </div>
         )}
       </div>
 
