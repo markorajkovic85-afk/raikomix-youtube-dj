@@ -12,6 +12,8 @@ interface DeckProps {
   onStateUpdate: (state: PlayerState) => void;
   onPlayerReady: (player: any) => void;
   eq: { hi: number, mid: number, low: number, filter: number };
+   effect: EffectType | null;
+  effectWet: number;
 }
 
 export interface DeckHandle {
@@ -53,7 +55,7 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
   );
 };
 
-const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPlayerReady, eq }, ref) => {
+const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPlayerReady, eq, effect, effectWet }, ref) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [tapHistory, setTapHistory] = useState<number[]>([]);
