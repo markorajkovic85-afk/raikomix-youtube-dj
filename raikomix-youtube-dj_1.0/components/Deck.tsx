@@ -88,6 +88,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
   const playerRef = useRef<any>(null);
   const localAudioRef = useRef<HTMLAudioElement>(null);
   const tempoContainerRef = useRef<HTMLDivElement>(null);
+  const tempoPointerIdRef = useRef<number | null>(null);
+  const tempoDraggingRef = useRef(false);
   const containerId = `yt-player-${id}`;
   
 const formatTime = useCallback((timeSeconds: number) => {
@@ -408,6 +410,42 @@ const effectNodesRef = useRef<{
     }
 
     setState(s => ({ ...s, playbackRate: newRate }));
+  }, []);
+
+  const getPlaybackRateFromPointer = useCallback((clientY: number) => {
+    if (!tempoContainerRef.current) return null;
+    const rect = tempoContainerRef.current.getBoundingClientRect();
+    const ratio = (clientY - rect.top) / rect.height;
+    const rate = 1.5 - ratio;
+    return Math.min(1.5, Math.max(0.5, rate));
+  }, []);
+
+  const handleTempoPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!tempoContainerRef.current) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    event.preventDefault();
+    tempoContainerRef.current.setPointerCapture(event.pointerId);
+    tempoPointerIdRef.current = event.pointerId;
+    tempoDraggingRef.current = true;
+    const rate = getPlaybackRateFromPointer(event.clientY);
+    if (rate !== null) updatePlaybackRate(rate);
+  }, [getPlaybackRateFromPointer, updatePlaybackRate]);
+
+  const handleTempoPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!tempoDraggingRef.current) return;
+    if (tempoPointerIdRef.current !== event.pointerId) return;
+    event.preventDefault();
+    const rate = getPlaybackRateFromPointer(event.clientY);
+    if (rate !== null) updatePlaybackRate(rate);
+  }, [getPlaybackRateFromPointer, updatePlaybackRate]);
+
+  const handleTempoPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (tempoPointerIdRef.current !== event.pointerId) return;
+    tempoDraggingRef.current = false;
+    tempoPointerIdRef.current = null;
+    if (tempoContainerRef.current?.hasPointerCapture(event.pointerId)) {
+      tempoContainerRef.current.releasePointerCapture(event.pointerId);
+    }
   }, []);
 
   const analyzeTrackMetadata = async (title: string, author: string) => {
@@ -782,12 +820,16 @@ const effectNodesRef = useRef<{
           ref={tempoContainerRef}
           className="w-12 bg-black/20 rounded-xl border border-white/5 flex flex-col items-center py-4 gap-2 relative group select-none transition-all hover:border-white/20 active:border-[#D0BCFF]/30"
           onDoubleClick={() => updatePlaybackRate(1.0)}
-      onWheel={(e) => {
-        e.preventDefault();
-        const delta = -e.deltaY * 0.001; // Fine control with mouse wheel
-        updatePlaybackRate(state.playbackRate + delta);
-      }}
-          title="Drag to Pitch • Scroll for Fine-Tune • Double-click to Reset"
+      onPointerDown={handleTempoPointerDown}
+          onPointerMove={handleTempoPointerMove}
+          onPointerUp={handleTempoPointerUp}
+          onPointerCancel={handleTempoPointerUp}
+          onWheel={(e) => {
+            e.preventDefault();
+            const delta = -e.deltaY * 0.001; // Fine control with mouse wheel
+            updatePlaybackRate(state.playbackRate + delta);
+          }}
+          title="Click/Drag to Pitch • Scroll for Fine-Tune • Double-click to Reset"
         >
            <div className="text-[8px] font-black text-gray-500 uppercase tracking-tighter vertical-text h-10 mb-2">Tempo</div>
            
