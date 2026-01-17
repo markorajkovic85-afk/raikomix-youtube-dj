@@ -5,9 +5,17 @@ import { EffectType } from '../types';
 interface EffectsPanelProps {
   activeEffect: EffectType | null;
   effectAmount: number;
-  onEffectToggle: (effect: EffectType) => void;
+  effectIntensity: number;
+  onEffectToggle: (effect: EffectType | null) => void;
   onAmountChange: (amount: number) => void;
+  onIntensityChange: (amount: number) => void;
   color: string;
+  target: 'A' | 'B' | 'AB';
+  onTargetChange: (target: 'A' | 'B' | 'AB') => void;
+  mixedEffect?: boolean;
+  mixedAmount?: boolean;
+  mixedIntensity?: boolean;
+  showStreamingNotice?: boolean;
 }
 
 const showResetToast = (sliderName: string) => {
@@ -28,65 +36,126 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
   effectAmount,
   onEffectToggle,
   onAmountChange,
+  effectIntensity,
+  onIntensityChange,
   color,
+  target,
+  onTargetChange,
+  mixedEffect = false,
+  mixedAmount = false,
+  mixedIntensity = false,
+  showStreamingNotice = false,
 }) => {
-  const effects: EffectType[] = ['ECHO', 'DELAY', 'REVERB', 'FLANGER', 'PHASER', 'CRUSH'];
+  const effects: { label: string; value: EffectType | null }[] = [
+    { label: 'None', value: null },
+    { label: 'Echo', value: 'ECHO' },
+    { label: 'Delay', value: 'DELAY' },
+    { label: 'Reverb', value: 'REVERB' },
+    { label: 'Flanger', value: 'FLANGER' },
+    { label: 'Phaser', value: 'PHASER' },
+    { label: 'Crush', value: 'CRUSH' },
+  ];
 
   return (
-    <div className="bg-black/40 p-4 rounded-xl border border-white/5 relative z-10">
-      <div className="flex justify-between items-center mb-3 px-1">
-        <div className="flex flex-col">
-          <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">FX Engine</label>
+    <div className="bg-black/40 p-4 rounded-xl border border-white/5 relative z-10 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">FX Engine</p>
+          <p className="text-[11px] font-semibold text-white/80">
+            {mixedEffect ? 'Mixed effects' : activeEffect ? activeEffect : 'No effect'}
+          </p>
         </div>
-        {activeEffect && (
-          <span className="text-[9px] font-mono text-white/60 uppercase">
-            <span style={{ color }}>{activeEffect}</span>
-          </span>
-        )}
+        <div className="flex items-center gap-1 bg-black/40 rounded-full border border-white/10 p-1">
+          {(['A', 'B', 'AB'] as const).map((option) => (
+            <button
+              key={option}
+              onClick={() => onTargetChange(option)}
+              className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition ${
+                target === option ? 'text-black' : 'text-gray-500'
+              }`}
+              style={target === option ? { backgroundColor: color } : undefined}
+            >
+              {option === 'AB' ? 'A+B' : option}
+            </button>
+          ))}
+        </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {effects.map((fx) => (
           <button
-            key={fx}
-            onClick={() => onEffectToggle(fx)}
-            className={`py-2 rounded-lg text-[10px] font-black transition-all border uppercase tracking-tighter ${
-              activeEffect === fx
-                ? 'bg-white/10 border-white/40 text-white'
-                : 'bg-white/5 border-white/5 text-gray-500 hover:bg-white/10 hover:text-white/30'
+            key={fx.label}
+            onClick={() => onEffectToggle(fx.value)}
+            className={`py-2 rounded-lg text-[10px] font-black transition-all border uppercase tracking-tight ${
+              activeEffect === fx.value
+                ? 'bg-white/15 border-white/30 text-white'
+                : 'bg-white/5 border-white/10 text-gray-500 hover:bg-white/10 hover:text-white/50'
             }`}
-            style={activeEffect === fx ? { borderColor: color, color: color } : {}}
+            style={activeEffect === fx.value ? { borderColor: color, color } : undefined}
           >
-            {fx}
+            {fx.label}
           </button>
         ))}
       </div>
 
-      {activeEffect && (
-        <div className="mt-4 pt-4 border-t border-white/5 animate-fade-in">
-          <div className="flex justify-between items-center mb-2 px-1">
-            <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">Wet / Dry</span>
-            <span className="text-[9px] font-mono text-white/40">{Math.round(effectAmount * 100)}%</span>
+      <div className="space-y-3 border-t border-white/5 pt-4">
+        <div className="flex justify-between items-center px-1">
+          <div>
+            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Intensity</span>
+            {mixedIntensity && <span className="ml-2 text-[8px] text-white/40 uppercase">Mixed</span>}
           </div>
-          <div className="bg-black/20 p-2 rounded-full border border-white/5">
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={effectAmount}
-              onChange={(e) => onAmountChange(parseFloat(e.target.value))}
-              onDoubleClick={() => {
-                onAmountChange(0.5);
-                showResetToast('FX WET/DRY');
-              }}
-              className="w-full accent-white h-2 cursor-pointer"
-              style={{ accentColor: color }}
-              title="Double-click to reset (50%)"
-            />
-          </div>
+           <span className="text-[9px] font-mono text-white/50">{Math.round(effectIntensity * 100)}%</span>
         </div>
-      )}
+        <div className={`bg-black/20 p-2 rounded-full border border-white/5 ${!activeEffect ? 'opacity-40' : ''}`}>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={effectIntensity}
+            onChange={(e) => onIntensityChange(parseFloat(e.target.value))}
+            onDoubleClick={() => {
+              onIntensityChange(0.5);
+              showResetToast('FX INTENSITY');
+            }}
+            className="w-full accent-white h-2 cursor-pointer"
+            style={{ accentColor: color }}
+            title="Double-click to reset (50%)"
+            disabled={!activeEffect}
+          />
+        </div>
+
+        <div className="flex justify-between items-center px-1">
+          <div>
+            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Wet / Dry</span>
+            {mixedAmount && <span className="ml-2 text-[8px] text-white/40 uppercase">Mixed</span>}
+          </div>
+          <span className="text-[9px] font-mono text-white/50">{Math.round(effectAmount * 100)}%</span>
+        </div>
+        <div className={`bg-black/20 p-2 rounded-full border border-white/5 ${!activeEffect ? 'opacity-40' : ''}`}>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={effectAmount}
+            onChange={(e) => onAmountChange(parseFloat(e.target.value))}
+            onDoubleClick={() => {
+              onAmountChange(0.5);
+              showResetToast('FX WET/DRY');
+            }}
+            className="w-full accent-white h-2 cursor-pointer"
+            style={{ accentColor: color }}
+            title="Double-click to reset (50%)"
+            disabled={!activeEffect}
+          />
+        </div>
+           {showStreamingNotice && (
+          <p className="text-[9px] text-white/40 uppercase tracking-widest px-1">
+            Streaming FX unavailable
+          </p>
+        )}
+      </div>
     </div>
   );
 };
