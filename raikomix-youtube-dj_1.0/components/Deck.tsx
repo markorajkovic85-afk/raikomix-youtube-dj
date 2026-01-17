@@ -14,6 +14,7 @@ interface DeckProps {
   eq: { hi: number, mid: number, low: number, filter: number };
    effect: EffectType | null;
   effectWet: number;
+  effectIntensity: number;
 }
 
 export interface DeckHandle {
@@ -55,7 +56,7 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
   );
 };
 
-const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPlayerReady, eq, effect, effectWet }, ref) => {
+const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPlayerReady, eq, effect, effectWet, effectIntensity }, ref) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [tapHistory, setTapHistory] = useState<number[]>([]);
@@ -111,7 +112,10 @@ const formatTime = useCallback((timeSeconds: number) => {
     effectInput: GainNode;
     effectOutput: GainNode;  
   } | null>(null);
-const effectNodesRef = useRef<AudioNode[] | null>(null);
+const effectNodesRef = useRef<{
+    nodes: AudioNode[];
+    dispose?: () => void;
+  } | null>(null);
   
   // Initialize Audio Engine - Safe version that doesn't re-create source node
   const initAudioEngine = useCallback(() => {
@@ -167,22 +171,18 @@ const effectNodesRef = useRef<AudioNode[] | null>(null);
     try {
       effectInput.disconnect();
     } catch (e) {}
-    try {
-      effectOutput.disconnect();
-    } catch (e) {}
     if (effectNodesRef.current) {
-      effectNodesRef.current.forEach(node => {
+      effectNodesRef.current.nodes.forEach(node => {
         try {
           node.disconnect();
         } catch (e) {}
       });
+      effectNodesRef.current.dispose?.();
     }
     effectNodesRef.current = null;
   }, []);
 
-  const buildReverbImpulse = useCallback((ctx: AudioContext) => {
-    const duration = 2;
-    const decay = 2.5;
+ const buildReverbImpulse = useCallback((ctx: AudioContext, duration: number, decay: number) => {
     const rate = ctx.sampleRate;
     const length = rate * duration;
     const impulse = ctx.createBuffer(2, length, rate);
@@ -195,73 +195,132 @@ const effectNodesRef = useRef<AudioNode[] | null>(null);
     return impulse;
   }, []);
 
-  const createEffectChain = useCallback((ctx: AudioContext, effectType: EffectType): AudioNode[] => {
+ const createDistortionCurve = useCallback((drive: number) => {
+    const samples = 44100;
+    const curve = new Float32Array(samples);
+    for (let i = 0; i < samples; i += 1) {
+      const x = (i * 2) / samples - 1;
+      curve[i] = Math.tanh(x * drive);
+    }
+    return curve;
+  }, []);
+
+  const createEffectChain = useCallback((ctx: AudioContext, effectType: EffectType, intensity: number) => {
+    const amount = Math.min(1, Math.max(0, intensity));
     switch (effectType) {
       case 'ECHO': {
+         const input = ctx.createGain();
         const delay = ctx.createDelay(1);
-        delay.delayTime.value = 0.25;
+        delay.delayTime.value = 0.18 + amount * 0.35;
         const feedback = ctx.createGain();
-        feedback.gain.value = 0.4;
+        feedback.gain.value = 0.25 + amount * 0.5;
+        const tone = ctx.createBiquadFilter();
+        tone.type = 'lowpass';
+        tone.frequency.value = 2000 + amount * 4000;
+        input.connect(delay);
         delay.connect(feedback);
         feedback.connect(delay);
-        return [delay, feedback];
+        delay.connect(tone);
+        return { input, output: tone, nodes: [input, delay, feedback, tone] };
       }
       case 'DELAY': {
+        const input = ctx.createGain();
         const delay = ctx.createDelay(1);
-        delay.delayTime.value = 0.15;
+        delay.delayTime.value = 0.08 + amount * 0.25;
         const feedback = ctx.createGain();
-        feedback.gain.value = 0.25;
+        feedback.gain.value = 0.18 + amount * 0.45;
+        const tone = ctx.createBiquadFilter();
+        tone.type = 'lowpass';
+        tone.frequency.value = 1500 + amount * 3500;
+        input.connect(delay);
         delay.connect(feedback);
         feedback.connect(delay);
-        return [delay, feedback];
+        delay.connect(tone);
+        return { input, output: tone, nodes: [input, delay, feedback, tone] };
       }
       case 'REVERB': {
+        const input = ctx.createGain();
+        const preDelay = ctx.createDelay(0.3);
         const convolver = ctx.createConvolver();
-        convolver.buffer = buildReverbImpulse(ctx);
-        return [convolver];
+        const duration = 1.4 + amount * 2.2;
+        const decay = 1.6 + amount * 2.2;
+        preDelay.delayTime.value = 0.02 + amount * 0.12;
+        convolver.buffer = buildReverbImpulse(ctx, duration, decay);
+        input.connect(preDelay);
+        preDelay.connect(convolver);
+        return { input, output: convolver, nodes: [input, preDelay, convolver] };
       }
       case 'FLANGER': {
+        const input = ctx.createGain();
         const delay = ctx.createDelay(0.02);
-        delay.delayTime.value = 0.005;
+        delay.delayTime.value = 0.002 + amount * 0.004;
         const lfo = ctx.createOscillator();
         lfo.type = 'sine';
-        lfo.frequency.value = 0.25;
+        lfo.frequency.value = 0.15 + amount * 0.8;
         const lfoGain = ctx.createGain();
-        lfoGain.gain.value = 0.002;
+        lfoGain.gain.value = 0.0008 + amount * 0.003;
+        const feedback = ctx.createGain();
+        feedback.gain.value = 0.1 + amount * 0.45;
+        input.connect(delay);
         lfo.connect(lfoGain);
         lfoGain.connect(delay.delayTime);
+        delay.connect(feedback);
+        feedback.connect(delay);
         lfo.start();
-        return [delay, lfo, lfoGain];
+        return {
+          input,
+          output: delay,
+          nodes: [input, delay, lfo, lfoGain, feedback],
+          dispose: () => lfo.stop()
+        };
       }
       case 'PHASER': {
-        const allpass = ctx.createBiquadFilter();
-        allpass.type = 'allpass';
-        allpass.frequency.value = 800;
+        const input = ctx.createGain();
+        const stages = Array.from({ length: 4 }, () => {
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'allpass';
+          filter.frequency.value = 400 + amount * 900;
+          filter.Q.value = 0.6 + amount * 0.8;
+          return filter;
+        });
         const lfo = ctx.createOscillator();
         lfo.type = 'sine';
-        lfo.frequency.value = 0.2;
+        lfo.frequency.value = 0.1 + amount * 0.9;
         const lfoGain = ctx.createGain();
-        lfoGain.gain.value = 600;
+        lfoGain.gain.value = 200 + amount * 1200;
         lfo.connect(lfoGain);
-        lfoGain.connect(allpass.frequency);
+        stages.forEach(stage => lfoGain.connect(stage.frequency));
         lfo.start();
-        return [allpass, lfo, lfoGain];
+        input.connect(stages[0]);
+        stages.reduce((prev, current) => {
+          prev.connect(current);
+          return current;
+        });
+        return {
+          input,
+          output: stages[stages.length - 1],
+          nodes: [input, ...stages, lfo, lfoGain],
+          dispose: () => lfo.stop()
+        };
       }
       case 'CRUSH': {
+        const input = ctx.createGain();
         const shaper = ctx.createWaveShaper();
-        const curve = new Float32Array(44100);
-        for (let i = 0; i < curve.length; i += 1) {
-          const x = (i * 2) / curve.length - 1;
-          curve[i] = Math.sign(x) * (1 - Math.exp(-Math.abs(x) * 6));
-        }
-        shaper.curve = curve;
+        const drive = 1 + amount * 18;
+        shaper.curve = createDistortionCurve(drive);
         shaper.oversample = '4x';
-        return [shaper];
+        const tone = ctx.createBiquadFilter();
+        tone.type = 'lowpass';
+        tone.frequency.value = 1200 + (1 - amount) * 5000;
+        input.connect(shaper);
+        shaper.connect(tone);
+        return { input, output: tone, nodes: [input, shaper, tone] };
       }
       default:
         return [];
+        return null;
     }
-  }, [buildReverbImpulse]);
+  }, [buildReverbImpulse, createDistortionCurve]);
 
   const applyEffectChain = useCallback((effectType: EffectType | null) => {
     if (!nodesRef.current || !audioCtxRef.current) return;
@@ -273,18 +332,18 @@ const effectNodesRef = useRef<AudioNode[] | null>(null);
       return;
     }
 
-    const chain = createEffectChain(audioCtxRef.current, effectType);
-    if (chain.length === 0) {
+    const chain = createEffectChain(audioCtxRef.current, effectType, effectIntensity);
+    if (!chain) {
       effectInput.connect(effectOutput);
       return;
     }
-    effectNodesRef.current = chain;
-    effectInput.connect(chain[0]);
-    chain[chain.length - 1].connect(effectOutput);
-  }, [clearEffectChain, createEffectChain]);
+    effectNodesRef.current = { nodes: chain.nodes, dispose: chain.dispose };
+    effectInput.connect(chain.input);
+    chain.output.connect(effectOutput);
+  }, [clearEffectChain, createEffectChain, effectIntensity]);
 
   // Sync EQ nodes with props
-  useEffect(() => {
+   useEffect(() => {
     if (nodesRef.current && audioCtxRef.current) {
       const { low, mid, hi, filter } = nodesRef.current;
       const now = audioCtxRef.current.currentTime;
@@ -308,18 +367,20 @@ const effectNodesRef = useRef<AudioNode[] | null>(null);
     }
   }, [eq]);
 
- useEffect(() => {
+  useEffect(() => {
     if (!nodesRef.current || !audioCtxRef.current) return;
     const { dryGain, wetGain } = nodesRef.current;
     const wet = Math.min(1, Math.max(0, effectWet));
-    dryGain.gain.value = 1 - wet;
-    wetGain.gain.value = wet;
+    const now = audioCtxRef.current.currentTime;
+    const ramp = 0.05;
+    dryGain.gain.setTargetAtTime(Math.cos(wet * Math.PI * 0.5), now, ramp);
+    wetGain.gain.setTargetAtTime(Math.sin(wet * Math.PI * 0.5), now, ramp);
   }, [effectWet]);
 
   useEffect(() => {
     if (!nodesRef.current || !audioCtxRef.current) return;
     applyEffectChain(effect);
-  }, [applyEffectChain, effect]);
+  }, [applyEffectChain, effect, effectIntensity]);
   
   useEffect(() => {
     setState(s => ({
