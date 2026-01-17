@@ -9,11 +9,25 @@ export const loadLibrary = (): LibraryTrack[] => {
     if (!saved) return [];
     const data = JSON.parse(saved);
     if (!Array.isArray(data)) return [];
-    // Migration: ensure all tracks have a sourceType
-    return data.map(track => ({
-      ...track,
-      sourceType: track.sourceType || 'youtube'
-    }));
+   // Migration: normalize entries and ensure required fields exist
+    return data
+      .filter(track => track && typeof track === 'object')
+      .map(track => {
+        const videoId = track.videoId || extractVideoId(track.url || '') || `unknown_${Date.now()}`;
+        return {
+          id: track.id || `${Date.now()}_${videoId}`,
+          videoId,
+          url: track.url || `https://www.youtube.com/watch?v=${videoId}`,
+          title: track.title || `Track ${videoId}`,
+          author: track.author || 'Unknown Artist',
+          thumbnailUrl: track.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+          addedAt: track.addedAt || Date.now(),
+          playCount: typeof track.playCount === 'number' ? track.playCount : 0,
+          lastPlayed: track.lastPlayed,
+          sourceType: track.sourceType || 'youtube',
+          fileName: track.fileName
+        } as LibraryTrack;
+      });
   } catch (e) {
     console.error('Failed to load library:', e);
     return [];
@@ -36,7 +50,17 @@ export const loadPlaylists = (): Playlist[] => {
   try {
     const saved = localStorage.getItem(PLAYLISTS_KEY);
     if (!saved) return [];
-    return JSON.parse(saved);
+      const data = JSON.parse(saved);
+    if (!Array.isArray(data)) return [];
+    return data
+      .filter((playlist) => playlist && typeof playlist === 'object')
+      .map((playlist) => ({
+        id: playlist.id || `pl_${Date.now()}`,
+        name: playlist.name || 'Untitled Playlist',
+        trackIds: Array.isArray(playlist.trackIds) ? playlist.trackIds : [],
+        createdAt: playlist.createdAt || Date.now(),
+        color: playlist.color
+      })) as Playlist[];
   } catch (e) {
     console.error('Failed to load playlists:', e);
     return [];
