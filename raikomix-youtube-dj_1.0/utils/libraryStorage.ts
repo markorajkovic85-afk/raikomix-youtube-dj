@@ -2,15 +2,21 @@ import { LibraryTrack, Playlist } from '../types';
 
 const STORAGE_KEY = 'raikomix_library';
 const PLAYLISTS_KEY = 'raikomix_playlists';
+const STORAGE_VERSION = 2;
 
 export const loadLibrary = (): LibraryTrack[] => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return [];
     const data = JSON.parse(saved);
-    if (!Array.isArray(data)) return [];
-   // Migration: normalize entries and ensure required fields exist
-    return data
+      const tracks = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.tracks)
+        ? data.tracks
+        : [];
+    if (!Array.isArray(tracks)) return [];
+    // Migration: normalize entries and ensure required fields exist
+    return tracks
       .filter(track => track && typeof track === 'object')
       .map(track => {
         const videoId = track.videoId || extractVideoId(track.url || '') || `unknown_${Date.now()}`;
@@ -38,7 +44,7 @@ export const saveLibrary = (tracks: LibraryTrack[]): boolean => {
   try {
     // Only save tracks that are not local (since ObjectURLs are temporary)
     // Or save them, but know URLs might break
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tracks));
+     localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION, tracks }));
     return true;
   } catch (e) {
     console.error('Failed to save library:', e);
