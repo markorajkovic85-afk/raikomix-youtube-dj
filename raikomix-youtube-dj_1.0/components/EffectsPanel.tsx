@@ -1,6 +1,6 @@
-
 import React from 'react';
 import { EffectType } from '../types';
+import PerformancePads from './PerformancePads';
 
 interface EffectsPanelProps {
   activeEffect: EffectType | null;
@@ -16,6 +16,8 @@ interface EffectsPanelProps {
   mixedAmount?: boolean;
   mixedIntensity?: boolean;
   showStreamingNotice?: boolean;
+  masterVolume: number;
+  onNotify: (message: string, type?: 'info' | 'success' | 'error') => void;
 }
 
 const showResetToast = (sliderName: string) => {
@@ -45,6 +47,8 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
   mixedAmount = false,
   mixedIntensity = false,
   showStreamingNotice = false,
+  masterVolume,
+  onNotify,
 }) => {
   const effects: { label: string; value: EffectType | null }[] = [
     { label: 'None', value: null },
@@ -150,11 +154,19 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
             disabled={!activeEffect}
           />
         </div>
-           {showStreamingNotice && (
+         {showStreamingNotice && (
           <p className="text-[9px] text-white/40 uppercase tracking-widest px-1">
             Streaming FX unavailable
           </p>
         )}
+      </div>
+
+      <div className="border-t border-white/5 pt-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Pads</span>
+          <span className="text-[8px] text-white/30 uppercase tracking-widest">Hold / Click</span>
+        </div>
+        <PerformancePads masterVolume={masterVolume} isActive onNotify={onNotify} />
       </div>
     </div>
   );
