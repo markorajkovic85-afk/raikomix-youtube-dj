@@ -78,6 +78,9 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
   const gainsRef = useRef<Record<number, GainNode | null>>({});
   const keyHoldRef = useRef<Record<string, number>>({});
   const ytPlayersRef = useRef<Record<number, { player: any; interval?: number }>>({});
+  const ytReadyRef = useRef<
+    Record<number, { promise: Promise<void>; resolve: () => void; reject: (error: Error) => void; ready: boolean }>
+  >({});
 
   const activePad = pads.find((pad) => pad.id === activePadId) ?? null;
 
@@ -119,12 +122,27 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
     []
   );
 
+  const getYouTubeReadyEntry = useCallback((padId: number) => {
+    const existing = ytReadyRef.current[padId];
+    if (existing) return existing;
+    let resolveFn: () => void = () => undefined;
+    let rejectFn: (error: Error) => void = () => undefined;
+    const promise = new Promise<void>((resolve, reject) => {
+      resolveFn = resolve;
+      rejectFn = reject;
+    });
+    const entry = { promise, resolve: resolveFn, reject: rejectFn, ready: false };
+    ytReadyRef.current[padId] = entry;
+    return entry;
+  }, []);
+
   const ensureYouTubePlayer = useCallback(
     async (pad: PerformancePadConfig) => {
       if (pad.sourceType !== 'youtube' || !pad.sourceId) return;
       if (ytPlayersRef.current[pad.id]) return;
       await waitForYouTubeApi();
       const containerId = `pad-player-${pad.id}`;
+      const readyEntry = getYouTubeReadyEntry(pad.id);
       const player = new window.YT.Player(containerId, {
         height: '1',
         width: '1',
@@ -132,6 +150,8 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
         playerVars: { autoplay: 0, controls: 0, disablekb: 1, rel: 0, modestbranding: 1 },
         events: {
           onReady: (event: any) => {
+            readyEntry.ready = true;
+            readyEntry.resolve();
             event.target.cueVideoById(pad.sourceId);
             const duration = event.target.getDuration?.() || pad.duration || 0;
             if (duration && duration !== pad.duration) {
@@ -148,11 +168,15 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
               );
             }
           },
+          onError: (event: any) => {
+            const error = new Error(`YouTube player error (${event?.data ?? 'unknown'})`);
+            readyEntry.reject(error);
+          },
         },
       });
       ytPlayersRef.current[pad.id] = { player };
     },
-    [waitForYouTubeApi]
+    [getYouTubeReadyEntry, waitForYouTubeApi]
   );
 
   useEffect(() => {
@@ -203,6 +227,72 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
     [onNotify]
   );
 
+  const startLocalPlayback = useCallback(
+    async (pad: PerformancePadConfig) => {
+      const buffer = await loadLocalBuffer(pad);
+      if (!buffer) return { ok: false, error: 'Unable to load local sample.' };
+      const ctx = ensureAudioContext();
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      gain.gain.value = pad.volume * masterVolume;
+      source.buffer = buffer;
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      const duration = Math.min(buffer.duration - pad.trimStart, pad.trimEnd - pad.trimStart);
+      if (pad.mode === 'ONE_SHOT') {
+        source.start(0, pad.trimStart, duration);
+      } else {
+        source.start(0, pad.trimStart);
+        source.stop(ctx.currentTime + duration);
+      }
+      source.onended = () => {
+        setPlayingPads((prev) => ({ ...prev, [pad.id]: false }));
+      };
+      sourcesRef.current[pad.id] = source;
+      gainsRef.current[pad.id] = gain;
+      return { ok: true };
+    },
+    [loadLocalBuffer, masterVolume]
+  );
+
+  const startYouTubePlayback = useCallback(
+    async (pad: PerformancePadConfig) => {
+      if (!pad.sourceId) return { ok: false, error: 'Missing YouTube source.' };
+      if (!ytPlayersRef.current[pad.id]) {
+        await ensureYouTubePlayer(pad);
+      }
+      const readyEntry = ytReadyRef.current[pad.id];
+      if (readyEntry && !readyEntry.ready) {
+        try {
+          await readyEntry.promise;
+        } catch (error) {
+          return { ok: false, error: 'YouTube preview failed to load.' };
+        }
+      }
+      const entry = ytPlayersRef.current[pad.id];
+      const player = entry?.player;
+      if (!player) {
+        return { ok: false, error: 'YouTube player is still loading.' };
+      }
+      try {
+        player.cueVideoById?.(pad.sourceId);
+      } catch (error) {}
+      player.unMute?.();
+      player.setVolume?.(Math.round(pad.volume * masterVolume * 100));
+      player.seekTo?.(pad.trimStart, true);
+      player.playVideo?.();
+      if (entry.interval) window.clearInterval(entry.interval);
+      entry.interval = window.setInterval(() => {
+        const current = player.getCurrentTime?.() || 0;
+        if (current >= pad.trimEnd) {
+          stopPad(pad.id);
+        }
+      }, 60);
+      return { ok: true };
+    },
+    [ensureYouTubePlayer, masterVolume, stopPad]
+  );
+
   const triggerPad = useCallback(
     async (padId: number, override?: PerformancePadConfig) => {
       const pad = override ?? pads.find((item) => item.id === padId);
@@ -212,59 +302,34 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       stopPad(padId);
       setPlayingPads((prev) => ({ ...prev, [padId]: true }));
 
-      if (pad.sourceType === 'local') {
-        const buffer = await loadLocalBuffer(pad);
-        if (!buffer) return;
-        const ctx = ensureAudioContext();
-        const source = ctx.createBufferSource();
-        const gain = ctx.createGain();
-        gain.gain.value = pad.volume * masterVolume;
-        source.buffer = buffer;
-        source.connect(gain);
-        gain.connect(ctx.destination);
-        const duration = Math.min(buffer.duration - pad.trimStart, pad.trimEnd - pad.trimStart);
-        if (pad.mode === 'ONE_SHOT') {
-          source.start(0, pad.trimStart, duration);
-        } else {
-          source.start(0, pad.trimStart);
-          source.stop(ctx.currentTime + duration);
-        }
-        source.onended = () => {
-          setPlayingPads((prev) => ({ ...prev, [padId]: false }));
-        };
-        sourcesRef.current[padId] = source;
-        gainsRef.current[padId] = gain;
-      }
-
-      if (pad.sourceType === 'youtube') {
-        if (!ytPlayersRef.current[padId]) {
-          await ensureYouTubePlayer(pad);
-        }
-        const entry = ytPlayersRef.current[padId];
-        const player = entry?.player;
-        if (!player) {
-          onNotify('YouTube player is still loading.', 'info');
-          return;
-        }
-        if (pad.sourceId) {
-          try {
-            player.cueVideoById?.(pad.sourceId);
-          } catch (error) {}
-        }
-        player.unMute?.();
-        player.setVolume?.(Math.round(pad.volume * masterVolume * 100));
-        player.seekTo?.(pad.trimStart, true);
-        player.playVideo?.();
-        if (entry.interval) window.clearInterval(entry.interval);
-        entry.interval = window.setInterval(() => {
-          const current = player.getCurrentTime?.() || 0;
-          if (current >= pad.trimEnd) {
-            stopPad(padId);
-          }
-        }, 60);
+      const result =
+        pad.sourceType === 'local' ? await startLocalPlayback(pad) : await startYouTubePlayback(pad);
+      if (!result.ok) {
+        setPlayingPads((prev) => ({ ...prev, [padId]: false }));
+        if (result.error) onNotify(result.error, 'error');
       }
     },
-    [pads, loadLocalBuffer, masterVolume, stopPad, onNotify, ensureYouTubePlayer]
+    [pads, startLocalPlayback, startYouTubePlayback, stopPad, onNotify]
+  );
+
+  const previewPad = useCallback(
+    async (pad: PerformancePadConfig) => {
+      if (!pad || pad.sourceType === 'empty') {
+        return { ok: false, error: 'Select a source before previewing.' };
+      }
+      if (pad.trimEnd <= pad.trimStart) {
+        return { ok: false, error: 'End time must be greater than start.' };
+      }
+      stopPad(pad.id);
+      setPlayingPads((prev) => ({ ...prev, [pad.id]: true }));
+      const result =
+        pad.sourceType === 'local' ? await startLocalPlayback(pad) : await startYouTubePlayback(pad);
+      if (!result.ok) {
+        setPlayingPads((prev) => ({ ...prev, [pad.id]: false }));
+      }
+      return result;
+    },
+    [startLocalPlayback, startYouTubePlayback, stopPad]
   );
 
   useEffect(() => {
@@ -306,6 +371,11 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
   const handleSave = (updated: PerformancePadConfig) => {
     setPads((prev) => prev.map((pad) => (pad.id === updated.id ? updated : pad)));
     onNotify('Pad saved', 'success');
+    setActivePadId(null);
+  };
+
+  const handleDialogClose = () => {
+    if (activePadId !== null) stopPad(activePadId);
     setActivePadId(null);
   };
 
@@ -431,11 +501,12 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       {activePad && (
         <PerformancePadDialog
           pad={activePad}
-          onClose={() => setActivePadId(null)}
+          onClose={handleDialogClose}
           onSave={handleSave}
           onClear={() => handleClear(activePad.id)}
           onLocalFileSelected={handleLocalFileSelected}
-          onPreview={(pad) => triggerPad(pad.id, pad)}
+          onPreview={previewPad}
+          onStopPreview={() => stopPad(activePad.id)}
           isKeyConflict={isKeyConflict}
         />
       )}
