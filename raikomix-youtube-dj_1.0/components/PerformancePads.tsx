@@ -259,15 +259,12 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
     async (pad: PerformancePadConfig) => {
       if (!pad.sourceId) return { ok: false, error: 'Missing YouTube source.' };
       if (!ytPlayersRef.current[pad.id]) {
-        await ensureYouTubePlayer(pad);
+        void ensureYouTubePlayer(pad);
+        return { ok: false, error: 'YouTube player is warming up. Click Preview again.' };
       }
       const readyEntry = ytReadyRef.current[pad.id];
       if (readyEntry && !readyEntry.ready) {
-        try {
-          await readyEntry.promise;
-        } catch (error) {
-          return { ok: false, error: 'YouTube preview failed to load.' };
-        }
+        return { ok: false, error: 'YouTube player is still loading. Click Preview again.' };
       }
       const entry = ytPlayersRef.current[pad.id];
       const player = entry?.player;
@@ -278,7 +275,6 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
         player.loadVideoById?.({
           videoId: pad.sourceId,
           startSeconds: pad.trimStart,
-          endSeconds: pad.trimEnd,
         });
       } catch (error) {}
       player.unMute?.();
