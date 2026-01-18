@@ -18,18 +18,18 @@ export const parseYouTubeTitle = (rawTitle: string, rawAuthor: string) => {
     /\(Official Music Video\)/gi, /\[Official Music Video\]/gi,
     /\(Lyrics\)/gi, /\[Lyrics\]/gi,
     /\(HD\)/gi, /\[HD\]/gi, /\(HQ\)/gi, /\[HQ\]/gi,
-    /​:codex-terminal-citation[codex-terminal-citation]{line_range_start=185 line_range_end=458 terminal_chunk_id=Official】/gi, /「Official」/gi,
+    /【Official】/gi, /「Official」/gi,
     /Video Oficial/gi, /Audio Oficial/gi,
-    /4K/g, /1080p/gi
+    /4K/g, /1080p/gi,
   ];
-  
-  noise.forEach(pattern => {
+
+  noise.forEach((pattern) => {
     title = title.replace(pattern, '');
   });
 
   // Common separators for YouTube titles
   const separators = [' - ', ' – ', ' — ', ' | ', ' // ', ' : ', ' ~ ', ' * '];
-  
+
   for (const sep of separators) {
     if (title.includes(sep)) {
       const parts = title.split(sep);
@@ -39,7 +39,7 @@ export const parseYouTubeTitle = (rawTitle: string, rawAuthor: string) => {
     }
   }
 
-  // If after splitting the author is just a generic channel name like "VEVO", 
+  // If after splitting the author is just a generic channel name like "VEVO",
   // we keep the original author but use the cleaned title.
   if (author.toLowerCase().includes('vevo') || author.toLowerCase().includes('records')) {
     author = rawAuthor;
@@ -53,7 +53,7 @@ export const parseYouTubeTitle = (rawTitle: string, rawAuthor: string) => {
  */
 export const extractPlaylistId = (url: string): string | null => {
   const trimmed = url.trim();
-  
+
   // Direct ID check
   if (/^[a-zA-Z0-9-_]{10,64}$/.test(trimmed)) {
     return trimmed;
@@ -63,7 +63,7 @@ export const extractPlaylistId = (url: string): string | null => {
     const urlObj = new URL(trimmed);
     const listId = urlObj.searchParams.get('list');
     if (listId) return listId;
-    
+
     if (urlObj.pathname.includes('/playlist')) {
       return urlObj.searchParams.get('list');
     }
@@ -71,7 +71,7 @@ export const extractPlaylistId = (url: string): string | null => {
     const patterns = [
       /[?&]list=([^#&?]+)/,
       /youtube\.com\/playlist\?list=([^&]+)/,
-      /video\/[a-zA-Z0-9_-]+\?list=([a-zA-Z0-9_-]+)/
+      /video\/[a-zA-Z0-9_-]+\?list=([a-zA-Z0-9_-]+)/,
     ];
     for (const pattern of patterns) {
       const match = trimmed.match(pattern);
@@ -94,7 +94,7 @@ export const fetchPlaylistItems = async (
   playlistId: string,
   onProgress?: (loaded: number, total?: number) => void
 ): Promise<Partial<LibraryTrack>[]> => {
- const apiKey = getYouTubeApiKey();
+  const apiKey = getYouTubeApiKey();
   if (!apiKey) throw new Error('API Key missing. Please set VITE_API_KEY or API_KEY.');
 
   let allTracks: Partial<LibraryTrack>[] = [];
@@ -107,7 +107,7 @@ export const fetchPlaylistItems = async (
         part: 'snippet,contentDetails',
         maxResults: '50',
         playlistId: playlistId,
-        key: apiKey
+        key: apiKey,
       });
 
       if (nextPageToken) {
@@ -115,7 +115,7 @@ export const fetchPlaylistItems = async (
       }
 
       const response = await fetch(`${YOUTUBE_API_BASE}/playlistItems?${queryParams.toString()}`);
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         const msg = errorData.error?.message || 'YouTube API Error';
@@ -123,31 +123,36 @@ export const fetchPlaylistItems = async (
       }
 
       const data = await response.json();
-      
+
       if (totalResults === undefined) {
         totalResults = data.pageInfo?.totalResults;
       }
 
-      const pageTracks = data.items.map((item: any) => {
-        const snippet = item.snippet;
-        const vId = item.contentDetails?.videoId || snippet?.resourceId?.videoId;
-        
-        const { title, author } = parseYouTubeTitle(
-          snippet?.title || 'Unknown Title', 
-          snippet?.videoOwnerChannelTitle || snippet?.channelTitle || 'Unknown Artist'
-        );
-        
-        return {
-          videoId: vId,
-          title,
-          author,
-          thumbnailUrl: snippet?.thumbnails?.medium?.url || snippet?.thumbnails?.default?.url || `https://img.youtube.com/vi/${vId}/mqdefault.jpg`,
-        };
-      }).filter((t: any) => t.videoId);
+      const pageTracks = data.items
+        .map((item: any) => {
+          const snippet = item.snippet;
+          const vId = item.contentDetails?.videoId || snippet?.resourceId?.videoId;
+
+          const { title, author } = parseYouTubeTitle(
+            snippet?.title || 'Unknown Title',
+            snippet?.videoOwnerChannelTitle || snippet?.channelTitle || 'Unknown Artist'
+          );
+
+          return {
+            videoId: vId,
+            title,
+            author,
+            thumbnailUrl:
+              snippet?.thumbnails?.medium?.url ||
+              snippet?.thumbnails?.default?.url ||
+              `https://img.youtube.com/vi/${vId}/mqdefault.jpg`,
+          };
+        })
+        .filter((t: any) => t.videoId);
 
       allTracks = [...allTracks, ...pageTracks];
       nextPageToken = data.nextPageToken;
-      
+
       if (onProgress) onProgress(allTracks.length, totalResults);
     } while (nextPageToken);
 
@@ -166,7 +171,7 @@ export const searchYouTube = async (
   maxResults: number = 15,
   signal?: AbortSignal
 ): Promise<YouTubeSearchResult[]> => {
-   const apiKey = getYouTubeApiKey();
+  const apiKey = getYouTubeApiKey();
   if (!apiKey) return [];
 
   try {
@@ -175,15 +180,15 @@ export const searchYouTube = async (
       maxResults: maxResults.toString(),
       q: query,
       type: 'video',
-      videoCategoryId: '10', 
+      videoCategoryId: '10',
       videoEmbeddable: 'true',
-      key: apiKey
+      key: apiKey,
     });
 
     const response = await fetch(`${YOUTUBE_API_BASE}/search?${queryParams.toString()}`, { signal });
     if (!response.ok) return [];
     const data = await response.json();
-    
+
     return data.items.map((item: any) => {
       const { title, author } = parseYouTubeTitle(item.snippet.title, item.snippet.channelTitle);
       return {
