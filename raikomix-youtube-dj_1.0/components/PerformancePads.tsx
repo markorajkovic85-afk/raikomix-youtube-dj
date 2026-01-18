@@ -275,11 +275,14 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
         return { ok: false, error: 'YouTube player is still loading.' };
       }
       try {
-        player.cueVideoById?.(pad.sourceId);
+        player.loadVideoById?.({
+          videoId: pad.sourceId,
+          startSeconds: pad.trimStart,
+          endSeconds: pad.trimEnd,
+        });
       } catch (error) {}
       player.unMute?.();
       player.setVolume?.(Math.round(pad.volume * masterVolume * 100));
-      player.seekTo?.(pad.trimStart, true);
       player.playVideo?.();
       if (entry.interval) window.clearInterval(entry.interval);
       entry.interval = window.setInterval(() => {
