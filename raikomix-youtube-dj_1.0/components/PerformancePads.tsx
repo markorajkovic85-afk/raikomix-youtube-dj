@@ -251,6 +251,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
             player.cueVideoById?.(pad.sourceId);
           } catch (error) {}
         }
+        player.unMute?.();
         player.setVolume?.(Math.round(pad.volume * masterVolume * 100));
         player.seekTo?.(pad.trimStart, true);
         player.playVideo?.();
