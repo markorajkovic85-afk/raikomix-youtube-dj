@@ -1,4 +1,3 @@
-
 import React, { Component, useState, useCallback, useEffect, useRef, Suspense, ReactNode } from 'react';
 import Deck, { DeckHandle } from './components/Deck';
 import Mixer from './components/Mixer';
@@ -312,6 +311,8 @@ const App: React.FC = () => {
                   mixedAmount={isMixedWet}
                   mixedIntensity={isMixedIntensity}
                   showStreamingNotice={streamingNotice}
+                  masterVolume={masterVolume}
+                  onNotify={showNotification}
                 />
               </div>
             </section>
