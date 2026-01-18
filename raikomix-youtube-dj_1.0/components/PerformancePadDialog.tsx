@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { PerformancePadConfig, PerformancePadMode, YouTubeSearchResult } from '../types';
+import { PerformancePadConfig, PerformancePadMode, YouTubeLoadingState, YouTubeSearchResult } from '../types';
 import { searchYouTube } from '../utils/youtubeApi';
 
 interface LocalSampleMeta {
@@ -17,6 +17,10 @@ interface PerformancePadDialogProps {
   onLocalFileSelected: (file: File) => Promise<LocalSampleMeta>;
   onPreview: (pad: PerformancePadConfig) => Promise<{ ok: boolean; error?: string }>;
   onStopPreview: () => void;
+  onPreflightYouTube: (pad: PerformancePadConfig) => void;
+  onCancelYouTube: (videoId?: string) => void;
+  youtubeStates: Record<string, { state: YouTubeLoadingState; message?: string }>;
+  activePreviewVideoId: string | null;
   isKeyConflict: (key: string) => boolean;
 }
 
@@ -49,12 +53,17 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   onLocalFileSelected,
   onPreview,
   onStopPreview,
+  onPreflightYouTube,
+  onCancelYouTube,
+  youtubeStates,
+  activePreviewVideoId,
   isKeyConflict,
 }) => {
   const [draft, setDraft] = useState<PerformancePadConfig>(pad);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchState, setSearchState] = useState<YouTubeLoadingState>('idle');
   const [activeTab, setActiveTab] = useState<'youtube' | 'local'>('youtube');
   const [listeningKey, setListeningKey] = useState(false);
   const [startInput, setStartInput] = useState(formatTime(pad.trimStart));
@@ -63,17 +72,27 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const [previewingType, setPreviewingType] = useState<'youtube' | 'local' | null>(null);
   const [previewErrors, setPreviewErrors] = useState<Record<string, string>>({});
   const [generalPreviewError, setGeneralPreviewError] = useState<string | null>(null);
+  const searchAbortRef = React.useRef<AbortController | null>(null);
 
   const duration = draft.duration ?? 0;
   const maxTrim = duration > 0 ? duration : Math.max(draft.trimEnd, 5);
 
+  const selectedYouTubeState =
+    draft.sourceType === 'youtube' && draft.sourceId ? youtubeStates[draft.sourceId]?.state : null;
+  const isYouTubeBusy = selectedYouTubeState
+    ? (['resolving', 'downloading', 'decoding', 'searching'] as YouTubeLoadingState[]).includes(
+        selectedYouTubeState
+      )
+    : false;
+
   const validation = useMemo(() => {
     const trimValid = draft.trimEnd > draft.trimStart;
+    const youtubeReady = draft.sourceType !== 'youtube' || !isYouTubeBusy;
     return {
       trimValid,
-      canSave: trimValid && draft.sourceType !== 'empty',
+      canSave: trimValid && draft.sourceType !== 'empty' && youtubeReady,
     };
-  }, [draft]);
+  }, [draft, isYouTubeBusy]);
 
   useEffect(() => {
     setDraft(pad);
@@ -93,13 +112,29 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     if (query.trim().length < 3) {
       setResults([]);
       setLoading(false);
+      setSearchState('idle');
       return;
     }
     const timeout = setTimeout(async () => {
+      searchAbortRef.current?.abort();
+      const controller = new AbortController();
+      searchAbortRef.current = controller;
+      const startedAt = performance.now();
       setLoading(true);
-      const res = await searchYouTube(query);
-      setResults(res);
+      setSearchState('searching');
+      const res = await searchYouTube(query, 15, controller.signal);
+      if (!controller.signal.aborted) {
+        setResults(res);
+      }
       setLoading(false);
+      if (!controller.signal.aborted) {
+        setSearchState('idle');
+        if (import.meta?.env?.DEV) {
+          console.log(`[YouTube Timing] search time: ${(performance.now() - startedAt).toFixed(0)}ms`);
+        }
+      } else {
+        setSearchState('cancelled');
+      }
     }, 400);
     return () => clearTimeout(timeout);
   }, [query]);
@@ -117,13 +152,28 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   }, [listeningKey]);
 
   useEffect(() => {
+    if (!activePreviewVideoId) return;
+    setPreviewingId(activePreviewVideoId);
+    setPreviewingType('youtube');
+  }, [activePreviewVideoId]);
+
+  useEffect(() => {
     onStopPreview();
+    onCancelYouTube();
+    searchAbortRef.current?.abort();
     setPreviewingId(null);
     setPreviewingType(null);
     setGeneralPreviewError(null);
-  }, [activeTab, onStopPreview]);
+  }, [activeTab, onCancelYouTube, onStopPreview]);
 
-  useEffect(() => () => onStopPreview(), [onStopPreview]);
+  useEffect(
+    () => () => {
+      onStopPreview();
+      onCancelYouTube();
+      searchAbortRef.current?.abort();
+    },
+    [onCancelYouTube, onStopPreview]
+  );
 
   const handleTrimChange = (field: 'trimStart' | 'trimEnd', value: number) => {
     if (!Number.isFinite(value)) return;
@@ -135,11 +185,14 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
   const handleClose = () => {
     onStopPreview();
+    onCancelYouTube();
+    searchAbortRef.current?.abort();
     onClose();
   };
 
   const stopPreview = () => {
     onStopPreview();
+    onCancelYouTube();
     setPreviewingId(null);
     setPreviewingType(null);
   };
@@ -153,8 +206,11 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     const response = await onPreview(nextDraft);
     if (!response.ok) {
       const message = response.error || 'Preview unavailable.';
-      if (previewId) {
+      const isTransient = /warming up|still loading/i.test(message);
+      if (previewId && !isTransient) {
         setPreviewErrors((prev) => ({ ...prev, [previewId]: message }));
+      } else if (!isTransient) {
+        setGeneralPreviewError(message);
       } else {
         setGeneralPreviewError(message);
       }
@@ -233,6 +289,12 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-[#D0BCFF] border-t-transparent rounded-full animate-spin" />
                     )}
                   </div>
+                  {searchState === 'searching' && (
+                    <p className="text-[10px] uppercase tracking-widest text-gray-500">Searching...</p>
+                  )}
+                  <p className="text-[10px] text-white/40">
+                    YouTube previews may take a moment to load before audio is ready.
+                  </p>
                   <div className="space-y-2 max-h-[260px] overflow-y-auto overflow-x-hidden pr-1 scrollbar-hide">
                     {results.map((result) => {
                       const nextDraft = {
@@ -245,11 +307,16 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                         trimEnd: draft.duration ? Math.min(draft.duration, 5) : Math.max(draft.trimEnd, 5),
                       };
                       const previewError = previewErrors[result.videoId];
+                      const rowState = youtubeStates[result.videoId]?.state ?? 'idle';
+                      const rowMessage = youtubeStates[result.videoId]?.message;
                       const isPreviewing = previewingType === 'youtube' && previewingId === result.videoId;
+                      const isBusy = ['resolving', 'downloading', 'decoding', 'searching'].includes(rowState);
+                      const showCancel = isPreviewing && ['resolving', 'downloading', 'decoding'].includes(rowState);
                       return (
                         <div
                           key={result.videoId}
                           className="w-full flex items-center gap-3 p-2 bg-white/5 rounded-xl border border-transparent hover:border-white/10 transition-all text-left min-w-0"
+                          onMouseEnter={() => onPreflightYouTube(nextDraft)}
                         >
                           <img
                             src={result.thumbnailUrl}
@@ -259,6 +326,14 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                           <div className="min-w-0 flex-1">
                             <p className="text-[11px] font-semibold text-white truncate">{result.title}</p>
                             <p className="text-[9px] text-gray-500 uppercase tracking-widest truncate">{result.channelTitle}</p>
+                            {rowState !== 'idle' && (
+                              <div className="mt-1 flex items-center gap-2 text-[9px] uppercase tracking-widest text-gray-400">
+                                {isBusy && (
+                                  <span className="inline-flex h-3 w-3 animate-spin rounded-full border-2 border-[#D0BCFF] border-t-transparent" />
+                                )}
+                                <span>{rowMessage || rowState}</span>
+                              </div>
+                            )}
                             {previewError && (
                               <div className="mt-1 flex items-center gap-2">
                                 <p className="text-[9px] text-[#F2B8B5]">{previewError}</p>
@@ -271,6 +346,20 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                                       return next;
                                     })
                                   }
+                                  className="text-[9px] uppercase tracking-widest text-[#D0BCFF]"
+                                >
+                                  Retry
+                                </button>
+                              </div>
+                            )}
+                            {rowState === 'error' && (
+                              <div className="mt-1 flex items-center gap-2">
+                                <p className="text-[9px] text-[#F2B8B5]">
+                                  {rowMessage || 'Failed to fetch audio.'}
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => onPreflightYouTube(nextDraft)}
                                   className="text-[9px] uppercase tracking-widest text-[#D0BCFF]"
                                 >
                                   Retry
@@ -290,13 +379,25 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                                 handlePreview(nextDraft, result.videoId);
                               }}
                               className="text-[9px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed"
-                              disabled={Boolean(previewError)}
+                              disabled={Boolean(previewError) || (!isPreviewing && isBusy)}
                             >
                               {isPreviewing ? 'Stop' : 'Preview'}
                             </button>
+                            {showCancel && (
+                              <button
+                                type="button"
+                                onClick={() => onCancelYouTube(result.videoId)}
+                                className="text-[9px] font-black uppercase tracking-widest text-[#F2B8B5] px-3 py-1.5 rounded-full border border-[#F2B8B5]/40"
+                              >
+                                Cancel
+                              </button>
+                            )}
                             <button
                               type="button"
-                              onClick={() => setDraft(nextDraft)}
+                              onClick={() => {
+                                setDraft(nextDraft);
+                                onPreflightYouTube(nextDraft);
+                              }}
                               className="text-[9px] font-black uppercase tracking-widest bg-[#D0BCFF] text-black px-3 py-1.5 rounded-full"
                             >
                               Use
@@ -491,6 +592,9 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
             Clear Pad
           </button>
           <div className="flex items-center gap-3">
+            {draft.sourceType === 'youtube' && isYouTubeBusy && (
+              <p className="text-[10px] text-gray-500">Waiting for YouTube audio to get ready...</p>
+            )}
             <button
               type="button"
               onClick={handleClose}
