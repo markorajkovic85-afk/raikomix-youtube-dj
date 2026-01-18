@@ -119,7 +119,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[3500] bg-black/70 backdrop-blur-md flex items-center justify-center p-4"
+      className="fixed inset-0 z-[5000] bg-black/70 backdrop-blur-md flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       onClick={onClose}
@@ -186,30 +186,48 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                   )}
                 </div>
                 <div className="space-y-2 max-h-[220px] overflow-y-auto scrollbar-hide">
-                  {results.map((result) => (
-                    <button
-                      key={result.videoId}
-                      type="button"
-                      onClick={() => {
-                        setDraft((prev) => ({
-                          ...prev,
-                          sourceType: 'youtube',
-                          sourceId: result.videoId,
-                          sampleName: result.title,
-                          sourceLabel: result.channelTitle,
-                          trimStart: 0,
-                          trimEnd: prev.duration ? Math.min(prev.duration, 5) : Math.max(prev.trimEnd, 5),
-                        }));
-                      }}
-                      className="w-full flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-transparent hover:border-white/10 transition-all text-left"
-                    >
-                      <img src={result.thumbnailUrl} className="w-12 h-9 object-cover rounded-lg shrink-0" alt="" />
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold text-white truncate">{result.title}</p>
-                        <p className="text-[9px] text-gray-500 uppercase tracking-widest truncate">{result.channelTitle}</p>
+                  {results.map((result) => {
+                    const nextDraft = {
+                      ...draft,
+                      sourceType: 'youtube' as const,
+                      sourceId: result.videoId,
+                      sampleName: result.title,
+                      sourceLabel: result.channelTitle,
+                      trimStart: 0,
+                      trimEnd: draft.duration ? Math.min(draft.duration, 5) : Math.max(draft.trimEnd, 5),
+                    };
+                    return (
+                      <div
+                        key={result.videoId}
+                        className="w-full flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-transparent hover:border-white/10 transition-all text-left"
+                      >
+                        <img src={result.thumbnailUrl} className="w-12 h-9 object-cover rounded-lg shrink-0" alt="" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-semibold text-white truncate">{result.title}</p>
+                          <p className="text-[9px] text-gray-500 uppercase tracking-widest truncate">{result.channelTitle}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDraft(nextDraft);
+                              onPreview(nextDraft);
+                            }}
+                            className="text-[9px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-full"
+                          >
+                            Preview
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDraft(nextDraft)}
+                            className="text-[9px] font-black uppercase tracking-widest bg-[#D0BCFF] text-black px-3 py-1.5 rounded-full"
+                          >
+                            Use
+                          </button>
+                        </div>
                       </div>
-                    </button>
-                  ))}
+                    );
+                  })}
                   {query.length > 0 && !loading && results.length === 0 && (
                     <p className="text-center text-[9px] uppercase tracking-widest text-gray-500 py-6">No results found</p>
                   )}
