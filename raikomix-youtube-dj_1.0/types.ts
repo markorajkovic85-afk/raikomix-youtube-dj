@@ -3,6 +3,8 @@ export type DeckId = 'A' | 'B';
 export type CrossfaderCurve = 'SMOOTH' | 'CUT' | 'DIP';
 export type EffectType = 'ECHO' | 'DELAY' | 'REVERB' | 'FLANGER' | 'PHASER' | 'CRUSH';
 export type TrackSourceType = 'youtube' | 'local';
+export type PerformancePadMode = 'ONE_SHOT' | 'HOLD';
+export type PerformancePadSourceType = 'youtube' | 'local' | 'empty';
 
 export interface YouTubeSearchResult {
   videoId: string;
@@ -28,18 +30,7 @@ export interface PlayerState {
   loopActive: boolean;
   loopStart: number;
   loopEnd: number;
-  bpm: number;
-  musicalKey?: string;
-  title?: string;
-  author?: string;
-}
-
-export interface MixerState {
-  crossfader: number;
-  masterVolume: number;
-  crossfaderCurve: CrossfaderCurve;
-}
-
+@@ -43,40 +45,55 @@ export interface MixerState {
 export interface QueueItem {
   id: string;
   videoId: string;
@@ -63,6 +54,21 @@ export interface LibraryTrack {
   playCount: number;
   sourceType: TrackSourceType;
   fileName?: string;
+}
+
+export interface PerformancePadConfig {
+  id: number;
+  title: string;
+  sourceType: PerformancePadSourceType;
+  sourceId?: string;
+  sourceLabel?: string;
+  trimStart: number;
+  trimEnd: number;
+  volume: number;
+  mode: PerformancePadMode;
+  keyBinding: string;
+  duration?: number;
+  sampleName?: string;
 }
 
 export interface Playlist {
