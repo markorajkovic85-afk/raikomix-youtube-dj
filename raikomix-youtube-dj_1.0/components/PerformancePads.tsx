@@ -1,5 +1,6 @@
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { PerformancePadConfig } from '../types';
+import { PerformancePadConfig, YouTubeLoadingState } from '../types';
 import PerformancePadDialog from './PerformancePadDialog';
 import {
   loadPerformancePadSample,
@@ -71,6 +72,10 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
   const [activePadId, setActivePadId] = useState<number | null>(null);
   const [playingPads, setPlayingPads] = useState<Record<number, boolean>>({});
   const [hasFocus, setHasFocus] = useState(false);
+  const [youtubeStates, setYoutubeStates] = useState<Record<string, { state: YouTubeLoadingState; message?: string }>>(
+    {}
+  );
+  const [activePreviewVideoId, setActivePreviewVideoId] = useState<string | null>(null);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const buffersRef = useRef<Record<number, AudioBuffer | null>>({});
@@ -81,10 +86,52 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
   const ytReadyRef = useRef<
     Record<number, { promise: Promise<void>; resolve: () => void; reject: (error: Error) => void; ready: boolean }>
   >({});
+  const activePreviewPadIdRef = useRef<number | null>(null);
+  const ytRequestedVideoIdRef = useRef<Record<number, string>>({});
+  const youtubeTimingsRef = useRef<Record<string, { resolveStart?: number; previewStart?: number }>>({});
+  const youtubeCacheRef = useRef<Map<string, { createdAt: number; duration?: number; sourceInfo?: string }>>(
+    new Map()
+  );
+  const YOUTUBE_CACHE_LIMIT = 15;
+  const isDev = Boolean(import.meta?.env?.DEV);
 
   const activePad = pads.find((pad) => pad.id === activePadId) ?? null;
 
   const isKeyConflict = useCallback((key: string) => RESERVED_KEYS.has(key.toLowerCase()), []);
+
+  const logDevTiming = useCallback(
+    (label: string, durationMs: number) => {
+      if (!isDev) return;
+      console.log(`[YouTube Timing] ${label}: ${durationMs.toFixed(0)}ms`);
+    },
+    [isDev]
+  );
+
+  const updateYouTubeState = useCallback((videoId: string, state: YouTubeLoadingState, message?: string) => {
+    setYoutubeStates((prev) => ({
+      ...prev,
+      [videoId]: { state, message },
+    }));
+  }, []);
+
+  const getYouTubeCacheKey = useCallback((pad: PerformancePadConfig) => {
+    const startMs = Math.round(pad.trimStart * 1000);
+    const endMs = Math.round(pad.trimEnd * 1000);
+    const quality = 'iframe';
+    return `${pad.sourceId}:${startMs}:${endMs}:${quality}`;
+  }, []);
+
+  const touchYoutubeCache = useCallback((key: string, value: { createdAt: number; duration?: number; sourceInfo?: string }) => {
+    const cache = youtubeCacheRef.current;
+    if (cache.has(key)) {
+      cache.delete(key);
+    }
+    cache.set(key, value);
+    if (cache.size > YOUTUBE_CACHE_LIMIT) {
+      const oldestKey = cache.keys().next().value;
+      if (oldestKey) cache.delete(oldestKey);
+    }
+  }, []);
 
   const ensureAudioContext = () => {
     if (!audioCtxRef.current) {
@@ -153,6 +200,11 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
             readyEntry.ready = true;
             readyEntry.resolve();
             event.target.cueVideoById(pad.sourceId);
+            updateYouTubeState(pad.sourceId, 'ready');
+            const timing = youtubeTimingsRef.current[pad.sourceId];
+            if (timing?.resolveStart) {
+              logDevTiming('resolve audio source', performance.now() - timing.resolveStart);
+            }
             const duration = event.target.getDuration?.() || pad.duration || 0;
             if (duration && duration !== pad.duration) {
               setPads((prev) =>
@@ -168,15 +220,26 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
               );
             }
           },
+          onStateChange: (event: any) => {
+            if (event?.data !== window.YT?.PlayerState?.PLAYING) return;
+            const videoId = event.target?.getVideoData?.().video_id || pad.sourceId;
+            updateYouTubeState(videoId, 'ready');
+            const timing = youtubeTimingsRef.current[videoId];
+            if (timing?.previewStart) {
+              logDevTiming('time-to-first-sound', performance.now() - timing.previewStart);
+              timing.previewStart = undefined;
+            }
+          },
           onError: (event: any) => {
             const error = new Error(`YouTube player error (${event?.data ?? 'unknown'})`);
             readyEntry.reject(error);
+            updateYouTubeState(pad.sourceId, 'error', 'Failed to load YouTube audio.');
           },
         },
       });
       ytPlayersRef.current[pad.id] = { player };
     },
-    [getYouTubeReadyEntry, waitForYouTubeApi]
+    [getYouTubeReadyEntry, logDevTiming, updateYouTubeState, waitForYouTubeApi]
   );
 
   useEffect(() => {
@@ -188,7 +251,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
   }, [pads, ensureYouTubePlayer]);
 
   const stopPad = useCallback(
-    (padId: number) => {
+    (padId: number, reason: 'cancel' | 'ended' = 'cancel') => {
       const pad = pads.find((item) => item.id === padId);
       if (!pad) return;
       if (pad.sourceType === 'local') {
@@ -202,10 +265,20 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
           playerEntry.interval = undefined;
         }
         playerEntry?.player?.pauseVideo?.();
+        const requestedVideoId = ytRequestedVideoIdRef.current[padId];
+        if (requestedVideoId && activePreviewVideoId === requestedVideoId) {
+          updateYouTubeState(
+            requestedVideoId,
+            reason === 'ended' ? 'ready' : 'cancelled',
+            reason === 'ended' ? 'Ready' : 'Stopped'
+          );
+          setActivePreviewVideoId(null);
+          activePreviewPadIdRef.current = null;
+        }
       }
       setPlayingPads((prev) => ({ ...prev, [padId]: false }));
     },
-    [pads]
+    [activePreviewVideoId, pads, updateYouTubeState]
   );
 
   const loadLocalBuffer = useCallback(
@@ -225,6 +298,51 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       }
     },
     [onNotify]
+  );
+
+  const preflightYouTube = useCallback(
+    (pad: PerformancePadConfig) => {
+      if (pad.sourceType !== 'youtube' || !pad.sourceId) return;
+      const cacheKey = getYouTubeCacheKey(pad);
+      if (youtubeCacheRef.current.has(cacheKey)) {
+        updateYouTubeState(pad.sourceId, 'ready');
+        return;
+      }
+      const timing = youtubeTimingsRef.current[pad.sourceId] ?? {};
+      if (!timing.resolveStart) {
+        timing.resolveStart = performance.now();
+        youtubeTimingsRef.current[pad.sourceId] = timing;
+      }
+      updateYouTubeState(pad.sourceId, 'resolving', 'Resolving audio...');
+      if (!ytPlayersRef.current[pad.id]) {
+        void ensureYouTubePlayer(pad);
+        return;
+      }
+      const entry = ytReadyRef.current[pad.id];
+      if (entry?.ready) {
+        updateYouTubeState(pad.sourceId, 'ready');
+      } else {
+        try {
+          ytPlayersRef.current[pad.id]?.player?.cueVideoById?.(pad.sourceId);
+        } catch (error) {}
+      }
+    },
+    [ensureYouTubePlayer, getYouTubeCacheKey, updateYouTubeState]
+  );
+
+  const cancelYouTubeOperation = useCallback(
+    (videoId?: string) => {
+      const currentVideoId = videoId ?? activePreviewVideoId;
+      if (currentVideoId) {
+        updateYouTubeState(currentVideoId, 'cancelled', 'Cancelled');
+      }
+      if (activePreviewPadIdRef.current !== null) {
+        stopPad(activePreviewPadIdRef.current);
+      }
+      setActivePreviewVideoId(null);
+      activePreviewPadIdRef.current = null;
+    },
+    [activePreviewVideoId, stopPad, updateYouTubeState]
   );
 
   const startLocalPlayback = useCallback(
@@ -258,6 +376,21 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
   const startYouTubePlayback = useCallback(
     async (pad: PerformancePadConfig) => {
       if (!pad.sourceId) return { ok: false, error: 'Missing YouTube source.' };
+      const cacheKey = getYouTubeCacheKey(pad);
+      if (activePreviewVideoId && activePreviewVideoId !== pad.sourceId) {
+        updateYouTubeState(activePreviewVideoId, 'cancelled', 'Cancelled');
+        if (activePreviewPadIdRef.current !== null) {
+          stopPad(activePreviewPadIdRef.current);
+        }
+      }
+      setActivePreviewVideoId(pad.sourceId);
+      activePreviewPadIdRef.current = pad.id;
+      ytRequestedVideoIdRef.current[pad.id] = pad.sourceId;
+      youtubeTimingsRef.current[pad.sourceId] = {
+        ...youtubeTimingsRef.current[pad.sourceId],
+        previewStart: performance.now(),
+      };
+      updateYouTubeState(pad.sourceId, 'resolving', 'Resolving audio...');
       if (!ytPlayersRef.current[pad.id]) {
         void ensureYouTubePlayer(pad);
         return { ok: false, error: 'YouTube player is warming up. Click Preview again.' };
@@ -280,16 +413,25 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       player.unMute?.();
       player.setVolume?.(Math.round(pad.volume * masterVolume * 100));
       player.playVideo?.();
+      touchYoutubeCache(cacheKey, { createdAt: Date.now(), duration: pad.duration, sourceInfo: 'iframe-ready' });
       if (entry.interval) window.clearInterval(entry.interval);
       entry.interval = window.setInterval(() => {
         const current = player.getCurrentTime?.() || 0;
         if (current >= pad.trimEnd) {
-          stopPad(pad.id);
+          stopPad(pad.id, 'ended');
         }
       }, 60);
       return { ok: true };
     },
-    [ensureYouTubePlayer, masterVolume, stopPad]
+    [
+      activePreviewVideoId,
+      ensureYouTubePlayer,
+      getYouTubeCacheKey,
+      masterVolume,
+      stopPad,
+      touchYoutubeCache,
+      updateYouTubeState,
+    ]
   );
 
   const triggerPad = useCallback(
@@ -306,9 +448,12 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       if (!result.ok) {
         setPlayingPads((prev) => ({ ...prev, [padId]: false }));
         if (result.error) onNotify(result.error, 'error');
+        if (pad.sourceType === 'youtube' && pad.sourceId) {
+          updateYouTubeState(pad.sourceId, 'error', result.error);
+        }
       }
     },
-    [pads, startLocalPlayback, startYouTubePlayback, stopPad, onNotify]
+    [pads, startLocalPlayback, startYouTubePlayback, stopPad, onNotify, updateYouTubeState]
   );
 
   const previewPad = useCallback(
@@ -325,10 +470,13 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
         pad.sourceType === 'local' ? await startLocalPlayback(pad) : await startYouTubePlayback(pad);
       if (!result.ok) {
         setPlayingPads((prev) => ({ ...prev, [pad.id]: false }));
+        if (pad.sourceType === 'youtube' && pad.sourceId) {
+          updateYouTubeState(pad.sourceId, 'error', result.error);
+        }
       }
       return result;
     },
-    [startLocalPlayback, startYouTubePlayback, stopPad]
+    [startLocalPlayback, startYouTubePlayback, stopPad, updateYouTubeState]
   );
 
   useEffect(() => {
@@ -375,6 +523,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
 
   const handleDialogClose = () => {
     if (activePadId !== null) stopPad(activePadId);
+    cancelYouTubeOperation();
     setActivePadId(null);
   };
 
@@ -506,6 +655,10 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
           onLocalFileSelected={handleLocalFileSelected}
           onPreview={previewPad}
           onStopPreview={() => stopPad(activePad.id)}
+          onPreflightYouTube={preflightYouTube}
+          onCancelYouTube={cancelYouTubeOperation}
+          youtubeStates={youtubeStates}
+          activePreviewVideoId={activePreviewVideoId}
           isKeyConflict={isKeyConflict}
         />
       )}
