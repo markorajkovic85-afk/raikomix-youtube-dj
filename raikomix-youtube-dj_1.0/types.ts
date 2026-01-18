@@ -5,6 +5,15 @@ export type EffectType = 'ECHO' | 'DELAY' | 'REVERB' | 'FLANGER' | 'PHASER' | 'C
 export type TrackSourceType = 'youtube' | 'local';
 export type PerformancePadMode = 'ONE_SHOT' | 'HOLD';
 export type PerformancePadSourceType = 'youtube' | 'local' | 'empty';
+export type YouTubeLoadingState =
+  | 'idle'
+  | 'searching'
+  | 'resolving'
+  | 'downloading'
+  | 'decoding'
+  | 'ready'
+  | 'error'
+  | 'cancelled';
 
 export interface YouTubeSearchResult {
   videoId: string;
@@ -30,7 +39,8 @@ export interface PlayerState {
   loopActive: boolean;
   loopStart: number;
   loopEnd: number;
-@@ -43,40 +45,55 @@ export interface MixerState {
+}
+
 export interface QueueItem {
   id: string;
   videoId: string;
