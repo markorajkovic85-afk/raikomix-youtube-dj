@@ -18,7 +18,7 @@ export const parseYouTubeTitle = (rawTitle: string, rawAuthor: string) => {
     /\(Official Music Video\)/gi, /\[Official Music Video\]/gi,
     /\(Lyrics\)/gi, /\[Lyrics\]/gi,
     /\(HD\)/gi, /\[HD\]/gi, /\(HQ\)/gi, /\[HQ\]/gi,
-    /【Official】/gi, /「Official」/gi,
+    /​:codex-terminal-citation[codex-terminal-citation]{line_range_start=185 line_range_end=458 terminal_chunk_id=Official】/gi, /「Official」/gi,
     /Video Oficial/gi, /Audio Oficial/gi,
     /4K/g, /1080p/gi
   ];
@@ -163,7 +163,8 @@ export const fetchPlaylistItems = async (
  */
 export const searchYouTube = async (
   query: string,
-  maxResults: number = 15
+  maxResults: number = 15,
+  signal?: AbortSignal
 ): Promise<YouTubeSearchResult[]> => {
    const apiKey = getYouTubeApiKey();
   if (!apiKey) return [];
@@ -179,7 +180,7 @@ export const searchYouTube = async (
       key: apiKey
     });
 
-    const response = await fetch(`${YOUTUBE_API_BASE}/search?${queryParams.toString()}`);
+    const response = await fetch(`${YOUTUBE_API_BASE}/search?${queryParams.toString()}`, { signal });
     if (!response.ok) return [];
     const data = await response.json();
     
