@@ -613,7 +613,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
   isLoaded
     ? 'border-white/20 hover:border-[#D0BCFF]/40'
     : 'border-white/10 hover:border-white/20'
-}
+}`}
 
                 isLoaded
                   ? 'border-white/20 hover:border-[#D0BCFF]/40'
