@@ -569,7 +569,8 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
   };
 
   return (
-    <div      className={`w-full outline-none rounded-xl ${hasFocus ? 'ring-4 ring-[#D0BCFF]/40 p-2' : 'p-2'}`}
+    <div
+      className={`w-full outline-none rounded-xl ${hasFocus ? 'ring-4 ring-[#D0BCFF]/40 p-2' : 'p-2'}`}
       tabIndex={0}
       onFocus={() => setHasFocus(true)}
       onBlur={() => setHasFocus(false)}
@@ -606,24 +607,15 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
                 setActivePadId(pad.id);
               }}
               className={`group relative aspect-square h-32 rounded-lg border-2 bg-black/40 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D0BCFF]/60 focus-visible:ring-inset p-2 ${
-  isLoaded
-    ? 'border-white/20 hover:border-[#D0BCFF]/40'
-    : 'border-white/10 hover:border-white/20'
-}`}
-  isLoaded
-    ? 'border-white/20 hover:border-[#D0BCFF]/40'
-    : 'border-white/10 hover:border-white/20'
-}`}
-
                 isLoaded
                   ? 'border-white/20 hover:border-[#D0BCFF]/40'
                   : 'border-white/10 hover:border-white/20'
               }`}
               aria-label={`Pad ${pad.id + 1}${isLoaded ? ' loaded' : ' empty'}`}
             >
-              <<span className="absolute left-3 top-3 text-[9px] font-black text-gray-400">P{pad.id + 1}</span>
+              <span className="absolute left-3 top-3 text-[9px] font-black text-gray-400">P{pad.id + 1}</span>
               <span
-                className={`absolute right-3 top-3 h-2 w-2 rounded-full ${...}`}
+                className={`absolute right-3 top-3 h-2 w-2 rounded-full ${
                   isPlaying
                     ? 'bg-[#D0BCFF] shadow-[0_0_10px_rgba(208,188,255,0.7)]'
                     : isLoaded
