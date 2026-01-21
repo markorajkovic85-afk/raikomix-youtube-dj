@@ -569,9 +569,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
   };
 
   return (
-    <div
-      <div
-      className={`w-full outline-none rounded-xl ${hasFocus ? 'ring-4 ring-[#D0BCFF]/40 p-2' : 'p-2'}`}
+    <div      className={`w-full outline-none rounded-xl ${hasFocus ? 'ring-4 ring-[#D0BCFF]/40 p-2' : 'p-2'}`}
       tabIndex={0}
       onFocus={() => setHasFocus(true)}
       onBlur={() => setHasFocus(false)}
