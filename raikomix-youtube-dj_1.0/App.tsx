@@ -274,7 +274,7 @@ const App: React.FC = () => {
               </div>
             </section>
           ) : (
-            <section className="bg-black/20 border-r border-white/5 flex flex-col h-full w-[320px] shrink-0">
+            <section className="bg-black/20 border-r border-white/5 flex flex-col h-full w-[420px] shrink-0">
               <div className="p-4 flex flex-col gap-4 h-full">
                 <EffectsPanel
                    activeEffect={targetEffect}
