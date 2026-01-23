@@ -1,6 +1,5 @@
-
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { PerformancePadConfig, YouTubeLoadingState } from '../types';
+import { EffectType, PerformancePadConfig, YouTubeLoadingState } from '../types';
 import PerformancePadDialog from './PerformancePadDialog';
 import {
   loadPerformancePadSample,
@@ -9,10 +8,14 @@ import {
   savePerformancePads,
   storePerformancePadSample,
 } from '../utils/performancePadsStorage';
+import { createEffectChain } from '../utils/effectsChain';
 
 interface PerformancePadsProps {
   masterVolume: number;
   isActive: boolean;
+  effect: EffectType | null;
+  effectWet: number;
+  effectIntensity: number;
   onNotify: (message: string, type?: 'info' | 'success' | 'error') => void;
 }
 
@@ -64,7 +67,23 @@ const normalizePads = (pads: PerformancePadConfig[]) => {
   });
 };
 
-const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActive, onNotify }) => {
+interface PadFxChain {
+  dryGain: GainNode;
+  wetGain: GainNode;
+  effectInput: GainNode;
+  effectOutput: GainNode;
+  nodes: AudioNode[];
+  dispose?: () => void;
+}
+
+const PerformancePads: React.FC<PerformancePadsProps> = ({
+  masterVolume,
+  isActive,
+  effect,
+  effectWet,
+  effectIntensity,
+  onNotify,
+}) => {
   const [pads, setPads] = useState<PerformancePadConfig[]>(() => {
     const stored = loadPerformancePads();
     return normalizePads(stored ?? []);
@@ -81,6 +100,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
   const buffersRef = useRef<Record<number, AudioBuffer | null>>({});
   const sourcesRef = useRef<Record<number, AudioBufferSourceNode | null>>({});
   const gainsRef = useRef<Record<number, GainNode | null>>({});
+  const fxChainsRef = useRef<Record<number, PadFxChain | null>>({});
   const keyHoldRef = useRef<Record<string, number>>({});
   const ytPlayersRef = useRef<Record<number, { player: any; interval?: number }>>({});
   const ytReadyRef = useRef<
@@ -142,6 +162,62 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
     }
     return audioCtxRef.current;
   };
+
+  const setPadWetDry = useCallback((ctx: AudioContext, dryGain: GainNode, wetGain: GainNode, wet: number) => {
+    const clamped = Math.min(1, Math.max(0, wet));
+    const now = ctx.currentTime;
+    const ramp = 0.05;
+    dryGain.gain.setTargetAtTime(Math.cos(clamped * Math.PI * 0.5), now, ramp);
+    wetGain.gain.setTargetAtTime(Math.sin(clamped * Math.PI * 0.5), now, ramp);
+  }, []);
+
+  const cleanupPadFxChain = useCallback((padId: number) => {
+    const chain = fxChainsRef.current[padId];
+    if (!chain) return;
+    try {
+      chain.effectInput.disconnect();
+    } catch (error) {}
+    try {
+      chain.effectOutput.disconnect();
+    } catch (error) {}
+    chain.nodes.forEach((node) => {
+      try {
+        node.disconnect();
+      } catch (error) {}
+    });
+    chain.dispose?.();
+    fxChainsRef.current[padId] = null;
+  }, []);
+
+  const rebuildPadFxChain = useCallback(
+    (padId: number) => {
+      const chain = fxChainsRef.current[padId];
+      if (!chain || !audioCtxRef.current) return;
+      cleanupPadFxChain(padId);
+      const ctx = audioCtxRef.current;
+      if (!effect) {
+        chain.effectInput.connect(chain.effectOutput);
+        chain.effectOutput.connect(chain.wetGain);
+        setPadWetDry(ctx, chain.dryGain, chain.wetGain, effectWet);
+        fxChainsRef.current[padId] = { ...chain, nodes: [] };
+        return;
+      }
+      const nextChain = createEffectChain(ctx, effect, effectIntensity);
+      if (!nextChain) {
+        chain.effectInput.connect(chain.effectOutput);
+        chain.effectOutput.connect(chain.wetGain);
+        setPadWetDry(ctx, chain.dryGain, chain.wetGain, effectWet);
+        fxChainsRef.current[padId] = { ...chain, nodes: [] };
+        return;
+      }
+      chain.effectInput.connect(nextChain.input);
+      nextChain.output.connect(chain.effectOutput);
+      chain.effectOutput.connect(chain.wetGain);
+      setPadWetDry(ctx, chain.dryGain, chain.wetGain, effectWet);
+      fxChainsRef.current[padId] = { ...chain, nodes: nextChain.nodes, dispose: nextChain.dispose };
+    },
+    [cleanupPadFxChain, effect, effectIntensity, effectWet, setPadWetDry]
+  );
 
   useEffect(() => {
     savePerformancePads(pads);
@@ -257,6 +333,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       if (pad.sourceType === 'local') {
         sourcesRef.current[padId]?.stop?.();
         sourcesRef.current[padId] = null;
+        cleanupPadFxChain(padId);
       }
       if (pad.sourceType === 'youtube') {
         const playerEntry = ytPlayersRef.current[padId];
@@ -278,7 +355,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       }
       setPlayingPads((prev) => ({ ...prev, [padId]: false }));
     },
-    [activePreviewVideoId, pads, updateYouTubeState]
+    [activePreviewVideoId, cleanupPadFxChain, pads, updateYouTubeState]
   );
 
   const loadLocalBuffer = useCallback(
@@ -352,10 +429,43 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       const ctx = ensureAudioContext();
       const source = ctx.createBufferSource();
       const gain = ctx.createGain();
+      const dryGain = ctx.createGain();
+      const wetGain = ctx.createGain();
+      const mixGain = ctx.createGain();
+      const effectInput = ctx.createGain();
+      const effectOutput = ctx.createGain();
       gain.gain.value = pad.volume * masterVolume;
       source.buffer = buffer;
-      source.connect(gain);
+      source.connect(dryGain);
+      source.connect(effectInput);
+      dryGain.connect(mixGain);
+      effectOutput.connect(wetGain);
+      wetGain.connect(mixGain);
+      mixGain.connect(gain);
       gain.connect(ctx.destination);
+      setPadWetDry(ctx, dryGain, wetGain, effectWet);
+      const nextChain = effect ? createEffectChain(ctx, effect, effectIntensity) : null;
+      if (nextChain) {
+        effectInput.connect(nextChain.input);
+        nextChain.output.connect(effectOutput);
+        fxChainsRef.current[pad.id] = {
+          dryGain,
+          wetGain,
+          effectInput,
+          effectOutput,
+          nodes: nextChain.nodes,
+          dispose: nextChain.dispose,
+        };
+      } else {
+        effectInput.connect(effectOutput);
+        fxChainsRef.current[pad.id] = {
+          dryGain,
+          wetGain,
+          effectInput,
+          effectOutput,
+          nodes: [],
+        };
+      }
       const duration = Math.min(buffer.duration - pad.trimStart, pad.trimEnd - pad.trimStart);
       if (pad.mode === 'ONE_SHOT') {
         source.start(0, pad.trimStart, duration);
@@ -365,12 +475,13 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       }
       source.onended = () => {
         setPlayingPads((prev) => ({ ...prev, [pad.id]: false }));
+        cleanupPadFxChain(pad.id);
       };
       sourcesRef.current[pad.id] = source;
       gainsRef.current[pad.id] = gain;
       return { ok: true };
     },
-    [loadLocalBuffer, masterVolume]
+    [cleanupPadFxChain, effect, effectIntensity, effectWet, loadLocalBuffer, masterVolume, setPadWetDry]
   );
 
   const startYouTubePlayback = useCallback(
@@ -489,6 +600,23 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       if (pad) entry.player?.setVolume?.(Math.round(pad.volume * masterVolume * 100));
     });
   }, [pads, masterVolume]);
+
+  useEffect(() => {
+    if (!audioCtxRef.current) return;
+    Object.values(fxChainsRef.current).forEach((chain) => {
+      if (!chain) return;
+      setPadWetDry(audioCtxRef.current as AudioContext, chain.dryGain, chain.wetGain, effectWet);
+    });
+  }, [effectWet, setPadWetDry]);
+
+  useEffect(() => {
+    Object.entries(fxChainsRef.current).forEach(([id, chain]) => {
+      if (!chain) return;
+      const pad = pads.find((item) => item.id === Number(id));
+      if (!pad || pad.sourceType !== 'local') return;
+      rebuildPadFxChain(pad.id);
+    });
+  }, [effect, effectIntensity, pads, rebuildPadFxChain]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!isActive) return;
