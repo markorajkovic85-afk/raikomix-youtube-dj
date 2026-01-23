@@ -27,7 +27,6 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-// FIX: Explicitly using Component from named imports and providing constructor to ensure props are correctly initialized and recognized by the compiler
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
@@ -44,7 +43,6 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   public render() {
     const { hasError } = this.state;
-    // Destructuring children from this.props; typing is now correctly inherited from the Component base class
     const { children } = this.props;
 
     if (hasError) return (
@@ -231,7 +229,7 @@ const App: React.FC = () => {
         </nav>
 
         <div className="flex-1 flex overflow-hidden relative min-h-0">
-             {viewMode === 'LIBRARY' ? (
+          {viewMode === 'LIBRARY' ? (
             <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 flex-none h-full ${libraryOpen ? 'w-[320px] lg:w-[360px] xl:w-[420px]' : 'w-0 border-none'}`}>
               <div className={`p-3 lg:p-4 flex flex-col gap-4 h-full min-w-[280px] lg:min-w-[320px] xl:min-w-[380px] min-h-0 ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
                 <SearchPanel 
@@ -250,7 +248,7 @@ const App: React.FC = () => {
                     });
                   }} 
                 />
-               <div className="flex-1 overflow-hidden border-t border-white/5 pt-4 min-h-0">
+                <div className="flex-1 overflow-hidden border-t border-white/5 pt-4 min-h-0">
                   <LibraryPanel 
                     library={library} 
                     onAddSingle={url => {
@@ -275,64 +273,62 @@ const App: React.FC = () => {
               </div>
             </section>
           ) : (
-            ) : (
-  <section className="bg-black/20 border-r border-white/5 flex flex-col h-full w-[260px] lg:w-[300px] xl:w-[340px] shrink-0">
-    <div className="p-3 lg:p-4 flex flex-col gap-4 h-full">
-      <EffectsPanel
-        activeEffect={targetEffect}
-        effectAmount={targetWet}
-        effectIntensity={targetIntensity}
-        onEffectToggle={(effect) => {
-          if (fxTarget === 'A') toggleEffect('A', effect);
-          else if (fxTarget === 'B') toggleEffect('B', effect);
-          else {
-            toggleEffect('A', effect);
-            toggleEffect('B', effect);
-          }
-        }}
-        onAmountChange={(amount) => {
-          if (fxTarget === 'A') setDeckAEffectWet(amount);
-          else if (fxTarget === 'B') setDeckBEffectWet(amount);
-          else {
-            setDeckAEffectWet(amount);
-            setDeckBEffectWet(amount);
-          }
-        }}
-        onIntensityChange={(amount) => {
-          if (fxTarget === 'A') setDeckAEffectIntensity(amount);
-          else if (fxTarget === 'B') setDeckBEffectIntensity(amount);
-          else {
-            setDeckAEffectIntensity(amount);
-            setDeckBEffectIntensity(amount);
-          }
-        }}
-        color={targetColor}
-        target={fxTarget}
-        onTargetChange={setFxTarget}
-        mixedEffect={isMixedEffect}
-        mixedAmount={isMixedWet}
-        mixedIntensity={isMixedIntensity}
-        showStreamingNotice={streamingNotice}
-        masterVolume={masterVolume}
-        onNotify={showNotification}
-      />
-      
-      {/* ADD PERFORMANCE PADS HERE */}
-      <div className="flex-1 min-h-0">
-        <PerformancePads
-          masterVolume={masterVolume}
-          isActive={viewMode === 'PERFORM'}
-          onNotify={showNotification}
-        />
-      </div>
-    </div>
-  </section>
-)}
+            <section className="bg-black/20 border-r border-white/5 flex flex-col h-full w-[260px] lg:w-[300px] xl:w-[340px] shrink-0">
+              <div className="p-3 lg:p-4 flex flex-col gap-4 h-full">
+                <EffectsPanel
+                  activeEffect={targetEffect}
+                  effectAmount={targetWet}
+                  effectIntensity={targetIntensity}
+                  onEffectToggle={(effect) => {
+                    if (fxTarget === 'A') toggleEffect('A', effect);
+                    else if (fxTarget === 'B') toggleEffect('B', effect);
+                    else {
+                      toggleEffect('A', effect);
+                      toggleEffect('B', effect);
+                    }
+                  }}
+                  onAmountChange={(amount) => {
+                    if (fxTarget === 'A') setDeckAEffectWet(amount);
+                    else if (fxTarget === 'B') setDeckBEffectWet(amount);
+                    else {
+                      setDeckAEffectWet(amount);
+                      setDeckBEffectWet(amount);
+                    }
+                  }}
+                  onIntensityChange={(amount) => {
+                    if (fxTarget === 'A') setDeckAEffectIntensity(amount);
+                    else if (fxTarget === 'B') setDeckBEffectIntensity(amount);
+                    else {
+                      setDeckAEffectIntensity(amount);
+                      setDeckBEffectIntensity(amount);
+                    }
+                  }}
+                  color={targetColor}
+                  target={fxTarget}
+                  onTargetChange={setFxTarget}
+                  mixedEffect={isMixedEffect}
+                  mixedAmount={isMixedWet}
+                  mixedIntensity={isMixedIntensity}
+                  showStreamingNotice={streamingNotice}
+                  masterVolume={masterVolume}
+                  onNotify={showNotification}
+                />
+                
+                <div className="flex-1 min-h-0">
+                  <PerformancePads
+                    masterVolume={masterVolume}
+                    isActive={viewMode === 'PERFORM'}
+                    onNotify={showNotification}
+                  />
+                </div>
+              </div>
+            </section>
+          )}
 
           <section className="flex-1 flex flex-col p-2 lg:p-3 xl:p-4 items-center justify-center overflow-hidden min-h-0">
             <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 xl:gap-6 items-center justify-center h-full w-full max-w-[2200px]">
-             <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} />
-            <Mixer
+              <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} />
+              <Mixer
                 crossfader={crossfader}
                 onCrossfaderChange={setCrossfader}
                 crossfaderCurve={xFaderCurve}
@@ -354,14 +350,14 @@ const App: React.FC = () => {
                 onDeckAEqChange={(k, v) => setDeckAEq(p => ({...p, [k]: v}))}
                 onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))}
               />
-                 <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} />
+              <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} />
             </div>
           </section>
 
-             {viewMode === 'LIBRARY' && (
+          {viewMode === 'LIBRARY' && (
             <>
               <aside className={`bg-black/10 flex-none border-l border-white/5 flex flex-col transition-all duration-300 overflow-hidden ${queueOpen ? 'w-64 lg:w-72 xl:w-80 p-3 lg:p-4' : 'w-0 p-0 border-none'}`}>
-                 <div className={`h-full min-w-[240px] lg:min-w-[260px] xl:min-w-[280px] ${!queueOpen ? 'opacity-0 invisible' : 'opacity-100 visible transition-opacity'}`}>
+                <div className={`h-full min-w-[240px] lg:min-w-[260px] xl:min-w-[280px] ${!queueOpen ? 'opacity-0 invisible' : 'opacity-100 visible transition-opacity'}`}>
                   <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
                     <span className="text-[10px] font-black uppercase text-gray-500 tracking-[0.2em]">Queue Console</span>
                     <button onClick={() => setQueueOpen(false)} className="text-gray-500 hover:text-white"><span className="material-symbols-outlined text-sm">close</span></button>
