@@ -1,10 +1,15 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { QueueItem, DeckId } from '../types';
 import { exportQueue } from '../utils/queueStorage';
 
 interface QueuePanelProps {
   queue: QueueItem[];
+  autoDjEnabled: boolean;
+  mixLeadSeconds: number;
+  mixDurationSeconds: number;
+  onToggleAutoDj: () => void;
+  onMixLeadChange: (value: number) => void;
+  onMixDurationChange: (value: number) => void;
   onLoadToDeck: (item: QueueItem, deck: DeckId) => void;
   onRemove: (id: string) => void;
   onClear: () => void;
@@ -35,7 +40,18 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
   );
 };
 
-const QueuePanel: React.FC<QueuePanelProps> = ({ queue, onLoadToDeck, onRemove, onClear }) => {
+const QueuePanel: React.FC<QueuePanelProps> = ({
+  queue,
+  autoDjEnabled,
+  mixLeadSeconds,
+  mixDurationSeconds,
+  onToggleAutoDj,
+  onMixLeadChange,
+  onMixDurationChange,
+  onLoadToDeck,
+  onRemove,
+  onClear
+}) => {
   return (
     <div className="flex flex-col h-full gap-4 elevation-2">
       <div className="flex items-center justify-between px-2">
@@ -57,6 +73,49 @@ const QueuePanel: React.FC<QueuePanelProps> = ({ queue, onLoadToDeck, onRemove, 
             </button>
           </div>
         )}
+      </div>
+
+      <div className="rounded-xl border border-white/5 bg-black/30 p-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Auto DJ</span>
+            <span className="text-[9px] text-gray-500">Autoplay + mix next queue item</span>
+          </div>
+          <button
+            onClick={onToggleAutoDj}
+            className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+              autoDjEnabled
+                ? 'bg-[#D0BCFF]/20 text-[#D0BCFF] border-[#D0BCFF]/40'
+                : 'bg-black/40 text-gray-500 border-white/10'
+            }`}
+          >
+            {autoDjEnabled ? 'On' : 'Off'}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-[9px] uppercase tracking-widest text-gray-500">
+          <label className="flex flex-col gap-1">
+            Mix Lead (sec)
+            <input
+              type="number"
+              min={4}
+              max={30}
+              value={mixLeadSeconds}
+              onChange={(e) => onMixLeadChange(Number(e.target.value))}
+              className="w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[10px] text-white"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            Mix Duration (sec)
+            <input
+              type="number"
+              min={2}
+              max={20}
+              value={mixDurationSeconds}
+              onChange={(e) => onMixDurationChange(Number(e.target.value))}
+              className="w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[10px] text-white"
+            />
+          </label>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pr-2 space-y-2 scrollbar-hide">
