@@ -10,13 +10,16 @@ interface EffectsPanelProps {
   onAmountChange: (amount: number) => void;
   onIntensityChange: (amount: number) => void;
   color: string;
-  target: 'A' | 'B' | 'AB';
-  onTargetChange: (target: 'A' | 'B' | 'AB') => void;
+  target: 'A' | 'B' | 'AB' | 'PADS';
+  onTargetChange: (target: 'A' | 'B' | 'AB' | 'PADS') => void;
   mixedEffect?: boolean;
   mixedAmount?: boolean;
   mixedIntensity?: boolean;
   showStreamingNotice?: boolean;
   masterVolume: number;
+  padEffect: EffectType | null;
+  padEffectWet: number;
+  padEffectIntensity: number;
   onNotify: (message: string, type?: 'info' | 'success' | 'error') => void;
 }
 
@@ -48,6 +51,9 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
   mixedIntensity = false,
   showStreamingNotice = false,
   masterVolume,
+  padEffect,
+  padEffectWet,
+  padEffectIntensity,
   onNotify,
 }) => {
   const effects: { label: string; value: EffectType | null }[] = [
@@ -70,7 +76,7 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-1 bg-black/40 rounded-full border border-white/10 p-1">
-          {(['A', 'B', 'AB'] as const).map((option) => (
+          {(['A', 'B', 'AB', 'PADS'] as const).map((option) => (
             <button
               key={option}
               onClick={() => onTargetChange(option)}
@@ -166,7 +172,14 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
           <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Pads</span>
           <span className="text-[8px] text-white/30 uppercase tracking-widest">Hold / Click</span>
         </div>
-        <PerformancePads masterVolume={masterVolume} isActive onNotify={onNotify} />
+        <PerformancePads
+          masterVolume={masterVolume}
+          isActive
+          effect={padEffect}
+          effectWet={padEffectWet}
+          effectIntensity={padEffectIntensity}
+          onNotify={onNotify}
+        />
       </div>
     </div>
   );
