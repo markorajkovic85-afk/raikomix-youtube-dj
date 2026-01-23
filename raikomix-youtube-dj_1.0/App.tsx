@@ -232,7 +232,7 @@ const App: React.FC = () => {
 
         <div className="flex-1 flex overflow-hidden relative min-h-0">
              {viewMode === 'LIBRARY' ? (
-            <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 flex-none h-full ${libraryOpen ? 'w-[320px] lg:w-[360px] xl:w-[420px]' : 'w-0 border-none'}`}
+            <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 flex-none h-full ${libraryOpen ? 'w-[320px] lg:w-[360px] xl:w-[420px]' : 'w-0 border-none'}`}>
               <div className={`p-3 lg:p-4 flex flex-col gap-4 h-full min-w-[280px] lg:min-w-[320px] xl:min-w-[380px] min-h-0 ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
                 <SearchPanel 
                   onLoadToDeck={(vid, url, deck, title, author) => handleLoadVideo(vid, url, deck, 'youtube', title, author)} 
