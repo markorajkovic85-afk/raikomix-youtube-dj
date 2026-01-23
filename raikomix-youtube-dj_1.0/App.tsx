@@ -79,6 +79,10 @@ const App: React.FC = () => {
   const [masterVolume, setMasterVolume] = useState(0.8);
   const [deckAVolume, setDeckAVolume] = useState(0.8);
   const [deckBVolume, setDeckBVolume] = useState(0.8);
+  const [autoDjEnabled, setAutoDjEnabled] = useState(false);
+  const [mixLeadSeconds, setMixLeadSeconds] = useState(12);
+  const [mixDurationSeconds, setMixDurationSeconds] = useState(6);
+  const [pendingMix, setPendingMix] = useState<{ deck: DeckId; fromDeck: DeckId; item: QueueItem } | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [toast, setToast] = useState<{ msg: string, type: ToastType } | null>(null);
   const [deckAEffect, setDeckAEffect] = useState<EffectType | null>(null);
@@ -97,11 +101,21 @@ const App: React.FC = () => {
 
   const deckARef = useRef<DeckHandle>(null);
   const deckBRef = useRef<DeckHandle>(null);
+  const mixAnimationRef = useRef<number | null>(null);
+  const mixInProgressRef = useRef(false);
+  const pendingMixRef = useRef<{ deck: DeckId; fromDeck: DeckId; item: QueueItem } | null>(null);
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => { saveLibrary(library); }, [library]);
 
   const showNotification = (msg: string, type: ToastType = 'info') => setToast({ msg, type });
+
+  const getActiveDeck = useCallback(() => {
+    if (deckAState?.playing && !deckBState?.playing) return 'A';
+    if (deckBState?.playing && !deckAState?.playing) return 'B';
+    if (deckAState?.playing && deckBState?.playing) return crossfader >= 0 ? 'B' : 'A';
+    return null;
+  }, [deckAState?.playing, deckBState?.playing, crossfader]);
 
   const handleDeckStateUpdate = useCallback((id: DeckId, state: PlayerState) => {
     id === 'A' ? setDeckAState(state) : setDeckBState(state);
@@ -132,6 +146,57 @@ const App: React.FC = () => {
     };
     setQueue(prev => [...prev, item]);
     showNotification('Added to Queue');
+  }, []);
+
+  const stopDeck = useCallback((deckId: DeckId) => {
+    const state = deckId === 'A' ? deckAState : deckBState;
+    const ref = deckId === 'A' ? deckARef : deckBRef;
+    if (state?.playing) {
+      ref.current?.togglePlay();
+    }
+  }, [deckAState, deckBState]);
+
+  const startAutoMix = useCallback((fromDeck: DeckId, targetDeck: DeckId) => {
+    if (mixInProgressRef.current) return;
+    mixInProgressRef.current = true;
+    const fromValue = crossfader;
+    const targetValue = targetDeck === 'A' ? -1 : 1;
+    const durationMs = Math.max(1, mixDurationSeconds) * 1000;
+    const start = performance.now();
+    const step = (now: number) => {
+      const elapsed = now - start;
+      const t = Math.min(1, elapsed / durationMs);
+      const eased = t * t * (3 - 2 * t);
+      setCrossfader(fromValue + (targetValue - fromValue) * eased);
+      if (t < 1) {
+        mixAnimationRef.current = requestAnimationFrame(step);
+      } else {
+        mixInProgressRef.current = false;
+        mixAnimationRef.current = null;
+        stopDeck(fromDeck);
+      }
+    };
+    mixAnimationRef.current = requestAnimationFrame(step);
+  }, [crossfader, mixDurationSeconds, stopDeck]);
+
+  const handleTrackEnd = useCallback((deckId: DeckId) => {
+    if (!autoDjEnabled || mixInProgressRef.current) return;
+    const nextItem = queue[0];
+    if (!nextItem) return;
+    handleLoadVideo(nextItem.videoId, nextItem.url, deckId, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author);
+    setQueue(prev => prev.filter(item => item.id !== nextItem.id));
+    const ref = deckId === 'A' ? deckARef : deckBRef;
+    setTimeout(() => ref.current?.togglePlay(), 0);
+  }, [autoDjEnabled, queue, handleLoadVideo]);
+
+  const handleMixLeadChange = useCallback((value: number) => {
+    if (!Number.isFinite(value)) return;
+    setMixLeadSeconds(Math.min(30, Math.max(4, value)));
+  }, []);
+
+  const handleMixDurationChange = useCallback((value: number) => {
+    if (!Number.isFinite(value)) return;
+    setMixDurationSeconds(Math.min(20, Math.max(2, value)));
   }, []);
 
   const muteDeck = (id: 'A' | 'B') => {
@@ -208,6 +273,53 @@ const App: React.FC = () => {
   useKeyboardShortcuts(deckARef, deckBRef, crossfader, setCrossfader, () => setShowHelp(p => !p), {
     muteDeck, pitchDeck, resetEq
   });
+
+  useEffect(() => {
+    if (!autoDjEnabled) return;
+    const interval = setInterval(() => {
+      if (mixInProgressRef.current || pendingMixRef.current || queue.length === 0) return;
+      const activeDeck = getActiveDeck();
+      if (!activeDeck) return;
+      const activeState = activeDeck === 'A' ? deckAState : deckBState;
+      if (!activeState?.duration || !activeState.isReady) return;
+      const remaining = activeState.duration - activeState.currentTime;
+      if (remaining <= mixLeadSeconds) {
+        const targetDeck = activeDeck === 'A' ? 'B' : 'A';
+        const nextItem = queue[0];
+        const pending = { deck: targetDeck, fromDeck: activeDeck, item: nextItem };
+        pendingMixRef.current = pending;
+        setPendingMix(pending);
+        handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author);
+        setQueue(prev => prev.filter(item => item.id !== nextItem.id));
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, getActiveDeck, handleLoadVideo]);
+
+  useEffect(() => {
+    if (autoDjEnabled) return;
+    pendingMixRef.current = null;
+    setPendingMix(null);
+  }, [autoDjEnabled]);
+
+  useEffect(() => {
+    if (!pendingMix) return;
+    const targetState = pendingMix.deck === 'A' ? deckAState : deckBState;
+    const targetRef = pendingMix.deck === 'A' ? deckARef : deckBRef;
+    if (!targetState?.isReady) return;
+    if (!targetState.playing) {
+      targetRef.current?.togglePlay();
+    }
+    startAutoMix(pendingMix.fromDeck, pendingMix.deck);
+    pendingMixRef.current = null;
+    setPendingMix(null);
+  }, [pendingMix, deckAState, deckBState, startAutoMix]);
+
+  useEffect(() => {
+    return () => {
+      if (mixAnimationRef.current) cancelAnimationFrame(mixAnimationRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -342,7 +454,7 @@ const App: React.FC = () => {
 
           <section className="flex-1 flex flex-col p-4 items-center justify-center overflow-auto min-h-0">
             <div className="flex flex-col lg:flex-row gap-6 items-center">
-             <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} />
+             <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
             <Mixer
                 crossfader={crossfader}
                 onCrossfaderChange={setCrossfader}
@@ -365,7 +477,7 @@ const App: React.FC = () => {
                 onDeckAEqChange={(k, v) => setDeckAEq(p => ({...p, [k]: v}))}
                 onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))}
               />
-                 <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} />
+                 <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} onTrackEnd={() => handleTrackEnd('B')} />
             </div>
           </section>
 
@@ -379,6 +491,12 @@ const App: React.FC = () => {
                   </div>
                   <QueuePanel 
                     queue={queue} 
+                    autoDjEnabled={autoDjEnabled}
+                    mixLeadSeconds={mixLeadSeconds}
+                    mixDurationSeconds={mixDurationSeconds}
+                    onToggleAutoDj={() => setAutoDjEnabled(prev => !prev)}
+                    onMixLeadChange={handleMixLeadChange}
+                    onMixDurationChange={handleMixDurationChange}
                     onLoadToDeck={(i, d) => { handleLoadVideo(i.videoId, i.url, d, i.sourceType || 'youtube', i.title, i.author); setQueue(p => p.filter(q => q.id !== i.id)); }} 
                     onRemove={id => setQueue(p => p.filter(i => i.id !== id))} 
                     onClear={() => setQueue([])} 
