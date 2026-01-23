@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { DeckId, EffectType, PlayerState, TrackSourceType } from '../types';
@@ -11,6 +10,7 @@ interface DeckProps {
   color: string;
   onStateUpdate: (state: PlayerState) => void;
   onPlayerReady: (player: any) => void;
+  onTrackEnd?: () => void;
   eq: { hi: number, mid: number, low: number, filter: number };
    effect: EffectType | null;
   effectWet: number;
@@ -56,7 +56,7 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
   );
 };
 
-const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPlayerReady, eq, effect, effectWet, effectIntensity }, ref) => {
+const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPlayerReady, onTrackEnd, eq, effect, effectWet, effectIntensity }, ref) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [tapHistory, setTapHistory] = useState<number[]>([]);
@@ -619,10 +619,15 @@ const effectNodesRef = useRef<{
             event.target.setPlaybackRate(state.playbackRate);
             setIsLoading(false); // Ensure loader clears
           }
+
+          if (playerState === window.YT.PlayerState.ENDED) {
+            setState(s => ({ ...s, playing: false }));
+            onTrackEnd?.();
+          }
         },
       }
     });
-  }, [containerId, onPlayerReady, updateMetadata, state.playbackRate]);
+  }, [containerId, onPlayerReady, onTrackEnd, updateMetadata, state.playbackRate]);
 
   const loadLocalFile = (url: string, metadata?: { title?: string, author?: string }) => {
     // Only init if not already done
@@ -733,7 +738,16 @@ const effectNodesRef = useRef<{
       <div className="absolute top-0 left-0 w-px h-px opacity-0 pointer-events-none overflow-hidden">
         <div id={containerId} />
       </div>
-      <audio ref={localAudioRef} style={{ display: 'none' }} onPlay={() => setState(s => ({...s, playing: true}))} onPause={() => setState(s => ({...s, playing: false}))} />
+      <audio
+        ref={localAudioRef}
+        style={{ display: 'none' }}
+        onPlay={() => setState(s => ({ ...s, playing: true }))}
+        onPause={() => setState(s => ({ ...s, playing: false }))}
+        onEnded={() => {
+          setState(s => ({ ...s, playing: false }));
+          onTrackEnd?.();
+        }}
+      />
       
       <div className="flex gap-4">
         {/* Main Deck Controls Area */}
