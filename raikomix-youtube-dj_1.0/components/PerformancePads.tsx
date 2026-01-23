@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { PerformancePadConfig, YouTubeLoadingState } from '../types';
 import PerformancePadDialog from './PerformancePadDialog';
@@ -569,7 +570,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
 
   return (
     <div
-      className={`w-full h-full flex items-center justify-center outline-none rounded-xl ${hasFocus ? 'ring-4 ring-[#D0BCFF]/40 p-2' : 'p-2'}`}
+      className={`w-full h-full flex items-center justify-center outline-none rounded-xl ${hasFocus ? 'ring-4 ring-[#D0BCFF]/40 p-4' : 'p-4'}`}
       tabIndex={0}
       onFocus={() => setHasFocus(true)}
       onBlur={() => setHasFocus(false)}
@@ -577,8 +578,8 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       onKeyUp={handleKeyUp}
       aria-label="Performance pads"
     >
-      <div className="w-full max-w-[380px] lg:max-w-[420px]">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:gap-4">
+      <div className="max-w-md mx-auto">
+        <div className="grid grid-cols-2 gap-4">
           {pads.map((pad) => {
             const isPlaying = playingPads[pad.id];
             const isLoaded = pad.sourceType !== 'empty';
@@ -606,7 +607,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
                   event.preventDefault();
                   setActivePadId(pad.id);
                 }}
-                className={`group relative aspect-square h-20 sm:h-24 lg:h-28 xl:h-32 rounded-lg border-2 bg-black/40 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D0BCFF]/60 focus-visible:ring-inset p-2 ${
+                className={`group relative aspect-square h-32 rounded-lg border-2 bg-black/40 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D0BCFF]/60 focus-visible:ring-inset p-2 ${
                   isLoaded
                     ? 'border-white/20 hover:border-[#D0BCFF]/40'
                     : 'border-white/10 hover:border-white/20'
