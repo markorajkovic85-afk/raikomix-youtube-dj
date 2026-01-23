@@ -578,7 +578,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({ masterVolume, isActiv
       onKeyUp={handleKeyUp}
       aria-label="Performance pads"
     >
-      <div className="w-full max-w-md mx-auto">
+      <div className="max-w-md mx-auto">
         <div className="grid grid-cols-2 gap-4">
           {pads.map((pad) => {
             const isPlaying = playingPads[pad.id];
