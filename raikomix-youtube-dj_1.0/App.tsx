@@ -87,7 +87,10 @@ const App: React.FC = () => {
   const [deckBEffect, setDeckBEffect] = useState<EffectType | null>(null);
   const [deckBEffectWet, setDeckBEffectWet] = useState(0.5);
   const [deckBEffectIntensity, setDeckBEffectIntensity] = useState(0.5);
-  const [fxTarget, setFxTarget] = useState<'A' | 'B' | 'AB'>('A');
+  const [padEffect, setPadEffect] = useState<EffectType | null>(null);
+  const [padEffectWet, setPadEffectWet] = useState(0.5);
+  const [padEffectIntensity, setPadEffectIntensity] = useState(0.5);
+  const [fxTarget, setFxTarget] = useState<'A' | 'B' | 'AB' | 'PADS'>('A');
 
   const [deckAEq, setDeckAEq] = useState({ hi: 1, mid: 1, low: 1, filter: 0 });
   const [deckBEq, setDeckBEq] = useState({ hi: 1, mid: 1, low: 1, filter: 0 });
@@ -158,32 +161,44 @@ const App: React.FC = () => {
     }
   };
 
+  const togglePadEffect = (effect: EffectType | null) => {
+    setPadEffect(prev => (prev === effect ? null : effect));
+  };
+
   const targetEffect = fxTarget === 'A'
     ? deckAEffect
     : fxTarget === 'B'
       ? deckBEffect
-      : deckAEffect === deckBEffect
-        ? deckAEffect
-        : null;
+      : fxTarget === 'PADS'
+        ? padEffect
+        : deckAEffect === deckBEffect
+          ? deckAEffect
+          : null;
   const targetWet = fxTarget === 'A'
     ? deckAEffectWet
     : fxTarget === 'B'
       ? deckBEffectWet
-      : (deckAEffectWet + deckBEffectWet) / 2;
+      : fxTarget === 'PADS'
+        ? padEffectWet
+        : (deckAEffectWet + deckBEffectWet) / 2;
   const targetIntensity = fxTarget === 'A'
     ? deckAEffectIntensity
     : fxTarget === 'B'
       ? deckBEffectIntensity
-      : (deckAEffectIntensity + deckBEffectIntensity) / 2;
+      : fxTarget === 'PADS'
+        ? padEffectIntensity
+        : (deckAEffectIntensity + deckBEffectIntensity) / 2;
   const isMixedEffect = fxTarget === 'AB' && deckAEffect !== deckBEffect;
   const isMixedWet = fxTarget === 'AB' && Math.abs(deckAEffectWet - deckBEffectWet) > 0.01;
   const isMixedIntensity = fxTarget === 'AB' && Math.abs(deckAEffectIntensity - deckBEffectIntensity) > 0.01;
-  const targetColor = fxTarget === 'A' ? '#D0BCFF' : fxTarget === 'B' ? '#F2B8B5' : '#E5D0F7';
+  const targetColor = fxTarget === 'A' ? '#D0BCFF' : fxTarget === 'B' ? '#F2B8B5' : fxTarget === 'PADS' ? '#B0E3D3' : '#E5D0F7';
   const streamingNotice = fxTarget === 'A'
     ? deckAState?.sourceType === 'youtube'
     : fxTarget === 'B'
       ? deckBState?.sourceType === 'youtube'
-      : deckAState?.sourceType === 'youtube' || deckBState?.sourceType === 'youtube';
+      : fxTarget === 'PADS'
+        ? false
+        : deckAState?.sourceType === 'youtube' || deckBState?.sourceType === 'youtube';
 
   const handleRemoveMultiple = useCallback((ids: string[]) => {
     setLibrary(prev => prev.filter(track => !ids.includes(track.id)));
@@ -283,7 +298,9 @@ const App: React.FC = () => {
                   onEffectToggle={(effect) => {
                     if (fxTarget === 'A') toggleEffect('A', effect);
                     else if (fxTarget === 'B') toggleEffect('B', effect);
-                    else {
+                    else if (fxTarget === 'PADS') {
+                      togglePadEffect(effect);
+                    } else {
                       toggleEffect('A', effect);
                       toggleEffect('B', effect);
                     }
@@ -291,6 +308,7 @@ const App: React.FC = () => {
                   onAmountChange={(amount) => {
                     if (fxTarget === 'A') setDeckAEffectWet(amount);
                     else if (fxTarget === 'B') setDeckBEffectWet(amount);
+                    else if (fxTarget === 'PADS') setPadEffectWet(amount);
                     else {
                       setDeckAEffectWet(amount);
                       setDeckBEffectWet(amount);
@@ -299,6 +317,7 @@ const App: React.FC = () => {
                   onIntensityChange={(amount) => {
                     if (fxTarget === 'A') setDeckAEffectIntensity(amount);
                     else if (fxTarget === 'B') setDeckBEffectIntensity(amount);
+                    else if (fxTarget === 'PADS') setPadEffectIntensity(amount);
                     else {
                       setDeckAEffectIntensity(amount);
                       setDeckBEffectIntensity(amount);
@@ -312,6 +331,9 @@ const App: React.FC = () => {
                   mixedIntensity={isMixedIntensity}
                   showStreamingNotice={streamingNotice}
                   masterVolume={masterVolume}
+                  padEffect={padEffect}
+                  padEffectWet={padEffectWet}
+                  padEffectIntensity={padEffectIntensity}
                   onNotify={showNotification}
                 />
               </div>
