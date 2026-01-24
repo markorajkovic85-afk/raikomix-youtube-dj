@@ -17,13 +17,16 @@ export const parseYouTubeTitle = (rawTitle: string, rawAuthor: string) => {
     /\(Official Music Video\)/gi, /\[Official Music Video\]/gi,
     /\(Lyrics\)/gi, /\[Lyrics\]/gi,
     /\(HD\)/gi, /\[HD\]/gi, /\(HQ\)/gi, /\[HQ\]/gi,
-    /​:codex-terminal-citation[codex-terminal-citation]{line_range_start=1 line_range_end=707 terminal_chunk_id=Official】/gi, /「Official」/gi,
     /Video Oficial/gi, /Audio Oficial/gi,
     /4K/g, /1080p/gi,
   ];
+  const literalNoise = ['​:codex-terminal-citation[codex-terminal-citation]{line_range_start=1 line_range_end=257 terminal_chunk_id=Official】', '「Official」'];
 
   noise.forEach((pattern) => {
     title = title.replace(pattern, '');
+  });
+  literalNoise.forEach((token) => {
+    title = title.replaceAll(token, '');
   });
 
   // Common separators for YouTube titles
