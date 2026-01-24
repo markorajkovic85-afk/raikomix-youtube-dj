@@ -101,6 +101,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
   const [activePadId, setActivePadId] = useState<number | null>(null);
   const [playingPads, setPlayingPads] = useState<Record<number, boolean>>({});
   const [hasFocus, setHasFocus] = useState(false);
+  const [configMode, setConfigMode] = useState(false);
   const [youtubeStates, setYoutubeStates] = useState<Record<string, { state: YouTubeLoadingState; message?: string }>>(
     {}
   );
@@ -735,6 +736,18 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
       aria-label="Performance pads"
     >
       <div className="w-full max-w-[600px] mx-auto">
+        <div className="flex justify-between items-center mb-3">
+          <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">
+            PADS <span className="text-white/40">RIGHT CLICK / CONFIGURE</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setConfigMode((prev) => !prev)}
+            className="px-3 py-1 text-[9px] font-black uppercase bg-white/5 hover:bg-white/10 rounded-lg"
+          >
+            {configMode ? 'Done' : 'Configure'}
+          </button>
+        </div>
         <div className="grid grid-cols-3 md:grid-cols-4 gap-2.5">
           {pads.map((pad) => {
             const isPlaying = playingPads[pad.id];
@@ -745,6 +758,10 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
                 type="button"
                 onPointerDown={(event) => {
                   if (event.button !== 0) return;
+                  if (configMode) {
+                    setActivePadId(pad.id);
+                    return;
+                  }
                   if (!isLoaded) return;
                   if (pad.mode === 'HOLD' || pad.mode === 'ONE_SHOT') {
                     triggerPad(pad.id);
@@ -756,9 +773,9 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
                 onPointerLeave={() => {
                   if (pad.mode === 'HOLD') stopPad(pad.id);
                 }}
-                onDoubleClick={() => setActivePadId(pad.id)}
                 onContextMenu={(event) => {
                   event.preventDefault();
+                  setActivePadId(pad.id);
                 }}
                 className={`group relative aspect-square h-22 rounded-lg border-2 bg-black/40 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D0BCFF]/60 focus-visible:ring-inset p-1.5 select-none touch-manipulation ${
                   isLoaded
@@ -778,17 +795,6 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
                   }`}
                   aria-hidden="true"
                 />
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setActivePadId(pad.id);
-                  }}
-                  className="absolute bottom-2.5 right-2.5 text-white/40 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition text-[10px]"
-                  aria-label={`Configure pad ${pad.id + 1}`}
-                >
-                  ⋮
-                </button>
               </button>
             );
           })}
