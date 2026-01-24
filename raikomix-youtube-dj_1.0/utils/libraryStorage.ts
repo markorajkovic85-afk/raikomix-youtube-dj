@@ -26,6 +26,7 @@ export const loadLibrary = (): LibraryTrack[] => {
           url: track.url || `https://www.youtube.com/watch?v=${videoId}`,
           title: track.title || `Track ${videoId}`,
           author: track.author || 'Unknown Artist',
+          album: track.album,
           thumbnailUrl: track.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
           addedAt: track.addedAt || Date.now(),
           playCount: typeof track.playCount === 'number' ? track.playCount : 0,
@@ -126,7 +127,7 @@ export const removeFromLibrary = (id: string, library: LibraryTrack[]): LibraryT
 
 export const updateTrackMetadata = (
   videoId: string,
-  metadata: { title?: string; author?: string },
+  metadata: { title?: string; author?: string; album?: string },
   library: LibraryTrack[]
 ): LibraryTrack[] => {
   return library.map(track => {
@@ -134,7 +135,8 @@ export const updateTrackMetadata = (
       return { 
         ...track, 
         title: metadata.title || track.title,
-        author: metadata.author || track.author
+        author: metadata.author || track.author,
+        album: metadata.album || track.album
       };
     }
     return track;
