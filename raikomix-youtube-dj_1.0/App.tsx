@@ -459,7 +459,7 @@ useEffect(() => {
             </section>
           ) : (
            <section className="bg-black/20 border-r border-white/5 flex flex-col h-full w-[clamp(320px,25vw,420px)] shrink-0 overflow-hidden">
-              <div className="p-4 flex flex-col gap-4 h-full min-h-0 overflow-y-auto">
+              <div className="p-3 flex flex-col gap-3 h-full min-h-0 overflow-y-auto scrollbar-slim">
                 <EffectsPanel
                    activeEffect={targetEffect}
                   effectAmount={targetWet}
