@@ -30,6 +30,17 @@ const createDistortionCurve = (drive: number) => {
   return curve;
 };
 
+const createBitcrusherCurve = (bitDepth: number) => {
+  const samples = 44100;
+  const curve = new Float32Array(samples);
+  const steps = Math.max(2, Math.pow(2, bitDepth));
+  for (let i = 0; i < samples; i += 1) {
+    const x = (i * 2) / samples - 1;
+    curve[i] = Math.round(x * steps) / steps;
+  }
+  return curve;
+};
+
 export const createEffectChain = (ctx: AudioContext, effectType: EffectType, intensity: number): EffectChain | null => {
   const amount = Math.min(1, Math.max(0, intensity));
   switch (effectType) {
@@ -140,6 +151,182 @@ export const createEffectChain = (ctx: AudioContext, effectType: EffectType, int
       input.connect(shaper);
       shaper.connect(tone);
       return { input, output: tone, nodes: [input, shaper, tone] };
+    }
+    case 'HIGH_PASS': {
+      const input = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 80 + amount * 12000;
+      filter.Q.value = 0.7 + amount * 1.2;
+      input.connect(filter);
+      return { input, output: filter, nodes: [input, filter] };
+    }
+    case 'LOW_PASS': {
+      const input = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 20000 - amount * 17000;
+      filter.Q.value = 0.7 + amount * 1.1;
+      input.connect(filter);
+      return { input, output: filter, nodes: [input, filter] };
+    }
+    case 'BAND_PASS': {
+      const input = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 400 + amount * 2800;
+      filter.Q.value = 1.2 + amount * 6;
+      input.connect(filter);
+      return { input, output: filter, nodes: [input, filter] };
+    }
+    case 'CHORUS': {
+      const input = ctx.createGain();
+      const mix = ctx.createGain();
+      mix.gain.value = 0.7;
+      const delays = [0.012, 0.017, 0.023].map((baseDelay, index) => {
+        const delay = ctx.createDelay(0.05);
+        delay.delayTime.value = baseDelay + amount * 0.004;
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.2 + amount * (0.8 + index * 0.15);
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 0.002 + amount * 0.004;
+        lfo.connect(lfoGain);
+        lfoGain.connect(delay.delayTime);
+        lfo.start();
+        return { delay, lfo, lfoGain };
+      });
+      delays.forEach(({ delay }) => {
+        input.connect(delay);
+        delay.connect(mix);
+      });
+      const nodes: AudioNode[] = [input, mix];
+      delays.forEach(({ delay, lfo, lfoGain }) => {
+        nodes.push(delay, lfo, lfoGain);
+      });
+      return {
+        input,
+        output: mix,
+        nodes,
+        dispose: () => delays.forEach(({ lfo }) => lfo.stop()),
+      };
+    }
+    case 'TREMOLO': {
+      const input = ctx.createGain();
+      const tremolo = ctx.createGain();
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 2 + amount * 8;
+      const depth = 0.2 + amount * 0.8;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = depth * 0.5;
+      tremolo.gain.value = 1 - depth * 0.5;
+      lfo.connect(lfoGain);
+      lfoGain.connect(tremolo.gain);
+      lfo.start();
+      input.connect(tremolo);
+      return {
+        input,
+        output: tremolo,
+        nodes: [input, tremolo, lfo, lfoGain],
+        dispose: () => lfo.stop(),
+      };
+    }
+    case 'AUTO_PAN': {
+      const input = ctx.createGain();
+      const panner = ctx.createStereoPanner();
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.2 + amount * 1.8;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 0.4 + amount * 0.6;
+      lfo.connect(lfoGain);
+      lfoGain.connect(panner.pan);
+      lfo.start();
+      input.connect(panner);
+      return {
+        input,
+        output: panner,
+        nodes: [input, panner, lfo, lfoGain],
+        dispose: () => lfo.stop(),
+      };
+    }
+    case 'BITCRUSH': {
+      const input = ctx.createGain();
+      const shaper = ctx.createWaveShaper();
+      const bitDepth = Math.round(12 - amount * 8);
+      shaper.curve = createBitcrusherCurve(bitDepth);
+      shaper.oversample = 'none';
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'lowpass';
+      tone.frequency.value = 1000 + (1 - amount) * 8000;
+      input.connect(shaper);
+      shaper.connect(tone);
+      return { input, output: tone, nodes: [input, shaper, tone] };
+    }
+    case 'OVERDRIVE': {
+      const input = ctx.createGain();
+      const shaper = ctx.createWaveShaper();
+      const drive = 2 + amount * 22;
+      shaper.curve = createDistortionCurve(drive);
+      shaper.oversample = '2x';
+      const tone = ctx.createBiquadFilter();
+      tone.type = 'lowpass';
+      tone.frequency.value = 3000 + (1 - amount) * 8000;
+      input.connect(shaper);
+      shaper.connect(tone);
+      return { input, output: tone, nodes: [input, shaper, tone] };
+    }
+    case 'FILTER_SWEEP': {
+      const input = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.value = 0.9 + amount * 1.1;
+      const lfo = ctx.createOscillator();
+      lfo.type = 'triangle';
+      lfo.frequency.value = 0.08 + amount * 0.35;
+      const sweepGain = ctx.createGain();
+      const minFreq = 300;
+      const maxFreq = 20000;
+      sweepGain.gain.value = (maxFreq - minFreq) / 2;
+      const sweepOffset = ctx.createConstantSource();
+      sweepOffset.offset.value = (maxFreq + minFreq) / 2;
+      lfo.connect(sweepGain);
+      sweepGain.connect(filter.frequency);
+      sweepOffset.connect(filter.frequency);
+      lfo.start();
+      sweepOffset.start();
+      input.connect(filter);
+      return {
+        input,
+        output: filter,
+        nodes: [input, filter, lfo, sweepGain, sweepOffset],
+        dispose: () => {
+          lfo.stop();
+          sweepOffset.stop();
+        },
+      };
+    }
+    case 'GATE': {
+      const input = ctx.createGain();
+      const gate = ctx.createGain();
+      const lfo = ctx.createOscillator();
+      lfo.type = 'square';
+      lfo.frequency.value = 2 + amount * 10;
+      const depth = 0.3 + amount * 0.7;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = depth * 0.5;
+      gate.gain.value = 1 - depth * 0.5;
+      lfo.connect(lfoGain);
+      lfoGain.connect(gate.gain);
+      lfo.start();
+      input.connect(gate);
+      return {
+        input,
+        output: gate,
+        nodes: [input, gate, lfo, lfoGain],
+        dispose: () => lfo.stop(),
+      };
     }
     default:
       return null;

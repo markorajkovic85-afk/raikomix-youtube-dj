@@ -57,15 +57,90 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
   padEffectIntensity,
   onNotify,
 }) => {
-  const effects: { label: string; value: EffectType | null }[] = [
-    { label: 'None', value: null },
-    { label: 'Echo', value: 'ECHO' },
-    { label: 'Delay', value: 'DELAY' },
-    { label: 'Reverb', value: 'REVERB' },
-    { label: 'Flanger', value: 'FLANGER' },
-    { label: 'Phaser', value: 'PHASER' },
-    { label: 'Crush', value: 'CRUSH' },
+  const effectSections: {
+    label: string;
+    effects: { label: string; value: EffectType | null; description: string }[];
+    columns: number;
+    accent: string;
+  }[] = [
+    {
+      label: 'BYPASS',
+      effects: [{ label: 'None', value: null, description: 'No effect applied' }],
+      columns: 1,
+      accent: '#D0BCFF',
+    },
+    {
+      label: 'FILTERS',
+      effects: [
+        { label: 'HP Filter', value: 'HIGH_PASS', description: 'Removes low frequencies, brightens sound' },
+        { label: 'LP Filter', value: 'LOW_PASS', description: 'Softens highs for warm, dulled tone' },
+        { label: 'BP Filter', value: 'BAND_PASS', description: 'Telephone/radio style mid focus' },
+      ],
+      columns: 3,
+      accent: '#6B8CFF',
+    },
+    {
+      label: 'TIME',
+      effects: [
+        { label: 'Echo', value: 'ECHO', description: 'Spacious echo repeats with tone' },
+        { label: 'Delay', value: 'DELAY', description: 'Tight rhythmic repeats' },
+        { label: 'Reverb', value: 'REVERB', description: 'Roomy ambience and tail' },
+      ],
+      columns: 3,
+      accent: '#00D1A7',
+    },
+    {
+      label: 'MODULATION',
+      effects: [
+        { label: 'Flanger', value: 'FLANGER', description: 'Sweeping jet-like comb effect' },
+        { label: 'Phaser', value: 'PHASER', description: 'Swirling phase movement' },
+        { label: 'Chorus', value: 'CHORUS', description: 'Thickens sound with detuned copies' },
+        { label: 'Tremolo', value: 'TREMOLO', description: 'Rhythmic volume pulsing' },
+        { label: 'AutoPan', value: 'AUTO_PAN', description: 'Stereo movement left to right' },
+      ],
+      columns: 3,
+      accent: '#D0BCFF',
+    },
+    {
+      label: 'DISTORTION',
+      effects: [
+        { label: 'Crush', value: 'CRUSH', description: 'Aggressive tone crushing' },
+        { label: 'Bitcrush', value: 'BITCRUSH', description: 'Lo-fi digital degradation' },
+        { label: 'Overdrive', value: 'OVERDRIVE', description: 'Warm saturation and grit' },
+      ],
+      columns: 3,
+      accent: '#FF8C42',
+    },
+    {
+      label: 'DJ FX',
+      effects: [
+        { label: 'Sweep', value: 'FILTER_SWEEP', description: 'Automated build-up filter sweep' },
+        { label: 'Gate', value: 'GATE', description: 'Rhythmic chopping effect' },
+      ],
+      columns: 2,
+      accent: '#FF6B6B',
+    },
   ];
+
+  const renderEffectButton = (
+    fx: { label: string; value: EffectType | null; description: string },
+    accent: string
+  ) => (
+    <button
+      key={fx.label}
+      onClick={() => onEffectToggle(fx.value)}
+      className={`py-2 rounded-lg text-[10px] font-black transition-all border uppercase tracking-tight focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+        activeEffect === fx.value
+          ? 'bg-white/15 border-white/30 text-white'
+          : 'bg-white/5 border-white/10 text-gray-500 hover:bg-white/10 hover:text-white/50'
+      }`}
+      style={activeEffect === fx.value ? { borderColor: accent, color: accent } : undefined}
+      title={fx.description}
+      aria-label={`${fx.label} effect`}
+    >
+      {fx.label}
+    </button>
+  );
 
   return (
     <div className="bg-black/40 p-3 rounded-xl border border-white/5 relative z-10 space-y-3">
@@ -92,20 +167,31 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
         </div>
       </div>
       
-      <div className="grid grid-cols-4 gap-2">
-        {effects.map((fx) => (
-          <button
-            key={fx.label}
-            onClick={() => onEffectToggle(fx.value)}
-            className={`py-2 rounded-lg text-[10px] font-black transition-all border uppercase tracking-tight ${
-              activeEffect === fx.value
-                ? 'bg-white/15 border-white/30 text-white'
-                : 'bg-white/5 border-white/10 text-gray-500 hover:bg-white/10 hover:text-white/50'
-            }`}
-            style={activeEffect === fx.value ? { borderColor: color, color } : undefined}
+      <div className="space-y-3">
+        {effectSections.map((section) => (
+          <div
+            key={section.label}
+            className="border border-white/5 rounded-lg p-2 bg-black/20 space-y-1.5"
           >
-            {fx.label}
-          </button>
+            <div className="flex items-center justify-between">
+              <span className="text-[8px] font-black uppercase tracking-[0.25em] text-gray-500">
+                {section.label}
+              </span>
+              <span
+                className="text-[8px] uppercase tracking-[0.25em]"
+                style={{ color: section.accent }}
+              >
+                FX
+              </span>
+            </div>
+            <div
+              className={`grid gap-1.5 ${section.columns === 1 ? 'grid-cols-1' : ''} ${
+                section.columns === 2 ? 'grid-cols-2' : ''
+              } ${section.columns === 3 ? 'grid-cols-3' : ''}`}
+            >
+              {section.effects.map((fx) => renderEffectButton(fx, section.accent))}
+            </div>
+          </div>
         ))}
       </div>
 
