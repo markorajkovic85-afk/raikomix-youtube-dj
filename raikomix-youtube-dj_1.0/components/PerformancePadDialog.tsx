@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PerformancePadConfig, PerformancePadMode, YouTubeLoadingState, YouTubeSearchResult } from '../types';
@@ -69,6 +68,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchState, setSearchState] = useState<YouTubeLoadingState>('idle');
+  const [searchMessage, setSearchMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'youtube' | 'local'>('youtube');
   const [listeningKey, setListeningKey] = useState(false);
   const [startInput, setStartInput] = useState(formatTime(pad.trimStart));
@@ -115,10 +115,12 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   }, [draft.trimStart, draft.trimEnd]);
 
   useEffect(() => {
-    if (query.trim().length < 3) {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 3) {
       setResults([]);
       setLoading(false);
       setSearchState('idle');
+      setSearchMessage(null);
       return;
     }
     const timeout = setTimeout(async () => {
@@ -128,9 +130,10 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       const startedAt = performance.now();
       setLoading(true);
       setSearchState('searching');
-      const res = await searchYouTube(query, 15, controller.signal, { restrictToMusic: false });
+      const res = await searchYouTube(trimmedQuery, 15, controller.signal, { restrictToMusic: false });
       if (!controller.signal.aborted) {
         setResults(res);
+        setSearchMessage(res.length === 0 ? 'No matching results found.' : null);
       }
       setLoading(false);
       if (!controller.signal.aborted) {
@@ -140,6 +143,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         }
       } else {
         setSearchState('cancelled');
+        setSearchMessage(null);
       }
     }, 400);
     return () => clearTimeout(timeout);
@@ -371,6 +375,9 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                     YouTube previews may take a moment to load before audio is ready.
                   </p>
                   <div className="space-y-2 max-h-[260px] overflow-y-auto overflow-x-hidden pr-1 scrollbar-hide">
+                    {searchState === 'idle' && searchMessage && results.length === 0 && (
+                      <p className="text-[10px] uppercase tracking-widest text-gray-500">{searchMessage}</p>
+                    )}
                     {results.map((result) => {
                       const nextDraft = {
                         ...draft,
