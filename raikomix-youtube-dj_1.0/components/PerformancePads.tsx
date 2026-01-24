@@ -19,7 +19,7 @@ interface PerformancePadsProps {
   onNotify: (message: string, type?: 'info' | 'success' | 'error') => void;
 }
 
-const DEFAULT_KEYS = ['1', '2', '3', '4', '5', 'q', 'w', 'e', 'r', 't'];
+const DEFAULT_KEYS = ['1', '2', '3', '4', '5', 'q', 'w', 'e', 'r', 't', 'a', 's'];
 const RESERVED_KEYS = new Set([
   'q',
   's',
@@ -48,7 +48,7 @@ const RESERVED_KEYS = new Set([
 ]);
 
 const buildDefaultPads = () =>
-  Array.from({ length: 10 }, (_, index) => ({
+  Array.from({ length: 12 }, (_, index) => ({
     id: index,
     title: `Pad ${index + 1}`,
     sourceType: 'empty' as const,
@@ -235,8 +235,8 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
   }, [pads]);
 
   useEffect(() => {
-    if (pads.length !== 10) {
-      console.warn(`Expected 10 performance pads, received ${pads.length}.`);
+    if (pads.length !== 12) {
+      console.warn(`Expected 12 performance pads, received ${pads.length}.`);
     }
   }, [pads.length]);
 
@@ -737,15 +737,15 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
     >
       <div className="w-full max-w-[600px] mx-auto">
         <div className="flex justify-between items-center mb-3">
-          <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">
-            PADS <span className="text-white/40">RIGHT CLICK / CONFIGURE</span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">
+            PADS <span className="text-white/40 uppercase tracking-widest">RIGHT CLICK</span>
           </span>
           <button
             type="button"
             onClick={() => setConfigMode((prev) => !prev)}
-            className="px-3 py-1 text-[9px] font-black uppercase bg-white/5 hover:bg-white/10 rounded-lg"
+            className="text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-400 transition-colors"
           >
-            {configMode ? 'Done' : 'Configure'}
+            {configMode ? 'DONE' : 'CONFIGURE'}
           </button>
         </div>
         <div className="grid grid-cols-3 md:grid-cols-4 gap-2.5">
@@ -775,6 +775,8 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
                 }}
                 onContextMenu={(event) => {
                   event.preventDefault();
+                  const pointerType = (event.nativeEvent as PointerEvent).pointerType;
+                  if (pointerType === 'touch') return;
                   setActivePadId(pad.id);
                 }}
                 className={`group relative aspect-square h-22 rounded-lg border-2 bg-black/40 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D0BCFF]/60 focus-visible:ring-inset p-1.5 select-none touch-manipulation ${
@@ -790,7 +792,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
                     isPlaying
                       ? 'bg-[#D0BCFF] shadow-[0_0_10px_rgba(208,188,255,0.7)]'
                       : isLoaded
-                        ? 'bg-white/40'
+                        ? 'bg-[#D0BCFF]/60'
                         : 'bg-white/10'
                   }`}
                   aria-hidden="true"
