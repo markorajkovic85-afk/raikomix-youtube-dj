@@ -104,6 +104,8 @@ const App: React.FC = () => {
   const mixAnimationRef = useRef<number | null>(null);
   const mixInProgressRef = useRef(false);
   const pendingMixRef = useRef<{ deck: DeckId; fromDeck: DeckId; item: QueueItem } | null>(null);
+  const lastAutoDeckRef = useRef<DeckId>('B');
+  const autoLoadDeckRef = useRef<DeckId | null>(null);
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => { saveLibrary(library); }, [library]);
@@ -119,6 +121,9 @@ const App: React.FC = () => {
 
   const handleDeckStateUpdate = useCallback((id: DeckId, state: PlayerState) => {
     id === 'A' ? setDeckAState(state) : setDeckBState(state);
+    if (state.playing && autoLoadDeckRef.current === id) {
+      autoLoadDeckRef.current = null;
+    }
     if (state.isReady && state.title && state.videoId && state.sourceType === 'youtube') {
       setLibrary(prev => updateTrackMetadata(state.videoId, { title: state.title, author: state.author }, prev));
     }
@@ -180,14 +185,18 @@ const App: React.FC = () => {
   }, [crossfader, mixDurationSeconds, stopDeck]);
 
   const handleTrackEnd = useCallback((deckId: DeckId) => {
-    if (!autoDjEnabled || mixInProgressRef.current) return;
+    if (!autoDjEnabled || mixInProgressRef.current || pendingMixRef.current) return;
+    const targetDeck = deckId === 'A' ? 'B' : 'A';
+    const targetState = targetDeck === 'A' ? deckAState : deckBState;
+    if (targetState?.playing) return;
     const nextItem = queue[0];
     if (!nextItem) return;
-    handleLoadVideo(nextItem.videoId, nextItem.url, deckId, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author);
+    handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author);
     setQueue(prev => prev.filter(item => item.id !== nextItem.id));
-    const ref = deckId === 'A' ? deckARef : deckBRef;
-    setTimeout(() => ref.current?.togglePlay(), 0);
-  }, [autoDjEnabled, queue, handleLoadVideo]);
+    const pending = { deck: targetDeck, fromDeck: deckId, item: nextItem };
+    pendingMixRef.current = pending;
+    setPendingMix(pending);
+  }, [autoDjEnabled, queue, deckAState, deckBState, handleLoadVideo]);
 
   const handleMixLeadChange = useCallback((value: number) => {
     if (!Number.isFinite(value)) return;
@@ -274,10 +283,39 @@ const App: React.FC = () => {
     muteDeck, pitchDeck, resetEq
   });
 
+  const loadNextQueueItem = useCallback((targetDeck: DeckId) => {
+    const nextItem = queue[0];
+    if (!nextItem) return null;
+    handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author);
+    setQueue(prev => prev.filter(item => item.id !== nextItem.id));
+    lastAutoDeckRef.current = targetDeck;
+    return nextItem;
+  }, [queue, handleLoadVideo]);
+
+  const triggerDeckPlay = useCallback((deck: DeckId) => {
+    const ref = deck === 'A' ? deckARef : deckBRef;
+    setTimeout(() => ref.current?.togglePlay(), 0);
+  }, []);
+
   useEffect(() => {
     if (!autoDjEnabled) return;
     const interval = setInterval(() => {
       if (mixInProgressRef.current || pendingMixRef.current || queue.length === 0) return;
+      const deckAPlaying = deckAState?.playing || false;
+      const deckBPlaying = deckBState?.playing || false;
+      if (!deckAPlaying && !deckBPlaying) {
+        if (autoLoadDeckRef.current) return;
+        const nextDeck = lastAutoDeckRef.current === 'A' ? 'B' : 'A';
+        const nextItem = loadNextQueueItem(nextDeck);
+        if (!nextItem) {
+          autoLoadDeckRef.current = null;
+          return;
+        }
+        autoLoadDeckRef.current = nextDeck;
+        setCrossfader(nextDeck === 'A' ? -1 : 1);
+        triggerDeckPlay(nextDeck);
+        return;
+      }
       const activeDeck = getActiveDeck();
       if (!activeDeck) return;
       const activeState = activeDeck === 'A' ? deckAState : deckBState;
@@ -285,20 +323,22 @@ const App: React.FC = () => {
       const remaining = activeState.duration - activeState.currentTime;
       if (remaining <= mixLeadSeconds) {
         const targetDeck = activeDeck === 'A' ? 'B' : 'A';
-        const nextItem = queue[0];
+        const targetState = targetDeck === 'A' ? deckAState : deckBState;
+        if (targetState?.playing) return;
+        const nextItem = loadNextQueueItem(targetDeck);
+        if (!nextItem) return;
         const pending = { deck: targetDeck, fromDeck: activeDeck, item: nextItem };
         pendingMixRef.current = pending;
         setPendingMix(pending);
-        handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author);
-        setQueue(prev => prev.filter(item => item.id !== nextItem.id));
       }
     }, 500);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, getActiveDeck, handleLoadVideo]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, getActiveDeck, loadNextQueueItem, triggerDeckPlay]);
 
   useEffect(() => {
     if (autoDjEnabled) return;
     pendingMixRef.current = null;
+    autoLoadDeckRef.current = null;
     setPendingMix(null);
   }, [autoDjEnabled]);
 
