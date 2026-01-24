@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PerformancePadConfig, PerformancePadMode, YouTubeLoadingState, YouTubeSearchResult } from '../types';
@@ -45,6 +44,10 @@ const parseTime = (value: string) => {
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+const getTrimLength = (pad: PerformancePadConfig) => {
+  const length = pad.trimLength ?? pad.trimEnd - pad.trimStart;
+  return Number.isFinite(length) && length > 0 ? length : 0.1;
+};
 
 const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   pad,
@@ -77,6 +80,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
   const duration = draft.duration ?? 0;
   const maxTrim = duration > 0 ? duration : Math.max(draft.trimEnd, 5);
+  const trimLength = getTrimLength(draft);
 
   const selectedYouTubeState =
     draft.sourceType === 'youtube' && draft.sourceId ? youtubeStates[draft.sourceId]?.state : null;
@@ -178,10 +182,79 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
   const handleTrimChange = (field: 'trimStart' | 'trimEnd', value: number) => {
     if (!Number.isFinite(value)) return;
-    setDraft((prev) => ({
-      ...prev,
-      [field]: clamp(value, 0, maxTrim),
-    }));
+    setDraft((prev) => {
+      const nextValue = clamp(value, 0, maxTrim);
+      if (!prev.trimLock) {
+        return { ...prev, [field]: nextValue };
+      }
+      const length = Math.min(getTrimLength(prev), maxTrim);
+      if (field === 'trimStart') {
+        const nextTrimEnd = clamp(nextValue + length, 0, maxTrim);
+        const nextTrimStart = Math.max(0, nextTrimEnd - length);
+        return {
+          ...prev,
+          trimStart: nextTrimStart,
+          trimEnd: nextTrimEnd,
+          trimLength: length,
+        };
+      }
+      const nextTrimStart = clamp(nextValue - length, 0, maxTrim);
+      const nextTrimEnd = Math.min(nextTrimStart + length, maxTrim);
+      return {
+        ...prev,
+        trimStart: nextTrimStart,
+        trimEnd: nextTrimEnd,
+        trimLength: length,
+      };
+    });
+  };
+
+  const handleTrimLengthChange = (value: number) => {
+    if (!Number.isFinite(value)) return;
+    setDraft((prev) => {
+      const nextLength = clamp(value, 0.1, maxTrim);
+      if (!prev.trimLock) {
+        return { ...prev, trimLength: nextLength };
+      }
+      const nextTrimEnd = Math.min(prev.trimStart + nextLength, maxTrim);
+      const nextTrimStart = Math.max(0, nextTrimEnd - nextLength);
+      return {
+        ...prev,
+        trimStart: nextTrimStart,
+        trimEnd: nextTrimEnd,
+        trimLength: nextLength,
+      };
+    });
+  };
+
+  const handleTrimLockToggle = (locked: boolean) => {
+    setDraft((prev) => {
+      if (!locked) {
+        return { ...prev, trimLock: false, trimLength: getTrimLength(prev) };
+      }
+      const nextLength = Math.min(getTrimLength(prev), maxTrim);
+      const nextTrimEnd = Math.min(prev.trimStart + nextLength, maxTrim);
+      const nextTrimStart = Math.max(0, nextTrimEnd - nextLength);
+      return {
+        ...prev,
+        trimLock: true,
+        trimLength: nextLength,
+        trimStart: nextTrimStart,
+        trimEnd: nextTrimEnd,
+      };
+    });
+  };
+
+  const handleFitToLength = () => {
+    setDraft((prev) => {
+      const nextLength = maxTrim;
+      return {
+        ...prev,
+        trimStart: 0,
+        trimEnd: maxTrim,
+        trimLength: nextLength,
+      };
+    });
   };
 
   const handleClose = () => {
@@ -305,7 +378,9 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                         sampleName: result.title,
                         sourceLabel: result.channelTitle,
                         trimStart: 0,
-                        trimEnd: draft.duration ? Math.min(draft.duration, 5) : Math.max(draft.trimEnd, 5),
+                        trimEnd: draft.duration ? draft.duration : Math.max(draft.trimEnd, 5),
+                        trimLength: draft.duration ? draft.duration : getTrimLength(draft),
+                        trimLock: false,
                       };
                       const previewError = previewErrors[result.videoId];
                       const rowState = youtubeStates[result.videoId]?.state ?? 'idle';
@@ -430,7 +505,9 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                         sourceLabel: 'Local File',
                         duration: meta.duration,
                         trimStart: 0,
-                        trimEnd: Math.min(meta.duration, 5),
+                        trimEnd: meta.duration,
+                        trimLength: meta.duration,
+                        trimLock: false,
                       }));
                     }}
                     className="w-full text-xs text-gray-400 file:bg-[#2B2930] file:text-white file:border-none file:px-4 file:py-2 file:rounded-full file:text-[10px] file:font-black file:uppercase file:tracking-widest"
@@ -454,12 +531,37 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                   className="text-[10px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-full disabled:opacity-40 disabled:cursor-not-allowed"
                   disabled={draft.sourceType === 'empty'}
                 >
-                  {previewingType && previewingType === draft.sourceType && previewingId === draft.sourceId ? 'Stop' : 'Preview'}
+                  {previewingType && previewingType === draft.sourceType && previewingId === draft.sourceId
+                    ? 'Stop Test'
+                    : 'Test Selection'}
                 </button>
               </div>
               {generalPreviewError && (
                 <p className="text-[10px] text-[#F2B8B5]">{generalPreviewError}</p>
               )}
+
+              <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/60">
+                <button
+                  type="button"
+                  onClick={handleFitToLength}
+                  className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                  disabled={draft.sourceType === 'empty'}
+                >
+                  Fit to Full Length
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTrimLockToggle(!draft.trimLock)}
+                  className={`px-3 py-1.5 rounded-full border transition ${
+                    draft.trimLock
+                      ? 'bg-[#D0BCFF] text-black border-[#D0BCFF]'
+                      : 'bg-white/10 text-white border-white/10 hover:border-white/30'
+                  }`}
+                  disabled={draft.sourceType === 'empty'}
+                >
+                  {draft.trimLock ? 'Fixed Length On' : 'Fixed Length Off'}
+                </button>
+              </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-[10px] text-white/60">
@@ -522,6 +624,33 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                 {!validation.trimValid && (
                   <p className="text-[10px] text-[#F2B8B5]">End time must be greater than start.</p>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[10px] text-white/60">
+                  <span>Fixed Length</span>
+                  <span>{trimLength.toFixed(2)}s</span>
+                </div>
+                <input
+                  type="range"
+                  min={0.1}
+                  max={maxTrim}
+                  step={0.1}
+                  value={trimLength}
+                  onChange={(event) => handleTrimLengthChange(parseFloat(event.target.value))}
+                  className="w-full accent-[#D0BCFF]"
+                  disabled={draft.sourceType === 'empty'}
+                />
+                <input
+                  type="number"
+                  min={0.1}
+                  max={maxTrim}
+                  step={0.1}
+                  value={Number(trimLength.toFixed(2))}
+                  onChange={(event) => handleTrimLengthChange(parseFloat(event.target.value))}
+                  className="w-full bg-[#111014] border border-white/10 rounded-lg p-2 text-xs text-white"
+                  disabled={draft.sourceType === 'empty'}
+                />
               </div>
 
               <div className="space-y-3 border-t border-white/10 pt-4">
