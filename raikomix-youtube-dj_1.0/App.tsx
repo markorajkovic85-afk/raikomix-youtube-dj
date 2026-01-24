@@ -106,6 +106,7 @@ const App: React.FC = () => {
   const pendingMixRef = useRef<{ deck: DeckId; fromDeck: DeckId; item: QueueItem } | null>(null);
   const lastAutoDeckRef = useRef<DeckId>('B');
   const autoLoadDeckRef = useRef<DeckId | null>(null);
+  const lastMixVideoRef = useRef<{ A?: string | null; B?: string | null }>({});
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => { saveLibrary(library); }, [library]);
@@ -214,16 +215,20 @@ const App: React.FC = () => {
     if (mixInProgressRef.current || pendingMixRef.current) return;
     const targetDeck = fromDeck === 'A' ? 'B' : 'A';
     const targetState = targetDeck === 'A' ? deckAState : deckBState;
-    if (targetState?.playing) return;
+    if (targetState?.playing) {
+      startAutoMix(fromDeck, targetDeck);
+      return;
+    }
     const nextItem = loadNextQueueItem(targetDeck, 'load');
     if (!nextItem) return;
     const pending = { deck: targetDeck, fromDeck, item: nextItem };
     pendingMixRef.current = pending;
     setPendingMix(pending);
-  }, [deckAState, deckBState, loadNextQueueItem]);
+  }, [deckAState, deckBState, loadNextQueueItem, startAutoMix]);
 
   const handleTrackEnd = useCallback((deckId: DeckId) => {
     if (!autoDjEnabled) return;
+    lastMixVideoRef.current[deckId] = null;
     queueAutoMix(deckId);
   }, [autoDjEnabled, queueAutoMix]);
 
@@ -335,8 +340,11 @@ const App: React.FC = () => {
       if (!activeDeck) return;
       const activeState = activeDeck === 'A' ? deckAState : deckBState;
       if (!activeState?.duration || !activeState.isReady) return;
+      if (activeState.videoId && lastMixVideoRef.current[activeDeck] === activeState.videoId) return;
       const remaining = activeState.duration - activeState.currentTime;
-      if (remaining <= mixLeadSeconds) {
+      const leadTime = Math.min(Math.max(1, mixLeadSeconds), activeState.duration);
+      if (remaining <= leadTime) {
+        lastMixVideoRef.current[activeDeck] = activeState.videoId;
         queueAutoMix(activeDeck);
       }
     }, 250);
@@ -348,6 +356,7 @@ const App: React.FC = () => {
     pendingMixRef.current = null;
     autoLoadDeckRef.current = null;
     setPendingMix(null);
+    lastMixVideoRef.current = {};
   }, [autoDjEnabled]);
 
   useEffect(() => {
@@ -517,6 +526,13 @@ useEffect(() => {
                 onCrossfaderChange={setCrossfader}
                 crossfaderCurve={xFaderCurve}
                 onCurveChange={setXFaderCurve}
+                autoDjEnabled={autoDjEnabled}
+                onToggleAutoDj={() => setAutoDjEnabled(prev => !prev)}
+                mixLeadSeconds={mixLeadSeconds}
+                mixDurationSeconds={mixDurationSeconds}
+                onMixLeadChange={handleMixLeadChange}
+                onMixDurationChange={handleMixDurationChange}
+                queueLength={queue.length}
                 masterVolume={masterVolume}
                 onMasterVolumeChange={setMasterVolume}
                 deckAVolume={deckAVolume}
