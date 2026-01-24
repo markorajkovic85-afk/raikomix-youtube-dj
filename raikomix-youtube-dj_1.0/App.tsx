@@ -210,17 +210,22 @@ const App: React.FC = () => {
     setTimeout(() => ref.current?.togglePlay(), 0);
   }, []);
 
-  const handleTrackEnd = useCallback((deckId: DeckId) => {
-    if (!autoDjEnabled || mixInProgressRef.current || pendingMixRef.current) return;
-    const targetDeck = deckId === 'A' ? 'B' : 'A';
+  const queueAutoMix = useCallback((fromDeck: DeckId) => {
+    if (mixInProgressRef.current || pendingMixRef.current) return;
+    const targetDeck = fromDeck === 'A' ? 'B' : 'A';
     const targetState = targetDeck === 'A' ? deckAState : deckBState;
     if (targetState?.playing) return;
     const nextItem = loadNextQueueItem(targetDeck, 'load');
     if (!nextItem) return;
-    const pending = { deck: targetDeck, fromDeck: deckId, item: nextItem };
+    const pending = { deck: targetDeck, fromDeck, item: nextItem };
     pendingMixRef.current = pending;
     setPendingMix(pending);
-  }, [autoDjEnabled, deckAState, deckBState, loadNextQueueItem]);
+  }, [deckAState, deckBState, loadNextQueueItem]);
+
+  const handleTrackEnd = useCallback((deckId: DeckId) => {
+    if (!autoDjEnabled) return;
+    queueAutoMix(deckId);
+  }, [autoDjEnabled, queueAutoMix]);
 
   const handleMixLeadChange = useCallback((value: number) => {
     if (!Number.isFinite(value)) return;
@@ -332,18 +337,11 @@ const App: React.FC = () => {
       if (!activeState?.duration || !activeState.isReady) return;
       const remaining = activeState.duration - activeState.currentTime;
       if (remaining <= mixLeadSeconds) {
-        const targetDeck = activeDeck === 'A' ? 'B' : 'A';
-        const targetState = targetDeck === 'A' ? deckAState : deckBState;
-        if (targetState?.playing) return;
-        const nextItem = loadNextQueueItem(targetDeck, 'load');
-        if (!nextItem) return;
-        const pending = { deck: targetDeck, fromDeck: activeDeck, item: nextItem };
-        pendingMixRef.current = pending;
-        setPendingMix(pending);
+        queueAutoMix(activeDeck);
       }
     }, 250);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, getActiveDeck, loadNextQueueItem, triggerDeckPlay]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, getActiveDeck, loadNextQueueItem, triggerDeckPlay, queueAutoMix]);
 
   useEffect(() => {
     if (autoDjEnabled) return;
@@ -359,7 +357,6 @@ const App: React.FC = () => {
     if (!targetState?.isReady) return;
     if (!targetState.playing) {
       targetRef.current?.togglePlay();
-      return;
     }
     startAutoMix(pendingMix.fromDeck, pendingMix.deck);
     pendingMixRef.current = null;
