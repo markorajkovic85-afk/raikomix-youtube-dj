@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { parseBlob } from 'music-metadata-browser';
 import { LibraryTrack, Playlist, DeckId } from '../types';
 import { exportLibrary, loadPlaylists, savePlaylists } from '../utils/libraryStorage';
 import { extractPlaylistId, fetchPlaylistItems } from '../utils/youtubeApi';
@@ -127,6 +126,104 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
     return btoa(binary);
   };
 
+  const decodeText = (data: Uint8Array, encodingByte: number) => {
+    if (data.length === 0) return '';
+    switch (encodingByte) {
+      case 1: { // utf-16 with BOM
+        const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+        if (data.length >= 2) {
+          const bom = view.getUint16(0);
+          const isLittleEndian = bom === 0xFFFE;
+          const textData = data.subarray(2);
+          return new TextDecoder(isLittleEndian ? 'utf-16le' : 'utf-16be').decode(textData).replace(/\0/g, '').trim();
+        }
+        return '';
+      }
+      case 2: // utf-16be without BOM
+        return new TextDecoder('utf-16be').decode(data).replace(/\0/g, '').trim();
+      case 3: // utf-8
+        return new TextDecoder('utf-8').decode(data).replace(/\0/g, '').trim();
+      default: // iso-8859-1
+        return new TextDecoder('iso-8859-1').decode(data).replace(/\0/g, '').trim();
+    }
+  };
+
+  const readSyncSafeInt = (bytes: Uint8Array) => {
+    return (bytes[0] << 21) | (bytes[1] << 14) | (bytes[2] << 7) | bytes[3];
+  };
+
+  const parseId3Metadata = (buffer: ArrayBuffer) => {
+    const view = new DataView(buffer);
+    if (view.byteLength < 10) return null;
+    const header = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2));
+    if (header !== 'ID3') return null;
+    const version = view.getUint8(3);
+    const tagSize = readSyncSafeInt(new Uint8Array(buffer, 6, 4));
+    let offset = 10;
+    const end = Math.min(view.byteLength, offset + tagSize);
+    let title = '';
+    let artist = '';
+    let album = '';
+    let pictureDataUrl = '';
+
+    while (offset + 10 <= end) {
+      const frameId = String.fromCharCode(
+        view.getUint8(offset),
+        view.getUint8(offset + 1),
+        view.getUint8(offset + 2),
+        view.getUint8(offset + 3)
+      );
+      const sizeBytes = new Uint8Array(buffer, offset + 4, 4);
+      const frameSize = version === 4 ? readSyncSafeInt(sizeBytes) : view.getUint32(offset + 4);
+      if (!frameId.trim() || frameSize <= 0) break;
+      const frameStart = offset + 10;
+      const frameEnd = frameStart + frameSize;
+      if (frameEnd > end) break;
+
+      const frameData = new Uint8Array(buffer, frameStart, frameSize);
+      if (frameId === 'TIT2' || frameId === 'TPE1' || frameId === 'TALB') {
+        const encodingByte = frameData[0];
+        const text = decodeText(frameData.subarray(1), encodingByte);
+        if (frameId === 'TIT2') title = text || title;
+        if (frameId === 'TPE1') artist = text || artist;
+        if (frameId === 'TALB') album = text || album;
+      } else if (frameId === 'APIC' && !pictureDataUrl) {
+        const encodingByte = frameData[0];
+        let idx = 1;
+        while (idx < frameData.length && frameData[idx] !== 0x00) idx++;
+        const mime = new TextDecoder('iso-8859-1').decode(frameData.subarray(1, idx)) || 'image/jpeg';
+        idx += 1; // skip null
+        idx += 1; // picture type
+        if (encodingByte === 1 || encodingByte === 2) {
+          while (idx + 1 < frameData.length && !(frameData[idx] === 0x00 && frameData[idx + 1] === 0x00)) idx += 2;
+          idx += 2;
+        } else {
+          while (idx < frameData.length && frameData[idx] !== 0x00) idx++;
+          idx += 1;
+        }
+        if (idx < frameData.length) {
+          const imageData = frameData.subarray(idx);
+          const base64 = toBase64(imageData);
+          pictureDataUrl = `data:${mime};base64,${base64}`;
+        }
+      }
+
+      offset = frameEnd;
+    }
+
+    return { title, artist, album, pictureDataUrl };
+  };
+
+  const readMetadataFromFile = async (file: File) => {
+    try {
+      const buffer = await file.arrayBuffer();
+      return parseId3Metadata(buffer);
+    } catch (error) {
+      console.warn('Unable to read metadata for local file:', file.name, error);
+      return null;
+    }
+  };
+
   const handleLocalFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -141,20 +238,14 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         let album = fallbackAlbum;
         let thumbnailUrl = fallbackThumbnail;
 
-        try {
-          const metadata = await parseBlob(file);
-          const common = metadata.common;
-          title = common.title?.trim() || title;
-          author = common.artist?.trim() || common.artists?.[0]?.trim() || author;
-          album = common.album?.trim() || album;
-
-          const picture = common.picture?.[0];
-          if (picture?.data?.length) {
-            const base64 = toBase64(picture.data);
-            thumbnailUrl = `data:${picture.format || 'image/jpeg'};base64,${base64}`;
+        const metadata = await readMetadataFromFile(file);
+        if (metadata) {
+          title = metadata.title || title;
+          author = metadata.artist || author;
+          album = metadata.album || album;
+          if (metadata.pictureDataUrl) {
+            thumbnailUrl = metadata.pictureDataUrl;
           }
-        } catch (error) {
-          console.warn('Unable to read metadata for local file:', file.name, error);
         }
 
         return {
@@ -325,6 +416,8 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
           <div
             key={t.id}
             title={tooltipText}
+            tabIndex={0}
+            onTouchStart={(event) => event.currentTarget.focus()}
             className={`group flex gap-3 items-center p-3 rounded-xl border transition-all relative ${
               isSelected ? 'bg-[#D0BCFF]/10 border-[#D0BCFF]/50' : 'bg-black/20 border-white/5 hover:border-white/20'
             } ${playedOpacity}`}
@@ -364,7 +457,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
               <button onClick={() => onLoadToDeck(t, 'B')} className="w-7 h-7 rounded-lg bg-[#F2B8B5] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">B</button>
               <button onClick={() => onRemove(t.id)} className="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all" title="Remove"><span className="material-symbols-outlined text-sm">delete</span></button>
             </div>
-            <div className="pointer-events-none absolute left-12 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-black/90 p-3 text-[9px] text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+            <div className="pointer-events-none absolute left-12 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-black/90 p-3 text-[9px] text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               <div className="font-bold text-[#D0BCFF] mb-1">Track Details</div>
               <div className="space-y-1 text-gray-200">
                 <div><span className="text-gray-500">Title:</span> {t.title || 'Unknown Title'}</div>
