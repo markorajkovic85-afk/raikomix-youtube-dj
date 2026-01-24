@@ -7,6 +7,13 @@ interface MixerProps {
   onCrossfaderChange: (val: number) => void;
   crossfaderCurve: CrossfaderCurve;
   onCurveChange: (curve: CrossfaderCurve) => void;
+  autoDjEnabled: boolean;
+  onToggleAutoDj: () => void;
+  mixLeadSeconds: number;
+  mixDurationSeconds: number;
+  onMixLeadChange: (value: number) => void;
+  onMixDurationChange: (value: number) => void;
+  queueLength: number;
   masterVolume: number;
   onMasterVolumeChange: (val: number) => void;
   deckAVolume: number;
@@ -202,6 +209,7 @@ const Fader: React.FC<{
 
 const Mixer: React.FC<MixerProps> = ({ 
   crossfader, onCrossfaderChange, crossfaderCurve, onCurveChange,
+  autoDjEnabled, onToggleAutoDj, mixLeadSeconds, mixDurationSeconds, onMixLeadChange, onMixDurationChange, queueLength,
   masterVolume, onMasterVolumeChange, deckAVolume, onDeckAVolumeChange, deckBVolume, onDeckBVolumeChange,
   deckAPlaying, deckBPlaying, deckATrim, deckBTrim, onDeckATrimChange, onDeckBTrimChange,
   deckAEq, deckBEq, onDeckAEqChange, onDeckBEqChange
@@ -400,6 +408,49 @@ const Mixer: React.FC<MixerProps> = ({
              <div className={`w-1 h-1 rounded-full transition-colors ${Math.abs(crossfader) < 0.05 ? 'bg-white shadow-[0_0_5px_white]' : 'bg-transparent'}`} />
            </div>
            <span className={`text-[7px] transition-colors ${crossfader > 0.8 ? 'text-[#F2B8B5]' : 'text-gray-600'}`}>Deck B</span>
+        </div>
+      </div>
+
+      <div className="mt-3 rounded-lg border border-white/5 bg-black/30 p-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col">
+            <span className="text-[8px] font-black uppercase tracking-widest text-gray-400">Auto DJ</span>
+            <span className="text-[7px] text-gray-500">Queue: {queueLength}</span>
+          </div>
+          <button
+            onClick={onToggleAutoDj}
+            className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${
+              autoDjEnabled
+                ? 'bg-[#D0BCFF]/20 text-[#D0BCFF] border-[#D0BCFF]/40'
+                : 'bg-black/40 text-gray-500 border-white/10'
+            }`}
+          >
+            {autoDjEnabled ? 'On' : 'Off'}
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-[7px] uppercase tracking-widest text-gray-500 mt-2">
+          <label className="flex flex-col gap-1">
+            Mix Lead
+            <input
+              type="number"
+              min={4}
+              max={30}
+              value={mixLeadSeconds}
+              onChange={(e) => onMixLeadChange(Number(e.target.value))}
+              className="w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[9px] text-white"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            Duration
+            <input
+              type="number"
+              min={2}
+              max={20}
+              value={mixDurationSeconds}
+              onChange={(e) => onMixDurationChange(Number(e.target.value))}
+              className="w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[9px] text-white"
+            />
+          </label>
         </div>
       </div>
     </div>
