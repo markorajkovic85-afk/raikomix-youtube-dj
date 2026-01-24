@@ -1,4 +1,3 @@
-
 export type DeckId = 'A' | 'B';
 export type CrossfaderCurve = 'SMOOTH' | 'CUT' | 'DIP';
 export type EffectType = 'ECHO' | 'DELAY' | 'REVERB' | 'FLANGER' | 'PHASER' | 'CRUSH';
@@ -55,7 +54,7 @@ export interface QueueItem {
 export interface LibraryTrack {
   id: string;
   videoId: string; // Used as unique identifier or YT ID
-  url: string;     // URL or ObjectURL
+  url: string; // URL or ObjectURL
   title: string;
   author: string;
   thumbnailUrl: string;

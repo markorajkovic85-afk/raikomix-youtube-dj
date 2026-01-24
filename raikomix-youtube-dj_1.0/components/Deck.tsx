@@ -735,7 +735,7 @@ const effectNodesRef = useRef<{
 
   return (
     <div className="m3-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden min-w-[420px]">
-      <div className="absolute top-0 left-0 w-px h-px opacity-0 pointer-events-none overflow-hidden">
+      <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden">
         <div id={containerId} />
       </div>
       <audio
