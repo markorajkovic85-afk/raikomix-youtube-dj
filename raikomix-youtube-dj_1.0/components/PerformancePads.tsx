@@ -727,7 +727,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
 
   return (
     <div
-     className={`w-full h-full flex items-center justify-center outline-none rounded-xl ${hasFocus ? 'ring-4 ring-[#D0BCFF]/40 p-3' : 'p-3'}`}
+      className={`w-full h-full flex items-center justify-center outline-none rounded-xl ${hasFocus ? 'ring-4 ring-[#D0BCFF]/40 p-3' : 'p-3'}`}
       tabIndex={0}
       onFocus={() => setHasFocus(true)}
       onBlur={() => setHasFocus(false)}
@@ -748,58 +748,64 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
             {configMode ? 'DONE' : 'CONFIGURE'}
           </button>
         </div>
-        <div className="grid grid-cols-3 md:grid-cols-4 gap-2.5">
-          {pads.map((pad) => {
-            const isPlaying = playingPads[pad.id];
-            const isLoaded = pad.sourceType !== 'empty';
-            return (
-              <button
-                key={pad.id}
-                type="button"
-                onPointerDown={(event) => {
-                  if (event.button !== 0) return;
-                  if (configMode) {
-                    setActivePadId(pad.id);
-                    return;
-                  }
-                  if (!isLoaded) return;
-                  if (pad.mode === 'HOLD' || pad.mode === 'ONE_SHOT') {
-                    triggerPad(pad.id);
-                  }
-                }}
-                onPointerUp={() => {
-                  if (pad.mode === 'HOLD') stopPad(pad.id);
-                }}
-                onPointerLeave={() => {
-                  if (pad.mode === 'HOLD') stopPad(pad.id);
-                }}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  const pointerType = (event.nativeEvent as PointerEvent).pointerType;
-                  if (pointerType === 'touch') return;
-                  setActivePadId(pad.id);
-                }}
-                className={`group relative aspect-square h-22 rounded-lg border-2 bg-black/40 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D0BCFF]/60 focus-visible:ring-inset p-1.5 select-none touch-manipulation ${
-                  isLoaded
-                    ? 'border-white/20 hover:border-[#D0BCFF]/40'
-                    : 'border-white/10 hover:border-white/20'
-                }`}
-                aria-label={`Pad ${pad.id + 1}${isLoaded ? ' loaded' : ' empty'}`}
-              >
-                <span className="absolute left-3 top-3 text-[9px] font-black text-gray-400">P{pad.id + 1}</span>
-                <span
-                  className={`absolute right-3 top-3 h-2 w-2 rounded-full ${
-                    isPlaying
-                      ? 'bg-[#D0BCFF] shadow-[0_0_10px_rgba(208,188,255,0.7)]'
-                      : isLoaded
-                        ? 'bg-[#D0BCFF]/60'
-                        : 'bg-white/10'
-                  }`}
-                  aria-hidden="true"
-                />
-              </button>
-            );
-          })}
+        <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-[#14121C]/80 via-[#111015]/90 to-[#0B0A10]/90 shadow-[0_12px_40px_rgba(3,3,10,0.55)] p-2">
+          <div className="max-h-[320px] overflow-y-auto pr-2 scrollbar-pads">
+            <div className="grid grid-cols-3 md:grid-cols-4 gap-2.5">
+              {pads.map((pad) => {
+                const isPlaying = playingPads[pad.id];
+                const isLoaded = pad.sourceType !== 'empty';
+                return (
+                  <button
+                    key={pad.id}
+                    type="button"
+                    onPointerDown={(event) => {
+                      if (event.button !== 0) return;
+                      if (configMode) {
+                        setActivePadId(pad.id);
+                        return;
+                      }
+                      if (!isLoaded) return;
+                      if (pad.mode === 'HOLD' || pad.mode === 'ONE_SHOT') {
+                        triggerPad(pad.id);
+                      }
+                    }}
+                    onPointerUp={() => {
+                      if (pad.mode === 'HOLD') stopPad(pad.id);
+                    }}
+                    onPointerLeave={() => {
+                      if (pad.mode === 'HOLD') stopPad(pad.id);
+                    }}
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      const pointerType = (event.nativeEvent as PointerEvent).pointerType;
+                      if (pointerType === 'touch') return;
+                      setActivePadId(pad.id);
+                    }}
+                    className={`group relative aspect-square h-22 rounded-xl border-2 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D0BCFF]/60 focus-visible:ring-inset p-1.5 select-none touch-manipulation ${
+                      isLoaded
+                        ? 'border-white/20 hover:border-[#D0BCFF]/40'
+                        : 'border-white/10 hover:border-white/20'
+                    } bg-gradient-to-br from-[#1D1B25]/90 via-[#0E0D13]/90 to-black/80 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_6px_14px_rgba(5,5,10,0.55)] hover:shadow-[inset_0_0_0_1px_rgba(208,188,255,0.25),0_10px_20px_rgba(8,7,16,0.75)]`}
+                    aria-label={`Pad ${pad.id + 1}${isLoaded ? ' loaded' : ' empty'}`}
+                  >
+                    <span className="absolute left-3 top-3 text-[9px] font-black text-gray-400">
+                      P{pad.id + 1}
+                    </span>
+                    <span
+                      className={`absolute right-3 top-3 h-2 w-2 rounded-full ${
+                        isPlaying
+                          ? 'bg-[#D0BCFF] shadow-[0_0_10px_rgba(208,188,255,0.7)]'
+                          : isLoaded
+                            ? 'bg-[#D0BCFF]/60'
+                            : 'bg-white/10'
+                      }`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 

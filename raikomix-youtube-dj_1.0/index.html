@@ -121,6 +121,35 @@
       background: #E9DDFF;
     }
 
+    .scrollbar-pads {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(208, 188, 255, 0.65) rgba(18, 16, 24, 0.95);
+    }
+
+    .scrollbar-pads::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    .scrollbar-pads::-webkit-scrollbar-track {
+      background: linear-gradient(180deg, rgba(20, 18, 28, 0.9), rgba(9, 8, 14, 0.95));
+      border-radius: 999px;
+      box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.6);
+    }
+
+    .scrollbar-pads::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, rgba(208, 188, 255, 0.85), rgba(119, 102, 186, 0.85));
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 10px rgba(208, 188, 255, 0.35);
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .scrollbar-pads::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, rgba(233, 221, 255, 0.95), rgba(150, 128, 208, 0.95));
+      box-shadow: 0 0 14px rgba(208, 188, 255, 0.55);
+    }
+
     .material-symbols-outlined.FILL {
       font-variation-settings: 'FILL' 1;
     }
