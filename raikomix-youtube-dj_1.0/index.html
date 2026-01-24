@@ -96,6 +96,31 @@
 
     .scrollbar-hide::-webkit-scrollbar { display: none; }
 
+    .scrollbar-slim {
+      scrollbar-width: thin;
+      scrollbar-color: #D0BCFF #1C1B1F;
+    }
+
+    .scrollbar-slim::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    .scrollbar-slim::-webkit-scrollbar-track {
+      background: #1C1B1F;
+      border-radius: 999px;
+    }
+
+    .scrollbar-slim::-webkit-scrollbar-thumb {
+      background: #D0BCFF;
+      border-radius: 999px;
+      transition: background 0.2s ease;
+    }
+
+    .scrollbar-slim::-webkit-scrollbar-thumb:hover {
+      background: #E9DDFF;
+    }
+
     .material-symbols-outlined.FILL {
       font-variation-settings: 'FILL' 1;
     }
