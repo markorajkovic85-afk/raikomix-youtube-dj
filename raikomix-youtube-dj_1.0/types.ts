@@ -57,6 +57,7 @@ export interface LibraryTrack {
   url: string; // URL or ObjectURL
   title: string;
   author: string;
+  album?: string;
   thumbnailUrl: string;
   addedAt: number;
   lastPlayed?: number;
