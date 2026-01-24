@@ -54,6 +54,8 @@ const buildDefaultPads = () =>
     sourceType: 'empty' as const,
     trimStart: 0,
     trimEnd: 1,
+    trimLength: 1,
+    trimLock: false,
     volume: 0.8,
     mode: 'ONE_SHOT' as const,
     keyBinding: DEFAULT_KEYS[index] || '',
@@ -63,7 +65,15 @@ const normalizePads = (pads: PerformancePadConfig[]) => {
   const defaults = buildDefaultPads();
   return defaults.map((pad) => {
     const saved = pads.find((item) => item.id === pad.id);
-    return saved ? { ...pad, ...saved } : pad;
+    if (!saved) return pad;
+    const inferredLength =
+      saved.trimLength ?? Math.max(0.1, (saved.trimEnd ?? pad.trimEnd) - (saved.trimStart ?? pad.trimStart));
+    return {
+      ...pad,
+      ...saved,
+      trimLength: inferredLength,
+      trimLock: saved.trimLock ?? false,
+    };
   });
 };
 
@@ -286,11 +296,27 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
               setPads((prev) =>
                 prev.map((item) =>
                   item.id === pad.id
-                    ? {
-                        ...item,
-                        duration,
-                        trimEnd: Math.min(item.trimEnd, duration || item.trimEnd),
-                      }
+                    ? (() => {
+                        const currentLength =
+                          item.trimLength ?? Math.max(0.1, item.trimEnd - item.trimStart);
+                        if (item.trimLock) {
+                          const nextTrimEnd = Math.min(item.trimStart + currentLength, duration);
+                          const nextTrimStart = Math.max(0, nextTrimEnd - currentLength);
+                          return {
+                            ...item,
+                            duration,
+                            trimStart: nextTrimStart,
+                            trimEnd: nextTrimEnd,
+                            trimLength: Math.min(currentLength, duration),
+                          };
+                        }
+                        const shouldAutoFit = item.trimStart === 0 && item.trimEnd <= 5;
+                        return {
+                          ...item,
+                          duration,
+                          trimEnd: shouldAutoFit ? duration : Math.min(item.trimEnd, duration || item.trimEnd),
+                        };
+                      })()
                     : item
                 )
               );
@@ -674,6 +700,8 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
               duration: undefined,
               trimStart: 0,
               trimEnd: 1,
+              trimLength: 1,
+              trimLock: false,
             }
           : item
       )
@@ -706,8 +734,8 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
       onKeyUp={handleKeyUp}
       aria-label="Performance pads"
     >
-       <div className="max-w-md mx-auto w-full">
-        <div className="grid grid-cols-2 gap-3 lg:gap-4 performance-pads-grid">
+      <div className="max-w-md mx-auto">
+        <div className="grid grid-cols-2 gap-4">
           {pads.map((pad) => {
             const isPlaying = playingPads[pad.id];
             const isLoaded = pad.sourceType !== 'empty';
@@ -735,7 +763,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
                   event.preventDefault();
                   setActivePadId(pad.id);
                 }}
-                className={`group relative aspect-square performance-pad rounded-lg border-2 bg-black/40 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D0BCFF]/60 focus-visible:ring-inset p-2 ${
+                className={`group relative aspect-square h-32 rounded-lg border-2 bg-black/40 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D0BCFF]/60 focus-visible:ring-inset p-2 ${
                   isLoaded
                     ? 'border-white/20 hover:border-[#D0BCFF]/40'
                     : 'border-white/10 hover:border-white/20'
