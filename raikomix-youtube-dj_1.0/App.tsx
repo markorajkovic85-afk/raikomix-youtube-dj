@@ -215,7 +215,7 @@ const App: React.FC = () => {
     const targetDeck = deckId === 'A' ? 'B' : 'A';
     const targetState = targetDeck === 'A' ? deckAState : deckBState;
     if (targetState?.playing) return;
-    const nextItem = loadNextQueueItem(targetDeck, 'cue');
+    const nextItem = loadNextQueueItem(targetDeck, 'load');
     if (!nextItem) return;
     const pending = { deck: targetDeck, fromDeck: deckId, item: nextItem };
     pendingMixRef.current = pending;
@@ -316,7 +316,7 @@ const App: React.FC = () => {
       if (!deckAPlaying && !deckBPlaying) {
         if (autoLoadDeckRef.current) return;
         const nextDeck = lastAutoDeckRef.current === 'A' ? 'B' : 'A';
-        const nextItem = loadNextQueueItem(nextDeck, 'cue');
+        const nextItem = loadNextQueueItem(nextDeck, 'load');
         if (!nextItem) {
           autoLoadDeckRef.current = null;
           return;
@@ -335,13 +335,13 @@ const App: React.FC = () => {
         const targetDeck = activeDeck === 'A' ? 'B' : 'A';
         const targetState = targetDeck === 'A' ? deckAState : deckBState;
         if (targetState?.playing) return;
-        const nextItem = loadNextQueueItem(targetDeck, 'cue');
+        const nextItem = loadNextQueueItem(targetDeck, 'load');
         if (!nextItem) return;
         const pending = { deck: targetDeck, fromDeck: activeDeck, item: nextItem };
         pendingMixRef.current = pending;
         setPendingMix(pending);
       }
-    }, 500);
+    }, 250);
     return () => clearInterval(interval);
   }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, getActiveDeck, loadNextQueueItem, triggerDeckPlay]);
 
@@ -359,12 +359,22 @@ const App: React.FC = () => {
     if (!targetState?.isReady) return;
     if (!targetState.playing) {
       targetRef.current?.togglePlay();
+      return;
     }
     startAutoMix(pendingMix.fromDeck, pendingMix.deck);
     pendingMixRef.current = null;
     setPendingMix(null);
   }, [pendingMix, deckAState, deckBState, startAutoMix]);
 
+useEffect(() => {
+    if (!autoDjEnabled || !autoLoadDeckRef.current) return;
+    const autoDeck = autoLoadDeckRef.current;
+    const targetState = autoDeck === 'A' ? deckAState : deckBState;
+    const targetRef = autoDeck === 'A' ? deckARef : deckBRef;
+    if (!targetState?.isReady || targetState.playing) return;
+    targetRef.current?.togglePlay();
+  }, [autoDjEnabled, deckAState, deckBState]);
+  
   useEffect(() => {
     return () => {
       if (mixAnimationRef.current) cancelAnimationFrame(mixAnimationRef.current);
