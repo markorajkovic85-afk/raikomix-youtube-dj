@@ -1,4 +1,3 @@
-
 import { LibraryTrack, YouTubeSearchResult } from '../types';
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
@@ -18,7 +17,7 @@ export const parseYouTubeTitle = (rawTitle: string, rawAuthor: string) => {
     /\(Official Music Video\)/gi, /\[Official Music Video\]/gi,
     /\(Lyrics\)/gi, /\[Lyrics\]/gi,
     /\(HD\)/gi, /\[HD\]/gi, /\(HQ\)/gi, /\[HQ\]/gi,
-    /【Official】/gi, /「Official」/gi,
+    /​:codex-terminal-citation[codex-terminal-citation]{line_range_start=1 line_range_end=707 terminal_chunk_id=Official】/gi, /「Official」/gi,
     /Video Oficial/gi, /Audio Oficial/gi,
     /4K/g, /1080p/gi,
   ];
@@ -92,6 +91,45 @@ const getYouTubeApiKey = (): string | undefined => {
 };
 
 export const hasYouTubeApiKey = (): boolean => Boolean(getYouTubeApiKey());
+
+const INVIDIOUS_INSTANCES = [
+  'https://yewtu.be',
+  'https://invidious.slipfox.xyz',
+  'https://vid.puffyan.us',
+];
+
+const fetchFromInvidious = async (
+  query: string,
+  maxResults: number,
+  signal?: AbortSignal
+): Promise<YouTubeSearchResult[]> => {
+  for (const baseUrl of INVIDIOUS_INSTANCES) {
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        type: 'video',
+      });
+      const response = await fetch(`${baseUrl}/api/v1/search?${params.toString()}`, { signal });
+      if (!response.ok) continue;
+      const data = await response.json();
+      if (!Array.isArray(data)) continue;
+      return data
+        .filter((item) => item?.type === 'video' && item?.videoId)
+        .slice(0, maxResults)
+        .map((item) => ({
+          videoId: item.videoId,
+          title: item.title,
+          channelTitle: item.author || 'Unknown Artist',
+          thumbnailUrl: `https://img.youtube.com/vi/${item.videoId}/mqdefault.jpg`,
+        }));
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') {
+        return [];
+      }
+    }
+  }
+  return [];
+};
 
 export const fetchPlaylistItems = async (
   playlistId: string,
@@ -176,9 +214,11 @@ export const searchYouTube = async (
   options: { restrictToMusic?: boolean } = {}
 ): Promise<YouTubeSearchResult[]> => {
   const apiKey = getYouTubeApiKey();
-  if (!apiKey) return [];
 
   try {
+    if (!apiKey) {
+      return await fetchFromInvidious(query, maxResults, signal);
+    }
     const { restrictToMusic = true } = options;
     const queryParams = new URLSearchParams({
       part: 'snippet',
@@ -193,7 +233,9 @@ export const searchYouTube = async (
     }
 
     const response = await fetch(`${YOUTUBE_API_BASE}/search?${queryParams.toString()}`, { signal });
-    if (!response.ok) return [];
+    if (!response.ok) {
+      return await fetchFromInvidious(query, maxResults, signal);
+    }
     const data = await response.json();
 
     return data.items.map((item: any) => {
@@ -206,6 +248,9 @@ export const searchYouTube = async (
       };
     });
   } catch (error) {
-    return [];
+    if ((error as Error)?.name === 'AbortError') {
+      return [];
+    }
+    return await fetchFromInvidious(query, maxResults, signal);
   }
 };
