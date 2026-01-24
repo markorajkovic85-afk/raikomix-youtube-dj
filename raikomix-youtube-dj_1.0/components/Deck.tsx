@@ -19,6 +19,7 @@ interface DeckProps {
 
 export interface DeckHandle {
   loadVideo: (url: string, sourceType?: TrackSourceType, metadata?: { title?: string, author?: string }) => void;
+  cueVideo: (url: string, sourceType?: TrackSourceType, metadata?: { title?: string, author?: string }) => void;
   togglePlay: () => void;
   triggerHotCue: (index: number, clear?: boolean) => void;
   toggleLoop: (beats?: number) => void;
@@ -567,9 +568,9 @@ const effectNodesRef = useRef<{
     }
   }, [state.playing, state.sourceType]);
 
-  const initPlayer = useCallback((videoId: string) => {
+  const initPlayer = useCallback((videoId: string, loadMode: 'load' | 'cue' = 'load') => {
     if (!window.YT || !window.YT.Player) {
-      setTimeout(() => initPlayer(videoId), 500);
+      setTimeout(() => initPlayer(videoId, loadMode), 500);
       return;
     }
 
@@ -586,7 +587,11 @@ const effectNodesRef = useRef<{
           currentTime: 0,
           loopActive: false
         }));
-        playerRef.current.loadVideoById(videoId);
+        if (loadMode === 'cue') {
+          playerRef.current.cueVideoById(videoId);
+        } else {
+          playerRef.current.loadVideoById(videoId);
+        }
         setIsLoading(true);
       } catch (e) { 
         setIsLoading(false); 
@@ -686,7 +691,20 @@ const effectNodesRef = useRef<{
       } else {
         const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
         if (vid) { 
-          initPlayer(vid); 
+          initPlayer(vid, 'load'); 
+          if (metadata) {
+            setState(s => ({ ...s, title: metadata.title, author: metadata.author }));
+          }
+        }
+      }
+    },
+    cueVideo: (url: string, sourceType: TrackSourceType = 'youtube', metadata?: { title?: string, author?: string }) => {
+      if (sourceType === 'local') {
+        loadLocalFile(url, metadata);
+      } else {
+        const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+        if (vid) {
+          initPlayer(vid, 'cue');
           if (metadata) {
             setState(s => ({ ...s, title: metadata.title, author: metadata.author }));
           }
