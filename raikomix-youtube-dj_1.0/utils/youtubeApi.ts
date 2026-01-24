@@ -91,6 +91,8 @@ const getYouTubeApiKey = (): string | undefined => {
   return process.env.YOUTUBE_API_KEY || process.env.API_KEY;
 };
 
+export const hasYouTubeApiKey = (): boolean => Boolean(getYouTubeApiKey());
+
 export const fetchPlaylistItems = async (
   playlistId: string,
   onProgress?: (loaded: number, total?: number) => void
