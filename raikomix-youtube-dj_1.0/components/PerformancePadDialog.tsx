@@ -128,7 +128,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       const startedAt = performance.now();
       setLoading(true);
       setSearchState('searching');
-      const res = await searchYouTube(query, 15, controller.signal);
+      const res = await searchYouTube(query, 15, controller.signal, { restrictToMusic: false });
       if (!controller.signal.aborted) {
         setResults(res);
       }
