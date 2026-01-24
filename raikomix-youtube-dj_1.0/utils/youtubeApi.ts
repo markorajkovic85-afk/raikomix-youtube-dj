@@ -85,9 +85,10 @@ export const extractPlaylistId = (url: string): string | null => {
  * Fetches all videos from a YouTube playlist using pagination.
  */
 const getYouTubeApiKey = (): string | undefined => {
-  const envKey = (import.meta as any)?.env?.VITE_API_KEY;
+  const env = (import.meta as any)?.env;
+  const envKey = env?.VITE_YOUTUBE_API_KEY || env?.VITE_API_KEY;
   if (envKey) return envKey;
-  return process.env.API_KEY;
+  return process.env.YOUTUBE_API_KEY || process.env.API_KEY;
 };
 
 export const fetchPlaylistItems = async (
@@ -95,7 +96,7 @@ export const fetchPlaylistItems = async (
   onProgress?: (loaded: number, total?: number) => void
 ): Promise<Partial<LibraryTrack>[]> => {
   const apiKey = getYouTubeApiKey();
-  if (!apiKey) throw new Error('API Key missing. Please set VITE_API_KEY or API_KEY.');
+  if (!apiKey) throw new Error('API Key missing. Please set VITE_YOUTUBE_API_KEY or YOUTUBE_API_KEY.');
 
   let allTracks: Partial<LibraryTrack>[] = [];
   let nextPageToken: string | undefined = '';
@@ -169,21 +170,25 @@ export const fetchPlaylistItems = async (
 export const searchYouTube = async (
   query: string,
   maxResults: number = 15,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options: { restrictToMusic?: boolean } = {}
 ): Promise<YouTubeSearchResult[]> => {
   const apiKey = getYouTubeApiKey();
   if (!apiKey) return [];
 
   try {
+    const { restrictToMusic = true } = options;
     const queryParams = new URLSearchParams({
       part: 'snippet',
       maxResults: maxResults.toString(),
       q: query,
       type: 'video',
-      videoCategoryId: '10',
       videoEmbeddable: 'true',
       key: apiKey,
     });
+    if (restrictToMusic) {
+      queryParams.set('videoCategoryId', '10');
+    }
 
     const response = await fetch(`${YOUTUBE_API_BASE}/search?${queryParams.toString()}`, { signal });
     if (!response.ok) return [];
