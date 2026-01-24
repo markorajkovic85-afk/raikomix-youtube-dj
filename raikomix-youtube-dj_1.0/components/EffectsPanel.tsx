@@ -1,6 +1,7 @@
 import React from 'react';
 import { EffectType } from '../types';
 import PerformancePads from './PerformancePads';
+import RotaryKnob from './RotaryKnob';
 
 interface EffectsPanelProps {
   activeEffect: EffectType | null;
@@ -108,60 +109,35 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
         ))}
       </div>
 
-      <div className="space-y-3 border-t border-white/5 pt-3">
-        <div className="flex justify-between items-center px-1">
-          <div>
-            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Intensity</span>
-            {mixedIntensity && <span className="ml-2 text-[8px] text-white/40 uppercase">Mixed</span>}
-          </div>
-           <span className="text-[9px] font-mono text-white/50">{Math.round(effectIntensity * 100)}%</span>
-        </div>
-        <div className={`bg-black/20 p-2 rounded-full border border-white/5 ${!activeEffect ? 'opacity-40' : ''}`}>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
+      <div className="border-t border-white/5 pt-3">
+        <div className="flex justify-center gap-8 px-4">
+          <RotaryKnob
+            label="INTENSITY"
             value={effectIntensity}
-            onChange={(e) => onIntensityChange(parseFloat(e.target.value))}
-            onDoubleClick={() => {
+            onChange={onIntensityChange}
+            color={color}
+            disabled={!activeEffect}
+            mixed={mixedIntensity}
+            onReset={() => {
               onIntensityChange(0.5);
               showResetToast('FX INTENSITY');
             }}
-            className="w-full accent-white h-2 cursor-pointer"
-            style={{ accentColor: color }}
-            title="Double-click to reset (50%)"
-            disabled={!activeEffect}
           />
-        </div>
-
-        <div className="flex justify-between items-center px-1">
-          <div>
-            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Wet / Dry</span>
-            {mixedAmount && <span className="ml-2 text-[8px] text-white/40 uppercase">Mixed</span>}
-          </div>
-          <span className="text-[9px] font-mono text-white/50">{Math.round(effectAmount * 100)}%</span>
-        </div>
-        <div className={`bg-black/20 p-2 rounded-full border border-white/5 ${!activeEffect ? 'opacity-40' : ''}`}>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
+          <RotaryKnob
+            label="WET / DRY"
             value={effectAmount}
-            onChange={(e) => onAmountChange(parseFloat(e.target.value))}
-            onDoubleClick={() => {
+            onChange={onAmountChange}
+            color={color}
+            disabled={!activeEffect}
+            mixed={mixedAmount}
+            onReset={() => {
               onAmountChange(0.5);
               showResetToast('FX WET/DRY');
             }}
-            className="w-full accent-white h-2 cursor-pointer"
-            style={{ accentColor: color }}
-            title="Double-click to reset (50%)"
-            disabled={!activeEffect}
           />
         </div>
-         {showStreamingNotice && (
-          <p className="text-[9px] text-white/40 uppercase tracking-widest px-1">
+        {showStreamingNotice && (
+          <p className="text-[9px] text-white/40 uppercase tracking-widest px-1 text-center mt-2">
             Streaming FX unavailable
           </p>
         )}
