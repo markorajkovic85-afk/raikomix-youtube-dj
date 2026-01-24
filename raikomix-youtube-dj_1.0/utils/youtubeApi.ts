@@ -20,7 +20,7 @@ export const parseYouTubeTitle = (rawTitle: string, rawAuthor: string) => {
     /Video Oficial/gi, /Audio Oficial/gi,
     /4K/g, /1080p/gi,
   ];
-  const literalNoise = ['​:codex-terminal-citation[codex-terminal-citation]{line_range_start=1 line_range_end=257 terminal_chunk_id=Official】', '「Official」'];
+  const literalNoise = ['「Official」'];
 
   noise.forEach((pattern) => {
     title = title.replace(pattern, '');
