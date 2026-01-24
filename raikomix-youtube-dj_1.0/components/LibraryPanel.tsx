@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
+import { parseBlob } from 'music-metadata-browser';
 import { LibraryTrack, Playlist, DeckId } from '../types';
 import { exportLibrary, loadPlaylists, savePlaylists } from '../utils/libraryStorage';
 import { extractPlaylistId, fetchPlaylistItems } from '../utils/youtubeApi';
@@ -11,7 +11,7 @@ interface LibraryPanelProps {
   onRemoveMultiple: (ids: string[]) => void;
   onLoadToDeck: (track: LibraryTrack, deck: DeckId) => void;
   onAddToQueue: (track: LibraryTrack) => void;
-  onUpdateMetadata: (videoId: string, meta: { title?: string, author?: string }) => void;
+  onUpdateMetadata: (videoId: string, meta: { title?: string, author?: string, album?: string }) => void;
   onImportLibrary: (tracks: LibraryTrack[] | ((prev: LibraryTrack[]) => LibraryTrack[])) => void;
 }
 
@@ -108,22 +108,61 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
     }
   };
 
-  const handleLocalFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const fallbackThumbnail = `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="100" viewBox="0 0 140 100">
+      <rect width="140" height="100" rx="12" fill="#1f1d24"/>
+      <rect x="6" y="6" width="128" height="88" rx="10" fill="#2b2930" stroke="#3b3842" stroke-width="2"/>
+      <path d="M46 32c0-3.3 2.7-6 6-6h36c3.3 0 6 2.7 6 6v30a10 10 0 1 1-6-9.2V32H52v34a10 10 0 1 1-6-9.2V32z" fill="#D0BCFF"/>
+      <circle cx="54" cy="76" r="6" fill="#1f1d24"/>
+      <circle cx="90" cy="76" r="6" fill="#1f1d24"/>
+    </svg>`
+  )}`;
+
+  const handleLocalFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
-    const newTracks: LibraryTrack[] = Array.from(files).map((file: File) => ({
-      id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      videoId: `local_${file.name}_${Date.now()}`,
-      url: URL.createObjectURL(file),
-      title: file.name.replace(/\.[^/.]+$/, ""),
-      author: 'Local File',
-      thumbnailUrl: 'https://img.icons8.com/fluency/96/000000/audio-file.png',
-      addedAt: Date.now(),
-      playCount: 0,
-      sourceType: 'local',
-      fileName: file.name
-    }));
+    const newTracks: LibraryTrack[] = await Promise.all(
+      Array.from(files).map(async (file: File) => {
+        const fallbackTitle = file.name.replace(/\.[^/.]+$/, '');
+        const fallbackAuthor = 'Unknown Artist';
+        const fallbackAlbum = 'Unknown Album';
+        let title = fallbackTitle;
+        let author = fallbackAuthor;
+        let album = fallbackAlbum;
+        let thumbnailUrl = fallbackThumbnail;
+
+        try {
+          const metadata = await parseBlob(file);
+          const common = metadata.common;
+          title = common.title?.trim() || title;
+          author = common.artist?.trim() || common.artists?.[0]?.trim() || author;
+          album = common.album?.trim() || album;
+
+          const picture = common.picture?.[0];
+          if (picture?.data?.length) {
+            const imageBlob = new Blob([picture.data], { type: picture.format || 'image/jpeg' });
+            thumbnailUrl = URL.createObjectURL(imageBlob);
+          }
+        } catch (error) {
+          console.warn('Unable to read metadata for local file:', file.name, error);
+        }
+
+        return {
+          id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          videoId: `local_${file.name}_${Date.now()}`,
+          url: URL.createObjectURL(file),
+          title,
+          author,
+          album,
+          thumbnailUrl,
+          addedAt: Date.now(),
+          playCount: 0,
+          sourceType: 'local',
+          fileName: file.name
+        };
+      })
+    );
 
     onImportLibrary((prev) => [...prev, ...newTracks]);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -157,7 +196,12 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const currentPl = activePl ? playlists.find(p => p.id === activePl) : null;
   const filtered = library.filter(t => 
     (!currentPl || currentPl.trackIds.includes(t.id)) &&
-    (t.title.toLowerCase().includes(search.toLowerCase()) || t.author.toLowerCase().includes(search.toLowerCase()))
+    (
+      t.title.toLowerCase().includes(search.toLowerCase()) ||
+      t.author.toLowerCase().includes(search.toLowerCase()) ||
+      (t.album || '').toLowerCase().includes(search.toLowerCase()) ||
+      (t.fileName || '').toLowerCase().includes(search.toLowerCase())
+    )
   ).sort((a, b) => b.addedAt - a.addedAt);
 
   return (
@@ -262,16 +306,30 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
           const hasBeenPlayed = t.playCount > 0;
           const isSelected = selectedTracks.has(t.id);
           const playedOpacity = hasBeenPlayed ? (isSelected ? 'opacity-80' : 'opacity-60 hover:opacity-100') : '';
+          const tooltipText = [
+            `Title: ${t.title || 'Unknown Title'}`,
+            `Artist: ${t.author || 'Unknown Artist'}`,
+            `Album: ${t.album || 'Unknown Album'}`,
+            `File: ${t.fileName || 'N/A'}`
+          ].join('\n');
           return (
           <div
             key={t.id}
+            title={tooltipText}
             className={`group flex gap-3 items-center p-3 rounded-xl border transition-all relative ${
               isSelected ? 'bg-[#D0BCFF]/10 border-[#D0BCFF]/50' : 'bg-black/20 border-white/5 hover:border-white/20'
             } ${playedOpacity}`}
           >
             <input type="checkbox" checked={selectedTracks.has(t.id)} onChange={() => toggleSelect(t.id)} className="w-4 h-4 accent-[#D0BCFF] shrink-0" />
             <div className="relative shrink-0">
-              <img src={t.thumbnailUrl} alt="" className="w-14 h-10 rounded-lg object-cover shadow-lg" />
+              <img
+                src={t.thumbnailUrl}
+                alt=""
+                className="w-14 h-10 rounded-lg object-cover shadow-lg"
+                onError={(event) => {
+                  event.currentTarget.src = fallbackThumbnail;
+                }}
+              />
               {t.sourceType === 'local' && (
                 <div className="absolute -top-1 -right-1 bg-blue-500 border border-black w-2.5 h-2.5 rounded-full" title="Local File" />
               )}
@@ -296,6 +354,15 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
               <button onClick={() => onLoadToDeck(t, 'A')} className="w-7 h-7 rounded-lg bg-[#D0BCFF] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">A</button>
               <button onClick={() => onLoadToDeck(t, 'B')} className="w-7 h-7 rounded-lg bg-[#F2B8B5] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">B</button>
               <button onClick={() => onRemove(t.id)} className="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all" title="Remove"><span className="material-symbols-outlined text-sm">delete</span></button>
+            </div>
+            <div className="pointer-events-none absolute left-12 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-black/90 p-3 text-[9px] text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+              <div className="font-bold text-[#D0BCFF] mb-1">Track Details</div>
+              <div className="space-y-1 text-gray-200">
+                <div><span className="text-gray-500">Title:</span> {t.title || 'Unknown Title'}</div>
+                <div><span className="text-gray-500">Artist:</span> {t.author || 'Unknown Artist'}</div>
+                <div><span className="text-gray-500">Album:</span> {t.album || 'Unknown Album'}</div>
+                <div><span className="text-gray-500">File:</span> {t.fileName || 'N/A'}</div>
+              </div>
             </div>
           </div>
            );
@@ -348,6 +415,10 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
               <div>
                 <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Author</label>
                 <input type="text" value={editingTrack.author} onChange={e => setEditingTrack({...editingTrack, author: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs focus:outline-none focus:border-[#D0BCFF]/50" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-500 uppercase block mb-1">Album</label>
+                <input type="text" value={editingTrack.album || ''} onChange={e => setEditingTrack({...editingTrack, album: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-xs focus:outline-none focus:border-[#D0BCFF]/50" />
               </div>
               <div className="flex gap-2 pt-4">
                 <button onClick={() => setEditingTrack(null)} className="flex-1 py-3 bg-white/5 text-white rounded-xl font-black uppercase text-[10px]">Cancel</button>
