@@ -74,6 +74,8 @@ export interface PerformancePadConfig {
   sourceLabel?: string;
   trimStart: number;
   trimEnd: number;
+  trimLength?: number;
+  trimLock?: boolean;
   volume: number;
   mode: PerformancePadMode;
   keyBinding: string;
