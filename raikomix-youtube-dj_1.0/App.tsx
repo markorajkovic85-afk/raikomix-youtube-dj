@@ -129,12 +129,24 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleLoadVideo = useCallback((videoId: string, url: string, deck: DeckId, sourceType: TrackSourceType = 'youtube', title?: string, author?: string) => {
+  const handleLoadVideo = useCallback((
+    videoId: string,
+    url: string,
+    deck: DeckId,
+    sourceType: TrackSourceType = 'youtube',
+    title?: string,
+    author?: string,
+    mode: 'load' | 'cue' = 'load'
+  ) => {
     const ref = deck === 'A' ? deckARef : deckBRef;
     if (ref.current) {
-      ref.current.loadVideo(url, sourceType, { title, author });
+      if (mode === 'cue') {
+        ref.current.cueVideo(url, sourceType, { title, author });
+      } else {
+        ref.current.loadVideo(url, sourceType, { title, author });
+      }
       setLibrary(prev => incrementPlayCount(videoId, prev));
-      showNotification(`${sourceType === 'local' ? 'File' : 'Stream'} Loaded to Deck ${deck}`, 'success');
+      showNotification(`${sourceType === 'local' ? 'File' : 'Stream'} ${mode === 'cue' ? 'Queued' : 'Loaded'} to Deck ${deck}`, 'success');
     }
   }, []);
 
@@ -184,19 +196,31 @@ const App: React.FC = () => {
     mixAnimationRef.current = requestAnimationFrame(step);
   }, [crossfader, mixDurationSeconds, stopDeck]);
 
+  const loadNextQueueItem = useCallback((targetDeck: DeckId, mode: 'load' | 'cue' = 'load') => {
+    const nextItem = queue[0];
+    if (!nextItem) return null;
+    handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author, mode);
+    setQueue(prev => prev.filter(item => item.id !== nextItem.id));
+    lastAutoDeckRef.current = targetDeck;
+    return nextItem;
+  }, [queue, handleLoadVideo]);
+
+  const triggerDeckPlay = useCallback((deck: DeckId) => {
+    const ref = deck === 'A' ? deckARef : deckBRef;
+    setTimeout(() => ref.current?.togglePlay(), 0);
+  }, []);
+
   const handleTrackEnd = useCallback((deckId: DeckId) => {
     if (!autoDjEnabled || mixInProgressRef.current || pendingMixRef.current) return;
     const targetDeck = deckId === 'A' ? 'B' : 'A';
     const targetState = targetDeck === 'A' ? deckAState : deckBState;
     if (targetState?.playing) return;
-    const nextItem = queue[0];
+    const nextItem = loadNextQueueItem(targetDeck, 'cue');
     if (!nextItem) return;
-    handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author);
-    setQueue(prev => prev.filter(item => item.id !== nextItem.id));
     const pending = { deck: targetDeck, fromDeck: deckId, item: nextItem };
     pendingMixRef.current = pending;
     setPendingMix(pending);
-  }, [autoDjEnabled, queue, deckAState, deckBState, handleLoadVideo]);
+  }, [autoDjEnabled, deckAState, deckBState, loadNextQueueItem]);
 
   const handleMixLeadChange = useCallback((value: number) => {
     if (!Number.isFinite(value)) return;
@@ -283,20 +307,6 @@ const App: React.FC = () => {
     muteDeck, pitchDeck, resetEq
   });
 
-  const loadNextQueueItem = useCallback((targetDeck: DeckId) => {
-    const nextItem = queue[0];
-    if (!nextItem) return null;
-    handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author);
-    setQueue(prev => prev.filter(item => item.id !== nextItem.id));
-    lastAutoDeckRef.current = targetDeck;
-    return nextItem;
-  }, [queue, handleLoadVideo]);
-
-  const triggerDeckPlay = useCallback((deck: DeckId) => {
-    const ref = deck === 'A' ? deckARef : deckBRef;
-    setTimeout(() => ref.current?.togglePlay(), 0);
-  }, []);
-
   useEffect(() => {
     if (!autoDjEnabled) return;
     const interval = setInterval(() => {
@@ -306,7 +316,7 @@ const App: React.FC = () => {
       if (!deckAPlaying && !deckBPlaying) {
         if (autoLoadDeckRef.current) return;
         const nextDeck = lastAutoDeckRef.current === 'A' ? 'B' : 'A';
-        const nextItem = loadNextQueueItem(nextDeck);
+        const nextItem = loadNextQueueItem(nextDeck, 'cue');
         if (!nextItem) {
           autoLoadDeckRef.current = null;
           return;
@@ -325,7 +335,7 @@ const App: React.FC = () => {
         const targetDeck = activeDeck === 'A' ? 'B' : 'A';
         const targetState = targetDeck === 'A' ? deckAState : deckBState;
         if (targetState?.playing) return;
-        const nextItem = loadNextQueueItem(targetDeck);
+        const nextItem = loadNextQueueItem(targetDeck, 'cue');
         if (!nextItem) return;
         const pending = { deck: targetDeck, fromDeck: activeDeck, item: nextItem };
         pendingMixRef.current = pending;
