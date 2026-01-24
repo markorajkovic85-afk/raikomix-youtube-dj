@@ -118,6 +118,15 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
     </svg>`
   )}`;
 
+  const toBase64 = (data: Uint8Array) => {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < data.length; i += chunkSize) {
+      binary += String.fromCharCode(...data.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+  };
+
   const handleLocalFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -141,8 +150,8 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
 
           const picture = common.picture?.[0];
           if (picture?.data?.length) {
-            const imageBlob = new Blob([picture.data], { type: picture.format || 'image/jpeg' });
-            thumbnailUrl = URL.createObjectURL(imageBlob);
+            const base64 = toBase64(picture.data);
+            thumbnailUrl = `data:${picture.format || 'image/jpeg'};base64,${base64}`;
           }
         } catch (error) {
           console.warn('Unable to read metadata for local file:', file.name, error);
