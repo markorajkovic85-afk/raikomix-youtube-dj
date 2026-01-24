@@ -1,6 +1,22 @@
 export type DeckId = 'A' | 'B';
 export type CrossfaderCurve = 'SMOOTH' | 'CUT' | 'DIP';
-export type EffectType = 'ECHO' | 'DELAY' | 'REVERB' | 'FLANGER' | 'PHASER' | 'CRUSH';
+export type EffectType =
+  | 'ECHO'
+  | 'DELAY'
+  | 'REVERB'
+  | 'FLANGER'
+  | 'PHASER'
+  | 'CRUSH'
+  | 'HIGH_PASS'
+  | 'LOW_PASS'
+  | 'BAND_PASS'
+  | 'CHORUS'
+  | 'TREMOLO'
+  | 'AUTO_PAN'
+  | 'BITCRUSH'
+  | 'OVERDRIVE'
+  | 'FILTER_SWEEP'
+  | 'GATE';
 export type TrackSourceType = 'youtube' | 'local';
 export type PerformancePadMode = 'ONE_SHOT' | 'HOLD';
 export type PerformancePadSourceType = 'youtube' | 'local' | 'empty';
