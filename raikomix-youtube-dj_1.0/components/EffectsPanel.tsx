@@ -67,7 +67,7 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
   ];
 
   return (
-    <div className="bg-black/40 p-4 rounded-xl border border-white/5 relative z-10 space-y-4">
+    <div className="bg-black/40 p-3 rounded-xl border border-white/5 relative z-10 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">FX Engine</p>
@@ -108,7 +108,7 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
         ))}
       </div>
 
-      <div className="space-y-3 border-t border-white/5 pt-4">
+      <div className="space-y-3 border-t border-white/5 pt-3">
         <div className="flex justify-between items-center px-1">
           <div>
             <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Intensity</span>
@@ -167,10 +167,10 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
         )}
       </div>
 
-      <div className="border-t border-white/5 pt-4">
+      <div className="border-t border-white/5 pt-3">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Pads</span>
-          <span className="text-[8px] text-white/30 uppercase tracking-widest">Hold / Click</span>
+          <span className="text-[8px] text-white/30 uppercase tracking-widest">Double-tap / click</span>
         </div>
         <PerformancePads
           masterVolume={masterVolume}
