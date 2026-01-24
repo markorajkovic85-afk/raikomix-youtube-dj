@@ -107,6 +107,41 @@
       border: 1px solid rgba(255, 255, 255, 0.05);
     }
 
+    .perform-stage {
+      padding: clamp(16px, 3vw, 36px);
+    }
+
+    .perform-stage__inner {
+      gap: clamp(16px, 3vw, 32px);
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 100%;
+    }
+
+    .deck-card {
+      width: clamp(320px, 34vw, 420px);
+      max-width: 100%;
+    }
+
+    .mixer-card {
+      width: clamp(220px, 18vw, 280px);
+      max-width: 100%;
+    }
+
+    .performance-pad {
+      height: clamp(76px, 11vh, 128px);
+    }
+
+    .performance-pads-grid {
+      justify-items: stretch;
+    }
+
+    @media (min-width: 1280px) {
+      .perform-stage__inner {
+        flex-wrap: nowrap;
+      }
+    }
+
     /* Vertical Text Utility */
     .vertical-text {
       writing-mode: vertical-rl;
@@ -143,6 +178,6 @@
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
   <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

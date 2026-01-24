@@ -401,7 +401,7 @@ const App: React.FC = () => {
               </div>
             </section>
           ) : (
-            <section className="bg-black/20 border-r border-white/5 flex flex-col h-full w-[420px] shrink-0">
+            <section className="bg-black/20 border-r border-white/5 flex flex-col h-full w-[clamp(320px,25vw,420px)] shrink-0">
               <div className="p-4 flex flex-col gap-4 h-full">
                 <EffectsPanel
                    activeEffect={targetEffect}
@@ -452,8 +452,8 @@ const App: React.FC = () => {
             </section>
           )}
 
-          <section className="flex-1 flex flex-col p-4 items-center justify-center overflow-auto min-h-0">
-            <div className="flex flex-col lg:flex-row gap-6 items-center">
+          <section className="flex-1 flex flex-col items-center justify-center overflow-auto min-h-0 perform-stage">
+            <div className="flex flex-col lg:flex-row items-center perform-stage__inner">
              <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
             <Mixer
                 crossfader={crossfader}
