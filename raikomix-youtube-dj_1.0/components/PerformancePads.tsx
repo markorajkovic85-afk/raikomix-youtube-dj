@@ -734,8 +734,8 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
       onKeyUp={handleKeyUp}
       aria-label="Performance pads"
     >
-      <div className="w-full max-w-[520px] mx-auto">
-        <div className="grid grid-cols-5 gap-2">
+      <div className="w-full max-w-[600px] mx-auto">
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-2.5">
           {pads.map((pad) => {
             const isPlaying = playingPads[pad.id];
             const isLoaded = pad.sourceType !== 'empty';
@@ -760,7 +760,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
                 onContextMenu={(event) => {
                   event.preventDefault();
                 }}
-                className={`group relative aspect-square h-20 rounded-lg border-2 bg-black/40 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D0BCFF]/60 focus-visible:ring-inset p-1.5 select-none touch-manipulation ${
+                className={`group relative aspect-square h-22 rounded-lg border-2 bg-black/40 text-left transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#D0BCFF]/60 focus-visible:ring-inset p-1.5 select-none touch-manipulation ${
                   isLoaded
                     ? 'border-white/20 hover:border-[#D0BCFF]/40'
                     : 'border-white/10 hover:border-white/20'
