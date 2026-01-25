@@ -106,6 +106,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
     {}
   );
   const [activePreviewVideoId, setActivePreviewVideoId] = useState<string | null>(null);
+  const hasLoadedPads = pads.some((pad) => pad.sourceType !== 'empty');
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const buffersRef = useRef<Record<number, AudioBuffer | null>>({});
@@ -711,6 +712,35 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
     setActivePadId(null);
   };
 
+  const clearPadData = (pad: PerformancePadConfig) => ({
+    ...pad,
+    sourceType: 'empty' as const,
+    sourceId: undefined,
+    sampleName: undefined,
+    sourceLabel: undefined,
+    duration: undefined,
+    trimStart: 0,
+    trimEnd: 1,
+    trimLength: 1,
+    trimLock: false,
+  });
+
+  const handleClearAll = async () => {
+    await Promise.all(
+      pads.map(async (pad) => {
+        if (pad.sourceType === 'local' && pad.sourceId) {
+          await removePerformancePadSample(pad.sourceId);
+          buffersRef.current[pad.id] = null;
+        }
+      })
+    );
+    pads.forEach((pad) => stopPad(pad.id));
+    cancelYouTubeOperation();
+    setPads((prev) => prev.map((pad) => clearPadData(pad)));
+    onNotify('All pads cleared', 'info');
+    setActivePadId(null);
+  };
+
   const handleLocalFileSelected = async (file: File) => {
     const record = await storePerformancePadSample(`pad_${Date.now()}`, file);
     const ctx = ensureAudioContext();
@@ -740,14 +770,24 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
           <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">
             PADS <span className="text-white/40 uppercase tracking-widest">RIGHT CLICK</span>
           </span>
-          <button
-            type="button"
-            onClick={() => setConfigMode((prev) => !prev)}
-            className="text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-400 transition-colors"
-          >
-            {configMode ? 'DONE' : 'CONFIGURE'}
-          </button>
-        </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="text-[8px] font-black uppercase tracking-widest text-rose-200/70 hover:text-rose-100 transition-colors disabled:cursor-not-allowed disabled:text-rose-200/30"
+              disabled={!hasLoadedPads}
+            >
+              CLEAR ALL
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfigMode((prev) => !prev)}
+              className="text-[8px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-400 transition-colors"
+            >
+              {configMode ? 'DONE' : 'CONFIGURE'}
+            </button>
+          </div>
+        </div> 
         <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-[#14121C]/80 via-[#111015]/90 to-[#0B0A10]/90 shadow-[0_12px_40px_rgba(3,3,10,0.55)] p-2">
           <div className="max-h-[320px] overflow-y-auto pr-2 scrollbar-pads">
             <div className="grid grid-cols-3 md:grid-cols-4 gap-2.5">
