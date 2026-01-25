@@ -711,6 +711,10 @@ const effectNodesRef = useRef<{
               if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
               else if (localAudioRef.current) localAudioRef.current.currentTime = time;
             }}
+            timeLabel={showRemaining
+              ? `-${formatTime(state.duration - state.currentTime)}`
+              : formatTime(state.currentTime)}
+            onTimeToggle={() => setShowRemaining(prev => !prev)}
           />
         </div>
 

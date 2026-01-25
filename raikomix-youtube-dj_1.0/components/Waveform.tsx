@@ -14,6 +14,8 @@ interface WaveformProps {
   cueColors?: string[];
   loop?: { active: boolean; start: number; end: number };
   onSeek?: (time: number) => void;
+  timeLabel?: string;
+  onTimeToggle?: () => void;
 }
 
 const defaultCueColors = ['#FFD700', '#00E5FF', '#FF4081', '#76FF03'];
@@ -30,7 +32,9 @@ const Waveform: React.FC<WaveformProps> = ({
   hotCues = [],
   cueColors = defaultCueColors,
   loop,
-  onSeek
+  onSeek,
+  timeLabel,
+  onTimeToggle
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,23 +73,14 @@ const Waveform: React.FC<WaveformProps> = ({
       if (cue === null || cue === undefined) return;
       const x = Math.min(width, Math.max(0, (cue / duration) * width));
       ctx.save();
-      const cueColor = cueColors[index] || color;
-      ctx.strokeStyle = cueColor;
-      ctx.lineWidth = 3;
-      ctx.shadowBlur = 10;
+      ctx.strokeStyle = cueColors[index] || color;
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 6;
       ctx.shadowColor = cueColors[index] || color;
       ctx.beginPath();
       ctx.moveTo(x, height * 0.15);
       ctx.lineTo(x, height * 0.85);
       ctx.stroke();
-      ctx.fillStyle = cueColor;
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.moveTo(x, height * 0.05);
-      ctx.lineTo(x - 4, height * 0.12);
-      ctx.lineTo(x + 4, height * 0.12);
-      ctx.closePath();
-      ctx.fill();
       ctx.restore();
     });
   };
@@ -234,6 +229,18 @@ const Waveform: React.FC<WaveformProps> = ({
       }}
     >
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/4 to-transparent pointer-events-none" />
+      <div className="absolute top-2 left-3 text-[9px] uppercase font-black tracking-[0.2em] text-white/30">Waveform</div>
+      <button
+        type="button"
+        className="absolute top-2 right-3 text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors"
+        onClick={(event) => {
+          event.stopPropagation();
+          onTimeToggle?.();
+        }}
+        title="Toggle time display"
+      >
+        {timeLabel ?? '--:--'}
+      </button>
       <canvas 
         ref={canvasRef} 
         className="w-full h-full"
