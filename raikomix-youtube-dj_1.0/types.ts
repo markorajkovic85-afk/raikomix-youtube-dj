@@ -54,6 +54,7 @@ export interface PlayerState {
   loopActive: boolean;
   loopStart: number;
   loopEnd: number;
+  waveformPeaks?: number[];
 }
 
 export interface QueueItem {
