@@ -159,7 +159,6 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
         )}
 
         {queue.map((item, index) => {
-          const addedDate = new Date(item.addedAt).toLocaleDateString();
           return (
           <div
             key={item.id}
@@ -190,18 +189,16 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
                 forceAnimate
               />
             </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-hidden">
+            <div className="flex-1 min-w-0 flex flex-col gap-1 overflow-hidden">
               <MarqueeText 
                 text={item.title} 
-                className="text-sm font-semibold text-[#E6E1E5] leading-tight" 
+                className="text-[11px] font-bold text-white leading-tight group-hover:text-[#D0BCFF] transition-colors" 
               />
-              <div className="rounded-full border border-white/5 bg-black/40 px-2 py-0.5">
-                <MarqueeText 
-                  text={item.author || 'Unknown Artist'} 
-                  className="text-[9px] text-gray-300 font-semibold uppercase tracking-[0.2em]" 
-                  forceAnimate
-                />
-              </div>
+              <MarqueeText 
+                text={item.author || 'Unknown Artist'} 
+                className="text-[9px] text-gray-500 uppercase font-bold tracking-tighter" 
+                forceAnimate
+              />
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 motion-standard">
               <button 
@@ -244,8 +241,8 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
               <div className="space-y-1 text-gray-200">
                 <div><span className="text-gray-500">Title:</span> {item.title || 'Unknown Title'}</div>
                 <div><span className="text-gray-500">Artist:</span> {item.author || 'Unknown Artist'}</div>
-                <div><span className="text-gray-500">Source:</span> {item.sourceType || 'youtube'}</div>
-                <div><span className="text-gray-500">Added:</span> {addedDate}</div>
+                <div><span className="text-gray-500">Album:</span> {item.album || 'Unknown Album'}</div>
+                <div><span className="text-gray-500">File:</span> {item.fileName || 'N/A'}</div>
               </div>
             </div>
           </div>

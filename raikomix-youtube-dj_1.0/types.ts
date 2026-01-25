@@ -65,6 +65,8 @@ export interface QueueItem {
   thumbnailUrl: string;
   addedAt: number;
   author?: string;
+  album?: string;
+  fileName?: string;
   sourceType?: TrackSourceType;
 }
 
