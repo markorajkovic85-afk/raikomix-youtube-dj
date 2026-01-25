@@ -5,6 +5,7 @@ import Waveform from './Waveform';
 import { detectBpmFromAudioBuffer, extractBPMFromTitle } from '../utils/bpmDetection';
 import { parseYouTubeTitle } from '../utils/youtubeApi';
 import { createEffectChain } from '../utils/effectsChain';
+import { buildWaveformPeaks } from '../utils/waveform';
 
 interface DeckProps {
   id: DeckId;
@@ -84,7 +85,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
     eqHigh: eq.hi,
     eqMid: eq.mid,
     eqLow: eq.low,
-    filter: eq.filter
+    filter: eq.filter,
+    waveformPeaks: undefined
   });
 
   const playerRef = useRef<any>(null);
@@ -341,7 +343,7 @@ const effectNodesRef = useRef<{
     }
   };
 
-    const analyzeLocalBpm = async (url: string) => {
+    const analyzeLocalAudio = async (url: string) => {
     try {
       setIsScanning(true);
       const response = await fetch(url);
@@ -350,14 +352,17 @@ const effectNodesRef = useRef<{
       const tempContext = existingContext ?? new (window.AudioContext || (window as any).webkitAudioContext)();
       const audioBuffer = await tempContext.decodeAudioData(arrayBuffer.slice(0));
       const bpm = detectBpmFromAudioBuffer(audioBuffer);
-      if (bpm) {
-        setState(s => ({ ...s, bpm }));
-      }
+      const peaks = buildWaveformPeaks(audioBuffer, 900);
+      setState(s => ({
+        ...s,
+        bpm: bpm ?? s.bpm,
+        waveformPeaks: peaks.length ? peaks : undefined
+      }));
       if (!existingContext) {
         await tempContext.close();
       }
     } catch (e) {
-      console.warn('Local BPM detection failed:', e);
+      console.warn('Local audio analysis failed:', e);
     } finally {
       setIsScanning(false);
     }
@@ -442,11 +447,12 @@ const effectNodesRef = useRef<{
           ...s, 
           videoId, 
           isReady: false, 
-          sourceType: 'youtube', 
+          sourceType: 'youtube',
           playbackRate: 1.0,
           playing: false,
           currentTime: 0,
-          loopActive: false
+          loopActive: false,
+          waveformPeaks: undefined
         }));
         if (loadMode === 'cue') {
           playerRef.current.cueVideoById(videoId);
@@ -523,11 +529,12 @@ const effectNodesRef = useRef<{
           playbackRate: 1.0,
           playing: false,
           currentTime: 0,
-          loopActive: false
+          loopActive: false,
+          waveformPeaks: undefined
         }));
 
         
-        analyzeLocalBpm(url);
+        analyzeLocalAudio(url);
         
         onPlayerReady({
           setVolume: (v: number) => { if(localAudioRef.current) localAudioRef.current.volume = v / 100; },
@@ -672,7 +679,11 @@ const effectNodesRef = useRef<{
             isPlaying={state.playing} 
             volume={state.volume * (0.5 + state.eqLow * 0.5)} 
             color={color} 
-            playbackRate={state.playbackRate} 
+            playbackRate={state.playbackRate}
+            currentTime={state.currentTime}
+            duration={state.duration}
+            peaks={state.waveformPeaks}
+            sourceType={state.sourceType}
           />
 
           <div className="space-y-1">
