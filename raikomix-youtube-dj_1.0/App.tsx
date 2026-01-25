@@ -501,16 +501,9 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, [crossfader, xFaderCurve, masterVolume, deckAVolume, deckBVolume, masterPlayerA, masterPlayerB]);
 
-  const leftColumnWidth = viewMode === 'LIBRARY'
-    ? (libraryOpen ? 'minmax(380px, 420px)' : '0px')
-    : 'minmax(320px, 420px)';
-  const rightColumnWidth = viewMode === 'LIBRARY' && queueOpen
-    ? 'minmax(280px, 320px)'
-    : '0px';
-
   return (
     <ErrorBoundary>
-       <div className="h-[100dvh] bg-[#1C1B1F] text-white flex overflow-hidden font-['Roboto']" data-theme={theme}>
+       <div className="h-screen bg-[#1C1B1F] text-white flex overflow-hidden font-['Roboto']" data-theme={theme}>
         <nav className="w-16 bg-black/40 border-r border-white/5 flex flex-col items-center py-8 gap-10 shrink-0">
           <button onClick={() => setViewMode('PERFORM')} className={`flex flex-col items-center gap-1 transition-all ${viewMode === 'PERFORM' ? 'text-[#D0BCFF] scale-110' : 'text-gray-600 hover:text-gray-400'}`}>
             <span className="material-icons text-3xl">speed</span>
@@ -537,12 +530,9 @@ useEffect(() => {
           </div>
         </nav>
 
-        <div
-          className="flex-1 grid overflow-hidden relative min-h-0"
-          style={{ gridTemplateColumns: `${leftColumnWidth} minmax(0, 1fr) ${rightColumnWidth}` }}
-        >
+        <div className="flex-1 flex overflow-hidden relative min-h-0">
              {viewMode === 'LIBRARY' ? (
-            <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 min-h-0 ${libraryOpen ? 'opacity-100' : 'opacity-0 pointer-events-none border-none'}`}>
+            <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 flex-none h-full ${libraryOpen ? 'w-[420px]' : 'w-0 border-none'}`}>
               <div className={`p-4 flex flex-col gap-4 h-full min-w-[380px] min-h-0 ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
                 <SearchPanel 
                   onLoadToDeck={(vid, url, deck, title, author) => handleLoadVideo(vid, url, deck, 'youtube', title, author)} 
@@ -585,7 +575,7 @@ useEffect(() => {
               </div>
             </section>
           ) : (
-           <section className="bg-black/20 border-r border-white/5 flex flex-col h-full min-h-0 overflow-hidden">
+           <section className="bg-black/20 border-r border-white/5 flex flex-col h-full w-[clamp(320px,25vw,420px)] shrink-0 overflow-hidden">
               <div className="p-3 flex flex-col gap-3 h-full min-h-0 overflow-y-auto scrollbar-slim">
                 <EffectsPanel
                    activeEffect={targetEffect}
@@ -636,8 +626,8 @@ useEffect(() => {
             </section>
           )}
 
-          <section className="flex-1 flex flex-col items-center justify-center overflow-hidden min-h-0 perform-stage">
-            <div className="flex flex-row items-stretch justify-center w-full h-full perform-stage__inner px-[clamp(8px,2vw,24px)] py-[clamp(8px,2vh,20px)] gap-[clamp(12px,2vw,20px)]">
+          <section className="flex-1 flex flex-col items-center justify-center overflow-auto min-h-0 perform-stage">
+            <div className="flex flex-col lg:flex-row items-center perform-stage__inner">
              <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
             <Mixer
                 crossfader={crossfader}
@@ -674,7 +664,7 @@ useEffect(() => {
 
              {viewMode === 'LIBRARY' && (
             <>
-              <aside className={`bg-black/10 flex border-l border-white/5 flex flex-col transition-all duration-300 overflow-hidden min-h-0 ${queueOpen ? 'p-4' : 'p-0 border-none opacity-0 pointer-events-none'}`}>
+              <aside className={`bg-black/10 flex-none border-l border-white/5 flex flex-col transition-all duration-300 overflow-hidden ${queueOpen ? 'w-80 p-4' : 'w-0 p-0 border-none'}`}>
                 <div className={`h-full min-w-[280px] ${!queueOpen ? 'opacity-0 invisible' : 'opacity-100 visible transition-opacity'}`}>
                   <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
                     <span className="text-[10px] font-black uppercase text-gray-500 tracking-[0.2em]">Queue Console</span>
