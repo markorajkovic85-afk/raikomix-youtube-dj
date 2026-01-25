@@ -348,14 +348,6 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     setRecordingError(null);
     if (recorderRef.current?.state === 'recording') return;
     try {
-      if (typeof MediaRecorder === 'undefined') {
-        setRecordingError('Recording is not supported in this browser.');
-        return;
-      }
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setRecordingError('Microphone access is unavailable.');
-        return;
-      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
       recorderStreamRef.current = stream;
