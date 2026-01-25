@@ -158,10 +158,12 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
           </div>
         )}
 
-        {queue.map((item, index) => (
+        {queue.map((item, index) => {
+          const addedDate = new Date(item.addedAt).toLocaleDateString();
+          return (
           <div
             key={item.id}
-            className={`m3-card group p-3 flex gap-4 items-center bg-[#1C1B1F]/40 hover:bg-[#2B2930] motion-standard border-dashed elevation-1 hover:elevation-2 overflow-hidden ${
+            className={`m3-card group p-3 flex gap-4 items-center bg-[#1C1B1F]/40 hover:bg-[#2B2930] motion-standard border-dashed elevation-1 hover:elevation-2 overflow-hidden relative ${
               overIndex === index ? 'ring-1 ring-[#D0BCFF]/40' : ''
             }`}
             draggable
@@ -237,8 +239,18 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
                 </button>
               </div>
             </div>
+            <div className="pointer-events-none absolute left-12 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-black/90 p-3 text-[9px] text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+              <div className="font-bold text-[#D0BCFF] mb-1">Track Details</div>
+              <div className="space-y-1 text-gray-200">
+                <div><span className="text-gray-500">Title:</span> {item.title || 'Unknown Title'}</div>
+                <div><span className="text-gray-500">Artist:</span> {item.author || 'Unknown Artist'}</div>
+                <div><span className="text-gray-500">Source:</span> {item.sourceType || 'youtube'}</div>
+                <div><span className="text-gray-500">Added:</span> {addedDate}</div>
+              </div>
+            </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
