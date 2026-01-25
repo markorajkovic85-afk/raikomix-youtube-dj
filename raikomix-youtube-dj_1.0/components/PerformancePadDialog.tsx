@@ -307,36 +307,49 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       onClick={handleClose}
     >
       <div
-        className="m3-card bg-[#1D1B20] border border-white/10 rounded-2xl w-full max-w-4xl shadow-[0_0_60px_rgba(0,0,0,0.6)] flex flex-col max-h-[90vh] overflow-hidden"
+        className="m3-card bg-[#1D1B20] border border-white/10 rounded-3xl w-full max-w-5xl shadow-[0_0_80px_rgba(13,11,19,0.9)] flex flex-col max-h-[90vh] overflow-hidden"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 p-6 border-b border-white/10">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Pad Config</p>
-            <h2 className="text-xl font-black text-[#D0BCFF] mt-2">P{pad.id + 1}</h2>
-            <p className="text-[11px] text-white/50 mt-1">{draft.sampleName || 'Empty'}</p>
+        <div className="flex items-start justify-between gap-4 p-6 border-b border-white/10 bg-gradient-to-r from-[#181520] via-[#121018] to-[#100F15]">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="h-16 w-16 rounded-2xl border border-white/10 bg-gradient-to-br from-[#262233] via-[#14121B] to-[#0A0A10] shadow-[inset_0_0_0_1px_rgba(208,188,255,0.15),0_8px_16px_rgba(8,7,15,0.7)] flex items-center justify-center text-[#D0BCFF] font-black text-lg tracking-widest">
+                P{pad.id + 1}
+              </div>
+              <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-[#D0BCFF] shadow-[0_0_12px_rgba(208,188,255,0.8)]" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.35em] text-gray-500">Pad Config</p>
+              <h2 className="text-2xl font-black text-[#E7DDFF] mt-2">Performance Pad</h2>
+              <p className="text-[11px] text-white/60 mt-1">{draft.sampleName || 'Empty'}</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={handleClose}
-            className="text-gray-500 hover:text-white"
+            className="text-gray-500 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-2"
             aria-label="Close dialog"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-pads">
           <div className="flex flex-col lg:flex-row gap-6 p-6">
             <div className="flex-1 space-y-6 min-w-0">
-              <div className="space-y-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Source</p>
-                <div className="flex items-center gap-2 bg-black/40 p-1 rounded-full border border-white/10">
+              <div className="m3-card bg-[#191721]/80 border border-white/10 rounded-2xl p-5 space-y-4 shadow-[0_10px_30px_rgba(9,8,14,0.55)]">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Source</p>
+                  <span className="text-[9px] uppercase tracking-[0.3em] text-white/30">Select</span>
+                </div>
+                <div className="flex items-center gap-2 bg-black/50 p-1.5 rounded-full border border-white/10 shadow-[inset_0_0_0_1px_rgba(208,188,255,0.08)]">
                   <button
                     type="button"
                     onClick={() => setActiveTab('youtube')}
-                    className={`flex-1 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition ${
-                      activeTab === 'youtube' ? 'bg-[#D0BCFF] text-black' : 'text-gray-400 hover:text-white'
+                    className={`flex-1 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                      activeTab === 'youtube'
+                        ? 'bg-[#D0BCFF] text-black shadow-[0_0_20px_rgba(208,188,255,0.45)]'
+                        : 'text-gray-400 hover:text-white'
                     }`}
                   >
                     YouTube Search
@@ -344,8 +357,10 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveTab('local')}
-                    className={`flex-1 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition ${
-                      activeTab === 'local' ? 'bg-[#D0BCFF] text-black' : 'text-gray-400 hover:text-white'
+                    className={`flex-1 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+                      activeTab === 'local'
+                        ? 'bg-[#D0BCFF] text-black shadow-[0_0_20px_rgba(208,188,255,0.45)]'
+                        : 'text-gray-400 hover:text-white'
                     }`}
                   >
                     Local File
@@ -355,26 +370,30 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
               {activeTab === 'youtube' ? (
                 <div className="space-y-4 min-w-0">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Search YouTube for effect samples..."
-                      className="w-full bg-[#111014] border border-white/10 rounded-full py-2.5 pl-10 pr-12 text-xs focus:outline-none focus:border-[#D0BCFF] shadow-inner"
-                    />
-                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">search</span>
-                    {loading && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-[#D0BCFF] border-t-transparent rounded-full animate-spin" />
+                  <div className="m3-card bg-[#15131A]/80 border border-white/10 rounded-2xl p-5 space-y-3">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Search YouTube for effect samples..."
+                        className="w-full bg-[#0F0E13] border border-white/10 rounded-full py-3 pl-11 pr-12 text-xs focus:outline-none focus:border-[#D0BCFF] shadow-inner"
+                      />
+                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+                        search
+                      </span>
+                      {loading && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-[#D0BCFF] border-t-transparent rounded-full animate-spin" />
+                      )}
+                    </div>
+                    {searchState === 'searching' && (
+                      <p className="text-[10px] uppercase tracking-widest text-gray-500">Searching...</p>
                     )}
+                    <p className="text-[10px] text-white/40">
+                      YouTube previews may take a moment to load before audio is ready.
+                    </p>
                   </div>
-                  {searchState === 'searching' && (
-                    <p className="text-[10px] uppercase tracking-widest text-gray-500">Searching...</p>
-                  )}
-                  <p className="text-[10px] text-white/40">
-                    YouTube previews may take a moment to load before audio is ready.
-                  </p>
-                  <div className="space-y-2 max-h-[260px] overflow-y-auto overflow-x-hidden pr-1 scrollbar-hide">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[360px] overflow-y-auto overflow-x-hidden pr-2 scrollbar-pads">
                     {searchState === 'idle' && searchMessage && results.length === 0 && (
                       <p className="text-[10px] uppercase tracking-widest text-gray-500">{searchMessage}</p>
                     )}
@@ -399,19 +418,26 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                       return (
                         <div
                           key={result.videoId}
-                          className="w-full flex items-center gap-3 p-2 bg-white/5 rounded-xl border border-transparent hover:border-white/10 transition-all text-left min-w-0"
+                          className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#1C1924]/90 via-[#14121A]/90 to-[#0B0A0F]/90 p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04),0_10px_18px_rgba(6,6,12,0.7)] transition-all hover:border-[#D0BCFF]/40 hover:shadow-[0_0_20px_rgba(208,188,255,0.25)]"
                           onMouseEnter={() => onPreflightYouTube(nextDraft)}
                         >
-                          <img
-                            src={result.thumbnailUrl}
-                            className="w-12 h-9 object-cover rounded-lg shrink-0"
-                            alt=""
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[11px] font-semibold text-white truncate">{result.title}</p>
-                            <p className="text-[9px] text-gray-500 uppercase tracking-widest truncate">{result.channelTitle}</p>
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={result.thumbnailUrl}
+                              className="w-14 h-10 object-cover rounded-xl border border-white/10 shrink-0"
+                              alt=""
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] font-semibold text-white truncate">{result.title}</p>
+                              <p className="text-[9px] text-gray-500 uppercase tracking-widest truncate">
+                                {result.channelTitle}
+                              </p>
+                            </div>
+                            <span className="text-[9px] uppercase tracking-[0.3em] text-white/30">YT</span>
+                          </div>
+                          <div className="mt-3 space-y-2">
                             {rowState !== 'idle' && (
-                              <div className="mt-1 flex items-center gap-2 text-[9px] uppercase tracking-widest text-gray-400">
+                              <div className="flex items-center gap-2 text-[9px] uppercase tracking-widest text-gray-400">
                                 {isBusy && (
                                   <span className="inline-flex h-3 w-3 animate-spin rounded-full border-2 border-[#D0BCFF] border-t-transparent" />
                                 )}
@@ -419,7 +445,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                               </div>
                             )}
                             {previewError && (
-                              <div className="mt-1 flex items-center gap-2">
+                              <div className="flex items-center gap-2">
                                 <p className="text-[9px] text-[#F2B8B5]">{previewError}</p>
                                 <button
                                   type="button"
@@ -437,7 +463,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                               </div>
                             )}
                             {rowState === 'error' && (
-                              <div className="mt-1 flex items-center gap-2">
+                              <div className="flex items-center gap-2">
                                 <p className="text-[9px] text-[#F2B8B5]">
                                   {rowMessage || 'Failed to fetch audio.'}
                                 </p>
@@ -450,42 +476,42 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                                 </button>
                               </div>
                             )}
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (isPreviewing) {
-                                  stopPreview();
-                                  return;
-                                }
-                                setDraft(nextDraft);
-                                handlePreview(nextDraft, result.videoId);
-                              }}
-                              className="text-[9px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed"
-                              disabled={Boolean(previewError) || (!isPreviewing && isBusy)}
-                            >
-                              {isPreviewing ? 'Stop' : 'Preview'}
-                            </button>
-                            {showCancel && (
+                            <div className="flex flex-wrap items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => onCancelYouTube(result.videoId)}
-                                className="text-[9px] font-black uppercase tracking-widest text-[#F2B8B5] px-3 py-1.5 rounded-full border border-[#F2B8B5]/40"
+                                onClick={() => {
+                                  if (isPreviewing) {
+                                    stopPreview();
+                                    return;
+                                  }
+                                  setDraft(nextDraft);
+                                  handlePreview(nextDraft, result.videoId);
+                                }}
+                                className="text-[9px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed"
+                                disabled={Boolean(previewError) || (!isPreviewing && isBusy)}
                               >
-                                Cancel
+                                {isPreviewing ? 'Stop' : 'Preview'}
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDraft(nextDraft);
-                                onPreflightYouTube(nextDraft);
-                              }}
-                              className="text-[9px] font-black uppercase tracking-widest bg-[#D0BCFF] text-black px-3 py-1.5 rounded-full"
-                            >
-                              Use
-                            </button>
+                              {showCancel && (
+                                <button
+                                  type="button"
+                                  onClick={() => onCancelYouTube(result.videoId)}
+                                  className="text-[9px] font-black uppercase tracking-widest text-[#F2B8B5] px-3 py-1.5 rounded-full border border-[#F2B8B5]/40"
+                                >
+                                  Cancel
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDraft(nextDraft);
+                                  onPreflightYouTube(nextDraft);
+                                }}
+                                className="text-[9px] font-black uppercase tracking-widest bg-[#D0BCFF] text-black px-3 py-1.5 rounded-full shadow-[0_0_16px_rgba(208,188,255,0.4)]"
+                              >
+                                Use
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -496,7 +522,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="m3-card bg-[#15131A]/80 border border-white/10 rounded-2xl p-5 space-y-4">
                   <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500">Upload</label>
                   <input
                     type="file"
@@ -524,7 +550,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
               )}
             </div>
 
-            <div className="flex-1 space-y-5 bg-black/30 rounded-2xl border border-white/10 p-5 min-w-0">
+            <div className="flex-1 space-y-5 bg-gradient-to-br from-[#14121C]/90 via-[#111018]/95 to-[#0B0A10]/90 rounded-2xl border border-white/10 p-6 min-w-0 shadow-[0_10px_30px_rgba(9,8,14,0.55)]">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Trim</p>
                 <button
@@ -536,7 +562,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                     }
                     handlePreview(draft, null);
                   }}
-                  className="text-[10px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-full disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="text-[10px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-full shadow-[0_0_12px_rgba(208,188,255,0.15)] disabled:opacity-40 disabled:cursor-not-allowed"
                   disabled={draft.sourceType === 'empty'}
                 >
                   {previewingType && previewingType === draft.sourceType && previewingId === draft.sourceId
@@ -595,7 +621,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                     if (parsed !== null) handleTrimChange('trimStart', parsed);
                   }}
                   onBlur={() => setStartInput(formatTime(draft.trimStart))}
-                  className="w-full bg-[#111014] border border-white/10 rounded-lg p-2 text-xs text-white"
+                  className="w-full bg-[#0F0E13] border border-white/10 rounded-xl p-2.5 text-xs text-white"
                   placeholder="0:00.00"
                   disabled={draft.sourceType === 'empty'}
                 />
@@ -625,7 +651,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                     if (parsed !== null) handleTrimChange('trimEnd', parsed);
                   }}
                   onBlur={() => setEndInput(formatTime(draft.trimEnd))}
-                  className="w-full bg-[#111014] border border-white/10 rounded-lg p-2 text-xs text-white"
+                  className="w-full bg-[#0F0E13] border border-white/10 rounded-xl p-2.5 text-xs text-white"
                   placeholder="0:00.00"
                   disabled={draft.sourceType === 'empty'}
                 />
@@ -656,7 +682,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                   step={0.1}
                   value={Number(trimLength.toFixed(2))}
                   onChange={(event) => handleTrimLengthChange(parseFloat(event.target.value))}
-                  className="w-full bg-[#111014] border border-white/10 rounded-lg p-2 text-xs text-white"
+                  className="w-full bg-[#0F0E13] border border-white/10 rounded-xl p-2.5 text-xs text-white"
                   disabled={draft.sourceType === 'empty'}
                 />
               </div>
@@ -669,9 +695,9 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                       key={mode}
                       type="button"
                       onClick={() => setDraft((prev) => ({ ...prev, mode }))}
-                      className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition ${
+                      className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition ${
                         draft.mode === mode
-                          ? 'bg-white/15 border-white/30 text-white'
+                          ? 'bg-white/15 border-white/30 text-white shadow-[0_0_12px_rgba(208,188,255,0.2)]'
                           : 'bg-white/5 border-white/10 text-gray-500 hover:text-white'
                       }`}
                     >
@@ -721,7 +747,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/10 px-6 py-4 bg-[#1D1B20]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/10 px-6 py-4 bg-gradient-to-r from-[#181520] via-[#121018] to-[#100F15]">
           <button
             type="button"
             onClick={onClear}
