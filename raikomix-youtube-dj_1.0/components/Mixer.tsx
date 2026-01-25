@@ -437,7 +437,7 @@ const Mixer: React.FC<MixerProps> = ({
               max={30}
               value={mixLeadSeconds}
               onChange={(e) => onMixLeadChange(Number(e.target.value))}
-              className="w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[9px] text-white"
+              className="mix-number-input w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[9px] text-white"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -448,7 +448,7 @@ const Mixer: React.FC<MixerProps> = ({
               max={20}
               value={mixDurationSeconds}
               onChange={(e) => onMixDurationChange(Number(e.target.value))}
-              className="w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[9px] text-white"
+              className="mix-number-input w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[9px] text-white"
             />
           </label>
         </div>
