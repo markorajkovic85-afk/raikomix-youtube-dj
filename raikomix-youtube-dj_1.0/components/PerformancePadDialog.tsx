@@ -49,6 +49,43 @@ const getTrimLength = (pad: PerformancePadConfig) => {
   return Number.isFinite(length) && length > 0 ? length : 0.1;
 };
 
+const writeString = (view: DataView, offset: number, value: string) => {
+  for (let i = 0; i < value.length; i += 1) {
+    view.setUint8(offset + i, value.charCodeAt(i));
+  }
+};
+
+const encodeWav = (buffers: Float32Array[], sampleRate: number) => {
+  const totalLength = buffers.reduce((sum, chunk) => sum + chunk.length, 0);
+  const buffer = new ArrayBuffer(44 + totalLength * 2);
+  const view = new DataView(buffer);
+
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + totalLength * 2, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, totalLength * 2, true);
+
+  let offset = 44;
+  buffers.forEach((chunk) => {
+    for (let i = 0; i < chunk.length; i += 1) {
+      const sample = Math.max(-1, Math.min(1, chunk[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      offset += 2;
+    }
+  });
+
+  return new Blob([buffer], { type: 'audio/wav' });
+};
+
 const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   pad,
   onClose,
@@ -85,6 +122,14 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const recorderChunksRef = React.useRef<Blob[]>([]);
   const recorderStreamRef = React.useRef<MediaStream | null>(null);
   const recorderTimerRef = React.useRef<number | null>(null);
+  const fallbackRecorderRef = React.useRef<{
+    ctx: AudioContext;
+    source: MediaStreamAudioSourceNode;
+    processor: ScriptProcessorNode;
+    stream: MediaStream;
+    buffers: Float32Array[];
+    sampleRate: number;
+  } | null>(null);
 
   const duration = draft.duration ?? 0;
   const maxTrim = duration > 0 ? duration : Math.max(draft.trimEnd, 5);
@@ -173,15 +218,18 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
         recorderStreamRef.current = null;
       };
-      recorderRef.current = recorder;
+      recorderChunksRef.current = [];
       setRecordingMs(0);
       setIsRecording(true);
       recorder.start(250);
     } catch (error) {
-      setRecordingError('Microphone access denied or unavailable.');
+      const message = supportsMediaRecorder
+        ? 'Microphone access denied or unavailable.'
+        : 'Recording is not supported in this browser and the fallback recorder failed.';
+      setRecordingError(message);
       setIsRecording(false);
     }
-  }, [onLocalFileSelected]);
+  }, [saveRecordingFile]);
 
   useEffect(() => {
     setDraft(pad);
@@ -287,6 +335,13 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       if (recorderRef.current?.state === 'recording') {
         recorderRef.current.stop();
       }
+      if (fallbackRecorderRef.current) {
+        fallbackRecorderRef.current.processor.disconnect();
+        fallbackRecorderRef.current.source.disconnect();
+        fallbackRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+        void fallbackRecorderRef.current.ctx.close();
+        fallbackRecorderRef.current = null;
+      }
       recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
       recorderStreamRef.current = null;
       recorderChunksRef.current = [];
@@ -377,6 +432,13 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     searchAbortRef.current?.abort();
     if (recorderRef.current?.state === 'recording') {
       recorderRef.current.stop();
+    }
+    if (fallbackRecorderRef.current) {
+      fallbackRecorderRef.current.processor.disconnect();
+      fallbackRecorderRef.current.source.disconnect();
+      fallbackRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+      void fallbackRecorderRef.current.ctx.close();
+      fallbackRecorderRef.current = null;
     }
     recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
     recorderStreamRef.current = null;
