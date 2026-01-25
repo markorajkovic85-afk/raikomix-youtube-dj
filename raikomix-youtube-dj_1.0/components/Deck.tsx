@@ -624,7 +624,7 @@ const effectNodesRef = useRef<{
     : undefined;
 
   return (
-    <div className="m3-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden min-w-[420px]">
+    <div className="m3-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-[320px] max-w-[520px] aspect-[4/5] p-4">
       <div id={containerId} className="h-0 w-0 overflow-hidden" />
       <audio
         ref={localAudioRef}
@@ -637,7 +637,7 @@ const effectNodesRef = useRef<{
         }}
       />
       
-      <div className="flex gap-4">
+      <div className="flex gap-4 flex-1">
         {/* Main Deck Controls Area */}
         <div className="flex-1 flex flex-col gap-4">
           <div className="flex items-center justify-between gap-4">
@@ -763,9 +763,9 @@ const effectNodesRef = useRef<{
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mt-2">
+      <div className="grid grid-cols-2 gap-3">
         <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2">
-          <div className="flex justify-between items-center px-1">
+          <div className="flex justify-between items-center px-1 min-h-[16px]">
              <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Hot Cues</div>
              <div className="text-[7px] text-gray-700 font-black uppercase">Shift + Click to Clear</div>
           </div>
@@ -783,10 +783,13 @@ const effectNodesRef = useRef<{
           </div>
         </div>
         <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2">
-          <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest px-1">Loops</div>
+          <div className="flex justify-between items-center px-1 min-h-[16px]">
+            <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Loops</div>
+            <div className="text-[7px] text-gray-700 font-black uppercase opacity-0">Shift + Click to Clear</div>
+          </div>
           <div className="grid grid-cols-4 gap-1">
             {[2, 4, 8, 16].map((b) => (
-              <button key={b} onClick={() => handleToggleLoop(b)} className={`h-7 rounded-lg text-[10px] font-black border transition-all ${state.loopActive && Math.abs((state.loopEnd - state.loopStart) - b * (60 / state.bpm)) < 0.1 ? 'bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'border-white/5 text-gray-500 hover:text-white hover:border-white/20'}`}>{b}</button>
+              <button key={b} onClick={() => handleToggleLoop(b)} className={`h-8 rounded-lg text-[10px] font-black border transition-all ${state.loopActive && Math.abs((state.loopEnd - state.loopStart) - b * (60 / state.bpm)) < 0.1 ? 'bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'border-white/5 text-gray-500 hover:text-white hover:border-white/20'}`}>{b}</button>
             ))}
           </div>
         </div>
