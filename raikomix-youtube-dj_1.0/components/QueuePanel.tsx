@@ -184,16 +184,18 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
             <div className="w-12 h-12 bg-black rounded overflow-hidden flex-shrink-0 elevation-1">
               <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
             </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-1 overflow-hidden">
+            <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-hidden">
               <MarqueeText 
                 text={item.title} 
                 className="text-sm font-semibold text-[#E6E1E5] leading-tight" 
               />
-              <MarqueeText 
-                text={item.author || 'Unknown Artist'} 
-                className="text-[10px] text-gray-400 font-medium uppercase tracking-[0.2em]" 
-                forceAnimate
-              />
+              <div className="rounded-full border border-white/5 bg-black/40 px-2 py-0.5">
+                <MarqueeText 
+                  text={item.author || 'Unknown Artist'} 
+                  className="text-[9px] text-gray-300 font-semibold uppercase tracking-[0.2em]" 
+                  forceAnimate
+                />
+              </div>
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 motion-standard">
               <button 
