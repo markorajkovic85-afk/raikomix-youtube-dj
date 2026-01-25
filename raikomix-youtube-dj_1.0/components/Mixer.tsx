@@ -47,8 +47,12 @@ const Knob: React.FC<{
   const startVal = useRef(0);
   const activePointerId = useRef<number | null>(null);
   const knobRef = useRef<HTMLDivElement>(null);
-  const knobSize = size === 'sm' ? 'w-9 h-9' : 'w-11 h-11';
-  const innerSize = size === 'sm' ? 'w-5 h-5' : 'w-6 h-6';
+  const knobSize = size === 'sm'
+    ? 'w-[clamp(30px,4.4vh,36px)] h-[clamp(30px,4.4vh,36px)]'
+    : 'w-[clamp(34px,4.8vh,44px)] h-[clamp(34px,4.8vh,44px)]';
+  const innerSize = size === 'sm'
+    ? 'w-[clamp(18px,2.6vh,22px)] h-[clamp(18px,2.6vh,22px)]'
+    : 'w-[clamp(20px,3vh,26px)] h-[clamp(20px,3vh,26px)]';
 
  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -135,7 +139,7 @@ const Fader: React.FC<{
   onChange: (val: number) => void,
   color: string,
   height?: string
-}> = ({ label, value, onChange, color, height = 'h-28' }) => {
+}> = ({ label, value, onChange, color, height = 'h-[clamp(88px,16vh,112px)]' }) => {
   const faderRef = useRef<HTMLDivElement>(null);
   const activePointerId = useRef<number | null>(null);
 
@@ -268,7 +272,7 @@ const Mixer: React.FC<MixerProps> = ({
   };
 
   return (
-    <div className="m3-card mixer-card h-full flex flex-col bg-[#1D1B20] shadow-2xl border-white/5 shrink-0 p-2 select-none" role="region" aria-label="Mixer Controls">
+    <div className="m3-card mixer-card h-full flex flex-col bg-[#1D1B20] shadow-2xl border-white/5 shrink-0 p-[clamp(8px,1.4vh,12px)] select-none w-[clamp(160px,12vw,220px)]" role="region" aria-label="Mixer Controls">
       <div className="flex flex-col items-center gap-0 border-b border-white/5 pb-1 mb-2">
         <h2 className="text-[8px] font-black uppercase tracking-[0.4em] text-[#D0BCFF]">Mixing Console</h2>
       </div>
@@ -312,7 +316,7 @@ const Mixer: React.FC<MixerProps> = ({
              })}
            </div>
            
-           <Fader label="MST" value={masterVolume} onChange={onMasterVolumeChange} color="#FFFFFF" height="h-20" />
+           <Fader label="MST" value={masterVolume} onChange={onMasterVolumeChange} color="#FFFFFF" height="h-[clamp(60px,10vh,80px)]" />
         </div>
 
         {/* Channel B Section */}
@@ -340,7 +344,7 @@ const Mixer: React.FC<MixerProps> = ({
       </div>
 
       {/* Crossfader Section - Enhanced visual design */}
-      <div className="mt-4 space-y-2 pt-2 border-t border-white/5 relative">
+      <div className="mt-[clamp(8px,1.6vh,16px)] space-y-2 pt-2 border-t border-white/5 relative">
         <div className="flex justify-between gap-1 p-0.5 bg-black/30 rounded-lg mb-1">
           {['SMOOTH', 'CUT', 'DIP'].map(curve => (
             <button 
@@ -356,7 +360,7 @@ const Mixer: React.FC<MixerProps> = ({
         {/* Redesigned Professional Crossfader with tactile feel */}
         <div 
           ref={crossfaderRef}
-              className="bg-black/80 h-14 rounded-xl relative group flex items-center px-4 border border-white/10 shadow-[inset_0_4px_12px_rgba(0,0,0,0.8)] cursor-pointer overflow-hidden transition-all hover:border-white/20 touch-none"
+              className="bg-black/80 h-[clamp(40px,7vh,56px)] rounded-xl relative group flex items-center px-4 border border-white/10 shadow-[inset_0_4px_12px_rgba(0,0,0,0.8)] cursor-pointer overflow-hidden transition-all hover:border-white/20 touch-none"
           onDoubleClick={() => onCrossfaderChange(0)}
           title="Scroll to Mix • Double-click to Center (50/0)"
         >
@@ -370,11 +374,11 @@ const Mixer: React.FC<MixerProps> = ({
 
            {/* Professional Aluminum-style Crossfader Handle */}
            <div 
-             className="absolute top-1/2 -translate-y-1/2 w-20 h-11 bg-[#323038] rounded-md border border-white/20 shadow-[0_12px_24px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.1)] flex items-center justify-center transition-all duration-150 z-10 group-hover:border-[#D0BCFF]/40 active:scale-95 active:shadow-inner"
+             className="absolute top-1/2 -translate-y-1/2 w-[clamp(56px,6vw,80px)] h-[clamp(30px,5vh,44px)] bg-[#323038] rounded-md border border-white/20 shadow-[0_12px_24px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.1)] flex items-center justify-center transition-all duration-150 z-10 group-hover:border-[#D0BCFF]/40 active:scale-95 active:shadow-inner"
              style={{ 
                left: `calc(1rem + ${(crossfader + 1) / 2} * (100% - 2rem - 5rem))`,
              }}
-           >
+          >
              {/* Tactile Handle Ridges */}
              <div className="flex gap-[3px]">
                <div className="w-[1.5px] h-6 bg-black/60 rounded-full" />
