@@ -207,6 +207,18 @@ const App: React.FC = () => {
     showNotification('Added to Queue');
   }, []);
 
+  const handleQueueReorder = useCallback((from: number, to: number) => {
+    setQueue(prev => {
+      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) {
+        return prev;
+      }
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }, []);
+
   const stopDeck = useCallback((deckId: DeckId) => {
     const state = deckId === 'A' ? deckAState : deckBState;
     const ref = deckId === 'A' ? deckARef : deckBRef;
@@ -667,7 +679,7 @@ useEffect(() => {
                     onLoadToDeck={(i, d) => { handleLoadVideo(i.videoId, i.url, d, i.sourceType || 'youtube', i.title, i.author); setQueue(p => p.filter(q => q.id !== i.id)); }} 
                     onRemove={id => setQueue(p => p.filter(i => i.id !== id))} 
                     onClear={() => setQueue([])} 
-                    onReorder={() => {}} 
+                    onReorder={handleQueueReorder} 
                   />
                 </div>
               </aside>
