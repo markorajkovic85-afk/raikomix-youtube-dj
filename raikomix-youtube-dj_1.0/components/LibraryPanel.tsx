@@ -364,7 +364,17 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         accept="audio/*" 
         className="hidden" 
       />
-
+<input 
+        type="file" 
+        ref={folderInputRef} 
+        onChange={handleFolderSelect} 
+        /* @ts-ignore */
+        webkitdirectory="true"
+        directory="true"
+        multiple 
+        className="hidden" 
+      />
+       
       <div className="flex justify-between items-center">
         <div className="flex flex-col">
           <h3 className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Collection ({library.length})</h3>
@@ -393,6 +403,9 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
           )}
           <button onClick={() => fileInputRef.current?.click()} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white" title="Import Local Files">
             <span className="material-symbols-outlined text-sm">folder_open</span>
+          </button>
+           <button onClick={() => folderInputRef.current?.click()} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white" title="Import Folder">
+            <span className="material-symbols-outlined text-sm">folder_special</span>
           </button>
           <button onClick={() => setShowBulkAdd(true)} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white" title="Import YouTube Playlist">
             <span className="material-symbols-outlined text-sm">dynamic_feed</span>
