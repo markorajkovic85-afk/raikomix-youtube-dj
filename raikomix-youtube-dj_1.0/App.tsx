@@ -502,10 +502,10 @@ useEffect(() => {
   }, [crossfader, xFaderCurve, masterVolume, deckAVolume, deckBVolume, masterPlayerA, masterPlayerB]);
 
   const leftColumnWidth = viewMode === 'LIBRARY'
-    ? (libraryOpen ? 'minmax(180px, 240px)' : '0px')
-    : 'minmax(180px, 220px)';
+    ? (libraryOpen ? 'minmax(380px, 420px)' : '0px')
+    : 'minmax(320px, 420px)';
   const rightColumnWidth = viewMode === 'LIBRARY' && queueOpen
-    ? 'minmax(180px, 220px)'
+    ? 'minmax(280px, 320px)'
     : '0px';
 
   return (
@@ -543,7 +543,7 @@ useEffect(() => {
         >
              {viewMode === 'LIBRARY' ? (
             <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 min-h-0 ${libraryOpen ? 'opacity-100' : 'opacity-0 pointer-events-none border-none'}`}>
-              <div className={`p-3 flex flex-col gap-3 h-full min-w-0 min-h-0 ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
+              <div className={`p-4 flex flex-col gap-4 h-full min-w-[380px] min-h-0 ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
                 <SearchPanel 
                   onLoadToDeck={(vid, url, deck, title, author) => handleLoadVideo(vid, url, deck, 'youtube', title, author)} 
                   onAddToQueue={handleAddToQueue} 
@@ -674,8 +674,8 @@ useEffect(() => {
 
              {viewMode === 'LIBRARY' && (
             <>
-              <aside className={`bg-black/10 flex border-l border-white/5 flex flex-col transition-all duration-300 overflow-hidden min-h-0 ${queueOpen ? 'p-3' : 'p-0 border-none opacity-0 pointer-events-none'}`}>
-                <div className={`h-full min-w-0 ${!queueOpen ? 'opacity-0 invisible' : 'opacity-100 visible transition-opacity'}`}>
+              <aside className={`bg-black/10 flex border-l border-white/5 flex flex-col transition-all duration-300 overflow-hidden min-h-0 ${queueOpen ? 'p-4' : 'p-0 border-none opacity-0 pointer-events-none'}`}>
+                <div className={`h-full min-w-[280px] ${!queueOpen ? 'opacity-0 invisible' : 'opacity-100 visible transition-opacity'}`}>
                   <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
                     <span className="text-[10px] font-black uppercase text-gray-500 tracking-[0.2em]">Queue Console</span>
                     <button onClick={() => setQueueOpen(false)} className="text-gray-500 hover:text-white"><span className="material-symbols-outlined text-sm">close</span></button>
