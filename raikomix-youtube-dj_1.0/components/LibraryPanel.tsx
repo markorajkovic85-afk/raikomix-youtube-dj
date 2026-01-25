@@ -29,6 +29,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
   const [editingTrack, setEditingTrack] = useState<LibraryTrack | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { savePlaylists(playlists); }, [playlists]);
 
@@ -268,6 +269,55 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+ const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const audioFiles = Array.from(files).filter(file =>
+      file.type.startsWith('audio/') || /\.(mp3|wav|m4a|flac|ogg)$/i.test(file.name)
+    );
+
+    const newTracks: LibraryTrack[] = await Promise.all(
+      audioFiles.map(async (file: File) => {
+        const pathParts = file.webkitRelativePath?.split('/') || [];
+        const folderName = pathParts.length > 1 ? pathParts[pathParts.length - 2] : 'Unknown Album';
+        const fallbackTitle = file.name.replace(/\.[^/.]+$/, '');
+        const fallbackAuthor = 'Unknown Artist';
+        let title = fallbackTitle;
+        let author = fallbackAuthor;
+        let album = folderName;
+        let thumbnailUrl = fallbackThumbnail;
+
+        const metadata = await readMetadataFromFile(file);
+        if (metadata) {
+          title = metadata.title || title;
+          author = metadata.artist || author;
+          album = metadata.album || album;
+          if (metadata.pictureDataUrl) {
+            thumbnailUrl = metadata.pictureDataUrl;
+          }
+        }
+
+        return {
+          id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          videoId: `local_${file.name}_${Date.now()}`,
+          url: URL.createObjectURL(file),
+          title,
+          author,
+          album,
+          thumbnailUrl,
+          addedAt: Date.now(),
+          playCount: 0,
+          sourceType: 'local',
+          fileName: file.name
+        };
+      })
+    );
+
+    onImportLibrary((prev) => [...prev, ...newTracks]);
+    if (folderInputRef.current) folderInputRef.current.value = '';
+  };
+ 
   const toggleSelect = (id: string) => {
     const next = new Set(selectedTracks);
     next.has(id) ? next.delete(id) : next.add(id);
