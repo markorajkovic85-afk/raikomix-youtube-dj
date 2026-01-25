@@ -619,11 +619,13 @@ const effectNodesRef = useRef<{
     }
   };
 
+  const playRingStyle = state.playing
+    ? { borderColor: color, boxShadow: `0 0 24px ${color}55` }
+    : undefined;
+
   return (
     <div className="m3-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden min-w-[420px]">
-      <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden">
-        <div id={containerId} />
-      </div>
+      <div id={containerId} className="h-0 w-0 overflow-hidden" />
       <audio
         ref={localAudioRef}
         style={{ display: 'none' }}
@@ -652,26 +654,27 @@ const effectNodesRef = useRef<{
             </div>
           </div>
 
-          <div className="flex justify-between items-center px-4 py-2 bg-black/30 rounded-2xl border border-white/5">
+          <div className="flex justify-between items-center px-3 py-1.5 bg-black/30 rounded-2xl border border-white/5">
             <div className="flex flex-col">
               <div className="flex items-baseline gap-1">
-                <div className={`text-3xl font-black mono ${isScanning ? 'animate-pulse text-gray-400' : ''}`} style={!isScanning ? { color } : {}}>
+                <div className={`text-2xl font-black mono ${isScanning ? 'animate-pulse text-gray-400' : ''}`} style={!isScanning ? { color } : {}}>
                   {(state.bpm * state.playbackRate).toFixed(1)}
                 </div>
-                <div className="text-[10px] text-gray-500 font-black uppercase">BPM</div>
+                <div className="text-[9px] text-gray-500 font-black uppercase">BPM</div>
               </div>
-              <div className="text-[10px] text-gray-600 font-black uppercase tracking-widest">Key: <span className="text-white/80">{state.musicalKey}</span></div>
+              <div className="text-[9px] text-gray-600 font-black uppercase tracking-widest">Key: <span className="text-white/80">{state.musicalKey}</span></div>
             </div>
-            <button onClick={handleTap} className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white">TAP</button>
+            <button onClick={handleTap} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-white">TAP</button>
           </div>
 
           <div className="flex items-center justify-center py-1">
             <button
               onClick={togglePlay}
               disabled={!state.isReady}
-              className={`w-20 h-20 rounded-full bg-black border-[3px] flex items-center justify-center transition-all ${state.playing ? 'border-[#D0BCFF] shadow-[0_0_30px_rgba(208,188,255,0.2)]' : 'border-white/10'}`}
+              className="w-16 h-16 rounded-full bg-gradient-to-b from-[#2A2733] to-[#16151C] border-2 flex items-center justify-center transition-all hover:scale-[1.02] active:scale-95"
+              style={playRingStyle}
             >
-              <span className="material-icons text-4xl text-white">{state.playing ? 'pause' : 'play_arrow'}</span>
+              <span className="material-icons text-3xl text-white">{state.playing ? 'pause' : 'play_arrow'}</span>
             </button>
           </div>
 
@@ -684,39 +687,22 @@ const effectNodesRef = useRef<{
             duration={state.duration}
             peaks={state.waveformPeaks}
             sourceType={state.sourceType}
+            hotCues={state.hotCues}
+            cueColors={CUE_COLORS}
+            loop={{
+              active: state.loopActive,
+              start: state.loopStart,
+              end: state.loopEnd
+            }}
+            onSeek={(time) => {
+              if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
+              else if (localAudioRef.current) localAudioRef.current.currentTime = time;
+            }}
+            timeLabel={showRemaining
+              ? `-${formatTime(state.duration - state.currentTime)}`
+              : formatTime(state.currentTime)}
+            onTimeToggle={() => setShowRemaining(prev => !prev)}
           />
-
-          <div className="space-y-1">
-            <div className="flex justify-between text-[9px] font-black uppercase text-gray-600 px-1">
-              <span>Timeline</span>
-            <button
-                type="button"
-                onClick={() => setShowRemaining(prev => !prev)}
-                className="mono text-gray-400 hover:text-white transition-colors"
-                title="Toggle time display"
-              >
-                {showRemaining
-                  ? `-${formatTime(state.duration - state.currentTime)}`
-                  : formatTime(state.currentTime)}
-              </button>
-            </div>
-            <div 
-              className="h-6 bg-black/50 rounded-lg relative cursor-pointer overflow-hidden border border-white/10"
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const pct = (e.clientX - rect.left) / rect.width;
-                const time = pct * state.duration;
-                if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
-                else if (localAudioRef.current) localAudioRef.current.currentTime = time;
-              }}
-            >
-              <div className="absolute inset-y-0 left-0 opacity-20" style={{ width: `${(state.currentTime / (state.duration || 1)) * 100}%`, backgroundColor: color }} />
-              {state.hotCues.map((cue, idx) => cue !== null && (
-                <div key={idx} className="absolute inset-y-0 w-[3px] z-20" style={{ left: `${(cue / (state.duration || 1)) * 100}%`, backgroundColor: CUE_COLORS[idx] }} />
-              ))}
-              <div className="absolute inset-y-0 w-0.5 bg-white z-30 shadow-[0_0_10px_white]" style={{ left: `${(state.currentTime / (state.duration || 1)) * 100}%` }} />
-            </div>
-          </div>
         </div>
 
         {/* Improved Pitch / Tempo Fader */}
