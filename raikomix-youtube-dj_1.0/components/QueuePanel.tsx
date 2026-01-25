@@ -183,18 +183,25 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
           >
             <span className="text-[10px] font-mono text-gray-600 w-4">{index + 1}</span>
             <span className="material-symbols-outlined text-gray-600 text-sm cursor-grab">drag_indicator</span>
-            <div className="w-28 h-12 rounded-lg border border-white/10 bg-black/50 px-2 py-1 flex items-center overflow-hidden flex-shrink-0 elevation-1">
+            <div className="w-24 h-12 rounded-lg border border-white/10 bg-black/50 px-2 py-1 flex items-center overflow-hidden flex-shrink-0 elevation-1">
               <MarqueeText
-                text={item.title}
+                text={`${item.author || 'Unknown Artist'} — ${item.title}`}
                 className="text-[9px] text-gray-200 font-semibold uppercase tracking-[0.2em]"
                 forceAnimate
               />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-hidden">
               <MarqueeText 
                 text={item.title} 
                 className="text-sm font-semibold text-[#E6E1E5] leading-tight" 
               />
+              <div className="rounded-full border border-white/5 bg-black/40 px-2 py-0.5">
+                <MarqueeText 
+                  text={item.author || 'Unknown Artist'} 
+                  className="text-[9px] text-gray-300 font-semibold uppercase tracking-[0.2em]" 
+                  forceAnimate
+                />
+              </div>
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 motion-standard">
               <button 
