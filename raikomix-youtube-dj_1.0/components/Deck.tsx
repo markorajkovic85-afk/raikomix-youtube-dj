@@ -640,16 +640,16 @@ const effectNodesRef = useRef<{
       <div className="flex gap-4 flex-1">
         {/* Main Deck Controls Area */}
         <div className="flex-1 flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 shrink-0">
               <div className={`w-3 h-3 rounded-full ${state.playing ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
-              <div className="text-4xl font-black" style={{ color }}>{id}</div>
+              <div className="text-[clamp(24px,3.2vw,36px)] font-black" style={{ color }}>{id}</div>
             </div>
             <div className="text-right min-w-0 flex-1 overflow-hidden">
-              <MarqueeText text={state.title || 'Deck Ready'} className="text-sm font-bold text-white uppercase tracking-tight" />
+              <MarqueeText text={state.title || 'Deck Ready'} className="text-[clamp(12px,1.6vh,14px)] font-bold text-white uppercase tracking-tight" />
               <MarqueeText 
                 text={state.author || (state.sourceType === 'local' ? 'Local Media' : 'Insert Media')} 
-                className="text-[10px] text-gray-500 font-bold uppercase tracking-widest opacity-80" 
+                className="text-[clamp(8px,1.2vh,10px)] text-gray-500 font-bold uppercase tracking-widest opacity-80" 
               />
             </div>
           </div>
@@ -657,24 +657,24 @@ const effectNodesRef = useRef<{
           <div className="flex justify-between items-center px-3 py-1.5 bg-black/30 rounded-2xl border border-white/5">
             <div className="flex flex-col">
               <div className="flex items-baseline gap-1">
-                <div className={`text-2xl font-black mono ${isScanning ? 'animate-pulse text-gray-400' : ''}`} style={!isScanning ? { color } : {}}>
+                <div className={`text-[clamp(18px,2.4vh,24px)] font-black mono ${isScanning ? 'animate-pulse text-gray-400' : ''}`} style={!isScanning ? { color } : {}}>
                   {(state.bpm * state.playbackRate).toFixed(1)}
                 </div>
                 <div className="text-[9px] text-gray-500 font-black uppercase">BPM</div>
               </div>
               <div className="text-[9px] text-gray-600 font-black uppercase tracking-widest">Key: <span className="text-white/80">{state.musicalKey}</span></div>
             </div>
-            <button onClick={handleTap} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-white">TAP</button>
+            <button onClick={handleTap} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[clamp(8px,1.1vh,9px)] font-black uppercase tracking-widest text-gray-400 hover:text-white">TAP</button>
           </div>
 
           <div className="flex items-center justify-center py-1">
             <button
               onClick={togglePlay}
               disabled={!state.isReady}
-              className="w-16 h-16 rounded-full bg-gradient-to-b from-[#2A2733] to-[#16151C] border-2 flex items-center justify-center transition-all hover:scale-[1.02] active:scale-95"
+              className="w-[clamp(52px,6vh,64px)] h-[clamp(52px,6vh,64px)] rounded-full bg-gradient-to-b from-[#2A2733] to-[#16151C] border-2 flex items-center justify-center transition-all hover:scale-[1.02] active:scale-95"
               style={playRingStyle}
             >
-              <span className="material-icons text-3xl text-white">{state.playing ? 'pause' : 'play_arrow'}</span>
+              <span className="material-icons text-[clamp(28px,3.8vh,36px)] text-white">{state.playing ? 'pause' : 'play_arrow'}</span>
             </button>
           </div>
 
@@ -774,7 +774,7 @@ const effectNodesRef = useRef<{
               <button 
                 key={i} 
                 onClick={(e) => handleHotCue(i, e.shiftKey)} 
-                className={`h-8 rounded-lg font-black text-[10px] border transition-all ${state.hotCues[i] !== null ? 'text-black' : 'border-white/5 text-gray-700 hover:border-white/20'}`} 
+                className={`h-[clamp(28px,4.2vh,32px)] rounded-lg font-black text-[10px] border transition-all ${state.hotCues[i] !== null ? 'text-black' : 'border-white/5 text-gray-700 hover:border-white/20'}`} 
                 style={state.hotCues[i] !== null ? { backgroundColor: CUE_COLORS[i], borderColor: CUE_COLORS[i], boxShadow: `0 0 10px ${CUE_COLORS[i]}44` } : {}}
               >
                 {i + 1}
