@@ -153,11 +153,51 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     };
   }, [draft, isYouTubeBusy]);
 
-  const stopRecording = useCallback(() => {
+  const saveRecordingFile = useCallback(
+    async (file: File) => {
+      try {
+        const meta = await onLocalFileSelected(file);
+        setDraft((prev) => ({
+          ...prev,
+          sourceType: 'local',
+          sourceId: meta.sourceId,
+          sampleName: 'Mic Recording',
+          sourceLabel: 'Microphone',
+          duration: meta.duration,
+          trimStart: 0,
+          trimEnd: meta.duration,
+          trimLength: meta.duration,
+          trimLock: false,
+        }));
+      } catch (error) {
+        setRecordingError('Recording saved but failed to load. Please try again.');
+      }
+    },
+    [onLocalFileSelected]
+  );
+
+  const stopRecording = useCallback(async () => {
     if (recorderRef.current?.state === 'recording') {
       recorderRef.current.stop();
+      return;
     }
-  }, []);
+    const fallback = fallbackRecorderRef.current;
+    if (!fallback) return;
+    fallback.processor.disconnect();
+    fallback.source.disconnect();
+    fallback.stream.getTracks().forEach((track) => track.stop());
+    fallbackRecorderRef.current = null;
+    recorderStreamRef.current = null;
+    await fallback.ctx.close().catch(() => undefined);
+    setIsRecording(false);
+    if (fallback.buffers.length === 0) {
+      setRecordingError('No audio captured. Try again.');
+      return;
+    }
+    const blob = encodeWav(fallback.buffers, fallback.sampleRate);
+    const file = new File([blob], `mic-recording-${Date.now()}.wav`, { type: blob.type });
+    await saveRecordingFile(file);
+  }, [saveRecordingFile]);
 
   const startRecording = useCallback(async () => {
     setRecordingError(null);
@@ -186,6 +226,37 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         setIsRecording(false);
         const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         recorderChunksRef.current = [];
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) recorderChunksRef.current.push(event.data);
+        };
+        recorder.onstop = async () => {
+          setIsRecording(false);
+          const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+          recorderChunksRef.current = [];
+          recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+          recorderStreamRef.current = null;
+          if (!blob.size) {
+            setRecordingError('No audio captured. Try again.');
+            return;
+          }
+          const extension = blob.type.includes('mp4') ? 'm4a' : 'webm';
+          const file = new File([blob], `mic-recording-${Date.now()}.${extension}`, { type: blob.type });
+          await saveRecordingFile(file);
+        };
+        recorder.onerror = () => {
+          setRecordingError('Recording failed. Please check mic permissions.');
+          setIsRecording(false);
+          recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+          recorderStreamRef.current = null;
+        };
+        recorderRef.current = recorder;
+        setRecordingMs(0);
+        setIsRecording(true);
+        recorder.start(250);
+        return;
+      }
+      if (!AudioContextClass || typeof AudioContextClass !== 'function') {
+        setRecordingError('Recording is not supported in this browser.');
         recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
         recorderStreamRef.current = null;
         if (!blob.size) {
