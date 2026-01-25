@@ -117,7 +117,6 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingMs, setRecordingMs] = useState(0);
   const [recordingError, setRecordingError] = useState<string | null>(null);
-  const searchAbortRef = React.useRef<AbortController | null>(null);
   const recorderRef = React.useRef<MediaRecorder | null>(null);
   const recorderChunksRef = React.useRef<Blob[]>([]);
   const recorderStreamRef = React.useRef<MediaStream | null>(null);
@@ -313,28 +312,23 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       return;
     }
     const timeout = setTimeout(async () => {
-      searchAbortRef.current?.abort();
-      const controller = new AbortController();
-      searchAbortRef.current = controller;
       const startedAt = performance.now();
       setLoading(true);
       setSearchState('searching');
-      const res = await searchYouTube(trimmedQuery, 15, controller.signal, { restrictToMusic: false });
-      if (!controller.signal.aborted) {
+      try {
+        const res = await searchYouTube(trimmedQuery);
         setResults(res);
         setSearchMessage(res.length === 0 ? 'No matching results found.' : null);
+      } catch (error) {
+        setResults([]);
+        setSearchMessage('Search failed. Please try again.');
       }
       setLoading(false);
-      if (!controller.signal.aborted) {
-        setSearchState('idle');
-        if (import.meta?.env?.DEV) {
-          console.log(`[YouTube Timing] search time: ${(performance.now() - startedAt).toFixed(0)}ms`);
-        }
-      } else {
-        setSearchState('cancelled');
-        setSearchMessage(null);
+      setSearchState('idle');
+      if (import.meta?.env?.DEV) {
+        console.log(`[YouTube Timing] search time: ${(performance.now() - startedAt).toFixed(0)}ms`);
       }
-    }, 400);
+    }, 500);
     return () => clearTimeout(timeout);
   }, [query]);
 
@@ -359,7 +353,6 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   useEffect(() => {
     onStopPreview();
     onCancelYouTube();
-    searchAbortRef.current?.abort();
     setPreviewingId(null);
     setPreviewingType(null);
     setGeneralPreviewError(null);
@@ -389,7 +382,6 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     () => () => {
       onStopPreview();
       onCancelYouTube();
-      searchAbortRef.current?.abort();
       if (recorderRef.current?.state === 'recording') {
         recorderRef.current.stop();
       }
@@ -487,7 +479,6 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const handleClose = () => {
     onStopPreview();
     onCancelYouTube();
-    searchAbortRef.current?.abort();
     if (recorderRef.current?.state === 'recording') {
       recorderRef.current.stop();
     }
@@ -508,6 +499,23 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     onCancelYouTube();
     setPreviewingId(null);
     setPreviewingType(null);
+  };
+
+  const buildYouTubeDraft = (result: YouTubeSearchResult): PerformancePadConfig => {
+    const nextTrimEnd = draft.sourceType === 'youtube' ? Math.max(draft.trimEnd, 5) : 5;
+    const nextTrimLength = draft.sourceType === 'youtube' ? getTrimLength(draft) : nextTrimEnd;
+    return {
+      ...draft,
+      sourceType: 'youtube' as const,
+      sourceId: result.videoId,
+      sampleName: result.title,
+      sourceLabel: result.channelTitle,
+      duration: undefined,
+      trimStart: 0,
+      trimEnd: nextTrimEnd,
+      trimLength: nextTrimLength,
+      trimLock: false,
+    };
   };
 
   const handlePreview = async (nextDraft: PerformancePadConfig, previewId?: string | null) => {
@@ -632,17 +640,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                       <p className="text-[10px] uppercase tracking-widest text-gray-500">{searchMessage}</p>
                     )}
                     {results.map((result) => {
-                      const nextDraft = {
-                        ...draft,
-                        sourceType: 'youtube' as const,
-                        sourceId: result.videoId,
-                        sampleName: result.title,
-                        sourceLabel: result.channelTitle,
-                        trimStart: 0,
-                        trimEnd: draft.duration ? draft.duration : Math.max(draft.trimEnd, 5),
-                        trimLength: draft.duration ? draft.duration : getTrimLength(draft),
-                        trimLock: false,
-                      };
+                      const nextDraft = buildYouTubeDraft(result);
                       const previewError = previewErrors[result.videoId];
                       const rowState = youtubeStates[result.videoId]?.state ?? 'idle';
                       const rowMessage = youtubeStates[result.videoId]?.message;
