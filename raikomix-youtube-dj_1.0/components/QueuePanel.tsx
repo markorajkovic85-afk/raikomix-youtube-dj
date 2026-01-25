@@ -159,6 +159,7 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
         )}
 
         {queue.map((item, index) => {
+          const addedDate = new Date(item.addedAt).toLocaleDateString();
           return (
           <div
             key={item.id}
@@ -182,22 +183,17 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
           >
             <span className="text-[10px] font-mono text-gray-600 w-4">{index + 1}</span>
             <span className="material-symbols-outlined text-gray-600 text-sm cursor-grab">drag_indicator</span>
-            <div className="w-24 h-12 rounded-lg border border-white/10 bg-black/50 px-2 py-1 flex items-center overflow-hidden flex-shrink-0 elevation-1">
+            <div className="w-28 h-12 rounded-lg border border-white/10 bg-black/50 px-2 py-1 flex items-center overflow-hidden flex-shrink-0 elevation-1">
               <MarqueeText
-                text={`${item.author || 'Unknown Artist'} — ${item.title}`}
+                text={item.title}
                 className="text-[9px] text-gray-200 font-semibold uppercase tracking-[0.2em]"
                 forceAnimate
               />
             </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-1 overflow-hidden">
+            <div className="flex-1 min-w-0">
               <MarqueeText 
                 text={item.title} 
-                className="text-[11px] font-bold text-white leading-tight group-hover:text-[#D0BCFF] transition-colors" 
-              />
-              <MarqueeText 
-                text={item.author || 'Unknown Artist'} 
-                className="text-[9px] text-gray-500 uppercase font-bold tracking-tighter" 
-                forceAnimate
+                className="text-sm font-semibold text-[#E6E1E5] leading-tight" 
               />
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 motion-standard">
@@ -241,8 +237,8 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
               <div className="space-y-1 text-gray-200">
                 <div><span className="text-gray-500">Title:</span> {item.title || 'Unknown Title'}</div>
                 <div><span className="text-gray-500">Artist:</span> {item.author || 'Unknown Artist'}</div>
-                <div><span className="text-gray-500">Album:</span> {item.album || 'Unknown Album'}</div>
-                <div><span className="text-gray-500">File:</span> {item.fileName || 'N/A'}</div>
+                <div><span className="text-gray-500">Source:</span> {item.sourceType || 'youtube'}</div>
+                <div><span className="text-gray-500">Added:</span> {addedDate}</div>
               </div>
             </div>
           </div>

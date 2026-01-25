@@ -502,10 +502,10 @@ useEffect(() => {
   }, [crossfader, xFaderCurve, masterVolume, deckAVolume, deckBVolume, masterPlayerA, masterPlayerB]);
 
   const leftColumnWidth = viewMode === 'LIBRARY'
-    ? (libraryOpen ? '420px' : '0px')
-    : 'clamp(320px, 25vw, 420px)';
+    ? (libraryOpen ? 'minmax(180px, 240px)' : '0px')
+    : 'minmax(180px, 220px)';
   const rightColumnWidth = viewMode === 'LIBRARY' && queueOpen
-    ? '320px'
+    ? 'minmax(180px, 220px)'
     : '0px';
 
   return (
