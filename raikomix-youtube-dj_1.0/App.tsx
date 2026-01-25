@@ -107,7 +107,47 @@ const App: React.FC = () => {
   const lastAutoDeckRef = useRef<DeckId>('B');
   const autoLoadDeckRef = useRef<DeckId | null>(null);
   const lastMixVideoRef = useRef<{ A?: string | null; B?: string | null }>({});
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
+  const [showSettings, setShowSettings] = useState(false);
+  const defaultKeyboardMappings = [
+    { action: 'Deck A: Play/Pause', keys: 'Q', detail: 'Toggle deck A playback' },
+    { action: 'Deck A: Loop', keys: 'S', detail: 'Enable/disable loop' },
+    { action: 'Deck A: Mute', keys: 'M', detail: 'Toggle deck A mute' },
+    { action: 'Deck A: Pitch -', keys: '[', detail: 'Pitch down' },
+    { action: 'Deck A: Pitch +', keys: ']', detail: 'Pitch up' },
+    { action: 'Deck A: Hot Cues 1-4', keys: '1 2 3 4', detail: 'Trigger hot cues' },
+    { action: 'Deck B: Play/Pause', keys: 'P', detail: 'Toggle deck B playback' },
+    { action: 'Deck B: Loop', keys: 'K', detail: 'Enable/disable loop' },
+    { action: 'Deck B: Mute', keys: 'N', detail: 'Toggle deck B mute' },
+    { action: 'Deck B: Pitch -', keys: ';', detail: 'Pitch down' },
+    { action: 'Deck B: Pitch +', keys: "'", detail: 'Pitch up' },
+    { action: 'Deck B: Hot Cues 1-4', keys: '7 8 9 0', detail: 'Trigger hot cues' },
+    { action: 'Crossfader', keys: '← / →', detail: 'Move crossfader left/right' },
+    { action: 'Crossfader Center', keys: 'Space', detail: 'Snap to center' },
+    { action: 'Reset EQ', keys: 'R', detail: 'Reset EQ to neutral' },
+    { action: 'Help Overlay', keys: '? / /', detail: 'Toggle help overlay' }
+  ];
+  const defaultMidiMappings = [
+    { action: 'Crossfader', channel: '1', control: 'CC 8', detail: 'Full-range crossfader' },
+    { action: 'Deck A Volume', channel: '1', control: 'CC 12', detail: 'Channel fader A' },
+    { action: 'Deck B Volume', channel: '1', control: 'CC 13', detail: 'Channel fader B' },
+    { action: 'Master Volume', channel: '1', control: 'CC 14', detail: 'Master output' },
+    { action: 'Deck A Play/Pause', channel: '1', control: 'Note 36', detail: 'Transport A' },
+    { action: 'Deck B Play/Pause', channel: '1', control: 'Note 37', detail: 'Transport B' },
+    { action: 'FX Toggle', channel: '1', control: 'Note 40', detail: 'Engage FX' },
+    { action: 'Hot Cues A', channel: '1', control: 'Notes 48-51', detail: 'Trigger cues 1-4' },
+    { action: 'Hot Cues B', channel: '1', control: 'Notes 52-55', detail: 'Trigger cues 1-4' }
+  ];
+  const [keyboardMappings, setKeyboardMappings] = useState(defaultKeyboardMappings);
+  const [midiMappings, setMidiMappings] = useState(defaultMidiMappings);
+
+  const updateKeyboardMapping = (index: number, value: string) => {
+    setKeyboardMappings(prev => prev.map((item, i) => (i === index ? { ...item, keys: value } : item)));
+  };
+
+  const updateMidiMapping = (index: number, field: 'channel' | 'control', value: string) => {
+    setMidiMappings(prev => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  };
 
   useEffect(() => { saveLibrary(library); }, [library]);
 
@@ -418,7 +458,13 @@ useEffect(() => {
             <button onClick={() => setQueueOpen(!queueOpen)} className={`text-gray-600 hover:text-white transition-transform ${queueOpen ? '' : 'rotate-180'}`} title="Toggle Queue">
               <span className="material-icons">playlist_play</span>
             </button>
-            <button onClick={toggleTheme} className="text-gray-600 hover:text-white"><span className="material-icons">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span></button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="text-gray-600 hover:text-white transition-transform hover:rotate-12"
+              title="Settings"
+            >
+              <span className="material-icons">settings</span>
+            </button>
           </div>
         </nav>
 
@@ -625,6 +671,122 @@ useEffect(() => {
                   </div>
                </div>
                <button onClick={() => setShowHelp(false)} className="w-full mt-12 py-5 bg-[#D0BCFF] text-black font-black rounded-2xl tracking-[0.5em] hover:bg-white transition-all">RESUME PERFORMANCE</button>
+            </div>
+          </div>
+        )}
+
+        {showSettings && (
+          <div className="fixed inset-0 z-[3500] flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowSettings(false)} />
+            <div className="relative w-full max-w-5xl bg-[#14131A] border border-white/10 rounded-3xl shadow-[0_0_80px_rgba(208,188,255,0.15)] overflow-hidden">
+              <div className="flex items-center justify-between px-8 py-6 border-b border-white/10 bg-gradient-to-r from-[#1A1822] via-[#15131B] to-[#111018]">
+                <div className="flex items-center gap-4">
+                  <span className="material-icons text-[#D0BCFF] text-3xl">settings</span>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">Configuration</p>
+                    <h2 className="text-2xl font-black text-white">Performance Settings</h2>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="text-gray-500 hover:text-white transition-colors"
+                >
+                  <span className="material-icons text-xl">close</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 px-8 py-6">
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#D0BCFF]">Keyboard Shortcuts</p>
+                      <p className="text-xs text-white/60">Map core DJ actions to your preferred key layout.</p>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/40 border border-white/10 px-3 py-1 rounded-full">Live</span>
+                  </div>
+                  <div className="space-y-3 max-h-[380px] overflow-y-auto pr-2 scrollbar-slim">
+                    {keyboardMappings.map((item, index) => (
+                      <div key={`${item.action}-${index}`} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-white">{item.action}</p>
+                          <p className="text-[11px] text-white/50">{item.detail}</p>
+                        </div>
+                        <input
+                          value={item.keys}
+                          onChange={(event) => updateKeyboardMapping(index, event.target.value)}
+                          className="w-28 bg-[#0F0E13] border border-white/10 rounded-xl px-3 py-2 text-xs text-white text-center uppercase tracking-widest focus:border-[#D0BCFF] focus:outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-white/40">Changes apply immediately. Avoid conflicting assignments across decks.</p>
+                </section>
+
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#D0BCFF]">MIDI Mapping</p>
+                      <p className="text-xs text-white/60">Route controller knobs, faders, and pads to mix actions.</p>
+                    </div>
+                    <button className="text-[10px] font-black uppercase tracking-widest text-white/60 border border-white/10 px-3 py-1 rounded-full hover:text-white">
+                      Scan Devices
+                    </button>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
+                    <p className="text-xs text-white/70">Status</p>
+                    <p className="text-sm font-semibold text-white mt-1">No MIDI device connected</p>
+                  </div>
+                  <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2 scrollbar-slim">
+                    {midiMappings.map((item, index) => (
+                      <div key={`${item.action}-${index}`} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-white">{item.action}</p>
+                          <p className="text-[11px] text-white/50">{item.detail}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={item.channel}
+                            onChange={(event) => updateMidiMapping(index, 'channel', event.target.value)}
+                            className="w-12 bg-[#0F0E13] border border-white/10 rounded-xl px-2 py-2 text-xs text-white text-center focus:border-[#D0BCFF] focus:outline-none"
+                          />
+                          <input
+                            value={item.control}
+                            onChange={(event) => updateMidiMapping(index, 'control', event.target.value)}
+                            className="w-24 bg-[#0F0E13] border border-white/10 rounded-xl px-2 py-2 text-xs text-white text-center uppercase focus:border-[#D0BCFF] focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-white/40">Tip: match your controller layout to keep performance muscle memory intact.</p>
+                </section>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-8 py-5 border-t border-white/10 bg-[#121018]">
+                <button
+                  onClick={() => {
+                    setKeyboardMappings(defaultKeyboardMappings);
+                    setMidiMappings(defaultMidiMappings);
+                  }}
+                  className="text-[10px] font-black uppercase tracking-widest text-[#F2B8B5] border border-[#F2B8B5]/40 px-4 py-2 rounded-full hover:bg-[#F2B8B5]/10"
+                >
+                  Reset Defaults
+                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-4 py-2 rounded-full hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="text-[10px] font-black uppercase tracking-widest bg-[#D0BCFF] text-black px-6 py-2 rounded-full hover:bg-white"
+                  >
+                    Save Settings
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
