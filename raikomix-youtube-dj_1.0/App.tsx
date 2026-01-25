@@ -107,6 +107,7 @@ const App: React.FC = () => {
   const lastAutoDeckRef = useRef<DeckId>('B');
   const autoLoadDeckRef = useRef<DeckId | null>(null);
   const lastMixVideoRef = useRef<{ A?: string | null; B?: string | null }>({});
+  const preloadedTrackRef = useRef<{ deck: DeckId; itemId: string; videoId: string } | null>(null);
   const { theme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const defaultKeyboardMappings = [
@@ -246,6 +247,18 @@ const App: React.FC = () => {
     return nextItem;
   }, [queue, handleLoadVideo]);
 
+  const preloadNextQueueItem = useCallback((targetDeck: DeckId) => {
+    const nextItem = queue[0];
+    if (!nextItem) return null;
+    const alreadyPreloaded = preloadedTrackRef.current;
+    if (alreadyPreloaded && alreadyPreloaded.itemId === nextItem.id && alreadyPreloaded.deck === targetDeck) {
+      return nextItem;
+    }
+    handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author, 'cue');
+    preloadedTrackRef.current = { deck: targetDeck, itemId: nextItem.id, videoId: nextItem.videoId };
+    return nextItem;
+  }, [queue, handleLoadVideo]);
+
   const triggerDeckPlay = useCallback((deck: DeckId) => {
     const ref = deck === 'A' ? deckARef : deckBRef;
     setTimeout(() => ref.current?.togglePlay(), 0);
@@ -259,12 +272,22 @@ const App: React.FC = () => {
       startAutoMix(fromDeck, targetDeck);
       return;
     }
+    const preloaded = preloadedTrackRef.current;
+    const queuedItem = queue[0];
+    if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === targetDeck) {
+      setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
+      const pending = { deck: targetDeck, fromDeck, item: queuedItem };
+      pendingMixRef.current = pending;
+      setPendingMix(pending);
+      preloadedTrackRef.current = null;
+      return;
+    }
     const nextItem = loadNextQueueItem(targetDeck, 'load');
     if (!nextItem) return;
     const pending = { deck: targetDeck, fromDeck, item: nextItem };
     pendingMixRef.current = pending;
     setPendingMix(pending);
-  }, [deckAState, deckBState, loadNextQueueItem, startAutoMix]);
+  }, [deckAState, deckBState, queue, loadNextQueueItem, startAutoMix]);
 
   const handleTrackEnd = useCallback((deckId: DeckId) => {
     if (!autoDjEnabled) return;
@@ -366,6 +389,16 @@ const App: React.FC = () => {
       if (!deckAPlaying && !deckBPlaying) {
         if (autoLoadDeckRef.current) return;
         const nextDeck = lastAutoDeckRef.current === 'A' ? 'B' : 'A';
+        const preloaded = preloadedTrackRef.current;
+        const queuedItem = queue[0];
+        if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === nextDeck) {
+          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
+          autoLoadDeckRef.current = nextDeck;
+          preloadedTrackRef.current = null;
+          setCrossfader(nextDeck === 'A' ? -1 : 1);
+          triggerDeckPlay(nextDeck);
+          return;
+        }
         const nextItem = loadNextQueueItem(nextDeck, 'load');
         if (!nextItem) {
           autoLoadDeckRef.current = null;
@@ -383,13 +416,19 @@ const App: React.FC = () => {
       if (activeState.videoId && lastMixVideoRef.current[activeDeck] === activeState.videoId) return;
       const remaining = activeState.duration - activeState.currentTime;
       const leadTime = Math.min(Math.max(1, mixLeadSeconds), activeState.duration);
+      const preloadTime = Math.min(activeState.duration, Math.max(leadTime + 6, leadTime * 2));
+      const targetDeck = activeDeck === 'A' ? 'B' : 'A';
+      const targetState = targetDeck === 'A' ? deckAState : deckBState;
+      if (remaining <= preloadTime && queue.length > 0 && !targetState?.playing && !pendingMixRef.current) {
+        preloadNextQueueItem(targetDeck);
+      }
       if (remaining <= leadTime) {
         lastMixVideoRef.current[activeDeck] = activeState.videoId;
         queueAutoMix(activeDeck);
       }
     }, 250);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, getActiveDeck, loadNextQueueItem, triggerDeckPlay, queueAutoMix]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, getActiveDeck, loadNextQueueItem, triggerDeckPlay, queueAutoMix, preloadNextQueueItem]);
 
   useEffect(() => {
     if (autoDjEnabled) return;
@@ -397,7 +436,16 @@ const App: React.FC = () => {
     autoLoadDeckRef.current = null;
     setPendingMix(null);
     lastMixVideoRef.current = {};
+    preloadedTrackRef.current = null;
   }, [autoDjEnabled]);
+
+  useEffect(() => {
+    if (!preloadedTrackRef.current) return;
+    const queuedItem = queue[0];
+    if (!queuedItem || queuedItem.id !== preloadedTrackRef.current.itemId) {
+      preloadedTrackRef.current = null;
+    }
+  }, [queue]);
 
   useEffect(() => {
     if (!pendingMix) return;
