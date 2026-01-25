@@ -50,11 +50,6 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
     handleDragEnd();
   };
 
-  const handleMove = (from: number, to: number) => {
-    if (to < 0 || to >= queue.length) return;
-    onReorder(from, to);
-  };
-
   return (
     <div className="flex flex-col h-full gap-4 elevation-2">
       <div className="flex items-center justify-between px-2">
