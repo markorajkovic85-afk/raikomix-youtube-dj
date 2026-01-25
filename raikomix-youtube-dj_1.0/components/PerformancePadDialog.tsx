@@ -205,13 +205,10 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       setRecordingError('Microphone access is not supported in this browser.');
       return;
     }
-    if (!window.isSecureContext) {
-      setRecordingError('Microphone access requires HTTPS or localhost.');
+    if (typeof MediaRecorder === 'undefined') {
+      setRecordingError('Recording is not supported in this browser.');
       return;
     }
-    const supportsMediaRecorder = typeof MediaRecorder !== 'undefined';
-    const AudioContextClass =
-      typeof window !== 'undefined' ? window.AudioContext || (window as any).webkitAudioContext : null;
     if (recorderRef.current?.state === 'recording') return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -220,8 +217,14 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       const preferredTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
       const canCheckMime = typeof MediaRecorder.isTypeSupported === 'function';
       const mimeType = canCheckMime ? preferredTypes.find((type) => MediaRecorder.isTypeSupported(type)) ?? '' : '';
-      if (supportsMediaRecorder) {
-        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recorderChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recorderChunksRef.current.push(event.data);
+      };
+      recorder.onstop = async () => {
+        setIsRecording(false);
+        const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         recorderChunksRef.current = [];
         recorder.ondataavailable = (event) => {
           if (event.data.size > 0) recorderChunksRef.current.push(event.data);
@@ -256,38 +259,40 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         setRecordingError('Recording is not supported in this browser.');
         recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
         recorderStreamRef.current = null;
-        return;
-      }
-      const ctx = new AudioContextClass();
-      if (!ctx.createScriptProcessor) {
-        setRecordingError('Recording is not supported in this browser.');
+        if (!blob.size) {
+          setRecordingError('No audio captured. Try again.');
+          return;
+        }
+        const extension = blob.type.includes('mp4') ? 'm4a' : 'webm';
+        const file = new File([blob], `mic-recording-${Date.now()}.${extension}`, { type: blob.type });
+        try {
+          const meta = await onLocalFileSelected(file);
+          setDraft((prev) => ({
+            ...prev,
+            sourceType: 'local',
+            sourceId: meta.sourceId,
+            sampleName: 'Mic Recording',
+            sourceLabel: 'Microphone',
+            duration: meta.duration,
+            trimStart: 0,
+            trimEnd: meta.duration,
+            trimLength: meta.duration,
+            trimLock: false,
+          }));
+        } catch (error) {
+          setRecordingError('Recording saved but failed to load. Please try again.');
+        }
+      };
+      recorder.onerror = () => {
+        setRecordingError('Recording failed. Please check mic permissions.');
+        setIsRecording(false);
         recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
         recorderStreamRef.current = null;
-        return;
-      }
-      const source = ctx.createMediaStreamSource(stream);
-      const processor = ctx.createScriptProcessor(4096, 1, 1);
-      const silenceGain = ctx.createGain();
-      silenceGain.gain.value = 0;
-      const buffers: Float32Array[] = [];
-      processor.onaudioprocess = (event) => {
-        const input = event.inputBuffer.getChannelData(0);
-        buffers.push(new Float32Array(input));
-      };
-      source.connect(processor);
-      processor.connect(silenceGain);
-      silenceGain.connect(ctx.destination);
-      fallbackRecorderRef.current = {
-        ctx,
-        source,
-        processor,
-        stream,
-        buffers,
-        sampleRate: ctx.sampleRate,
       };
       recorderChunksRef.current = [];
       setRecordingMs(0);
       setIsRecording(true);
+      recorder.start(250);
     } catch (error) {
       const message = supportsMediaRecorder
         ? 'Microphone access denied or unavailable.'
@@ -405,7 +410,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         fallbackRecorderRef.current.processor.disconnect();
         fallbackRecorderRef.current.source.disconnect();
         fallbackRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
-        void fallbackRecorderRef.current.ctx.close().catch(() => undefined);
+        void fallbackRecorderRef.current.ctx.close();
         fallbackRecorderRef.current = null;
       }
       recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -503,7 +508,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       fallbackRecorderRef.current.processor.disconnect();
       fallbackRecorderRef.current.source.disconnect();
       fallbackRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
-      void fallbackRecorderRef.current.ctx.close().catch(() => undefined);
+      void fallbackRecorderRef.current.ctx.close();
       fallbackRecorderRef.current = null;
     }
     recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
