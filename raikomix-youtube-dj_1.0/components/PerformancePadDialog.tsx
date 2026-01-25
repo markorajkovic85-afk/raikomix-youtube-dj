@@ -116,13 +116,22 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
   const startRecording = useCallback(async () => {
     setRecordingError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setRecordingError('Microphone access is not supported in this browser.');
+      return;
+    }
+    if (typeof MediaRecorder === 'undefined') {
+      setRecordingError('Recording is not supported in this browser.');
+      return;
+    }
     if (recorderRef.current?.state === 'recording') return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
       recorderStreamRef.current = stream;
       const preferredTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
-      const mimeType = preferredTypes.find((type) => MediaRecorder.isTypeSupported(type)) ?? '';
+      const canCheckMime = typeof MediaRecorder.isTypeSupported === 'function';
+      const mimeType = canCheckMime ? preferredTypes.find((type) => MediaRecorder.isTypeSupported(type)) ?? '' : '';
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       recorderChunksRef.current = [];
       recorder.ondataavailable = (event) => {
@@ -140,28 +149,34 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         }
         const extension = blob.type.includes('mp4') ? 'm4a' : 'webm';
         const file = new File([blob], `mic-recording-${Date.now()}.${extension}`, { type: blob.type });
-        const meta = await onLocalFileSelected(file);
-        setDraft((prev) => ({
-          ...prev,
-          sourceType: 'local',
-          sourceId: meta.sourceId,
-          sampleName: 'Mic Recording',
-          sourceLabel: 'Microphone',
-          duration: meta.duration,
-          trimStart: 0,
-          trimEnd: meta.duration,
-          trimLength: meta.duration,
-          trimLock: false,
-        }));
+        try {
+          const meta = await onLocalFileSelected(file);
+          setDraft((prev) => ({
+            ...prev,
+            sourceType: 'local',
+            sourceId: meta.sourceId,
+            sampleName: 'Mic Recording',
+            sourceLabel: 'Microphone',
+            duration: meta.duration,
+            trimStart: 0,
+            trimEnd: meta.duration,
+            trimLength: meta.duration,
+            trimLock: false,
+          }));
+        } catch (error) {
+          setRecordingError('Recording saved but failed to load. Please try again.');
+        }
       };
       recorder.onerror = () => {
         setRecordingError('Recording failed. Please check mic permissions.');
         setIsRecording(false);
+        recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+        recorderStreamRef.current = null;
       };
       recorderRef.current = recorder;
       setRecordingMs(0);
       setIsRecording(true);
-      recorder.start();
+      recorder.start(250);
     } catch (error) {
       setRecordingError('Microphone access denied or unavailable.');
       setIsRecording(false);
