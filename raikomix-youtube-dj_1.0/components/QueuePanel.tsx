@@ -16,16 +16,16 @@ interface QueuePanelProps {
   onReorder: (from: number, to: number) => void;
 }
 
-const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, className }) => {
+const MarqueeText: React.FC<{ text: string; className: string; forceAnimate?: boolean }> = ({ text, className, forceAnimate = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const [shouldAnimate, setShouldAnimate] = useState(false);
 
   useEffect(() => {
     if (containerRef.current && textRef.current) {
-      setShouldAnimate(textRef.current.scrollWidth > containerRef.current.clientWidth);
+      setShouldAnimate(forceAnimate || textRef.current.scrollWidth > containerRef.current.clientWidth);
     }
-  }, [text]);
+  }, [forceAnimate, text]);
 
   return (
     <div ref={containerRef} className="marquee-container w-full">
@@ -50,8 +50,35 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
   onMixDurationChange,
   onLoadToDeck,
   onRemove,
-  onClear
+  onClear,
+  onReorder
 }) => {
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (index: number) => {
+    setDragIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setOverIndex(null);
+  };
+
+  const handleDrop = (index: number) => {
+    if (dragIndex === null || dragIndex === index) {
+      handleDragEnd();
+      return;
+    }
+    onReorder(dragIndex, index);
+    handleDragEnd();
+  };
+
+  const handleMove = (from: number, to: number) => {
+    if (to < 0 || to >= queue.length) return;
+    onReorder(from, to);
+  };
+
   return (
     <div className="flex flex-col h-full gap-4 elevation-2">
       <div className="flex items-center justify-between px-2">
@@ -74,6 +101,11 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
           </div>
         )}
       </div>
+      {queue.length > 1 && (
+        <div className="px-2 text-[9px] uppercase tracking-[0.3em] text-gray-600">
+          Drag to reorder
+        </div>
+      )}
 
       <div className="rounded-xl border border-white/5 bg-black/30 p-3 space-y-3">
         <div className="flex items-center justify-between">
@@ -127,8 +159,28 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
         )}
 
         {queue.map((item, index) => (
-          <div key={item.id} className="m3-card group p-3 flex gap-4 items-center bg-[#1C1B1F]/40 hover:bg-[#2B2930] motion-standard border-dashed elevation-1 hover:elevation-2 overflow-hidden">
+          <div
+            key={item.id}
+            className={`m3-card group p-3 flex gap-4 items-center bg-[#1C1B1F]/40 hover:bg-[#2B2930] motion-standard border-dashed elevation-1 hover:elevation-2 overflow-hidden ${
+              overIndex === index ? 'ring-1 ring-[#D0BCFF]/40' : ''
+            }`}
+            draggable
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = 'move';
+              handleDragStart(index);
+            }}
+            onDragEnd={handleDragEnd}
+            onDragOver={(event) => {
+              event.preventDefault();
+              if (overIndex !== index) setOverIndex(index);
+            }}
+            onDragLeave={() => {
+              if (overIndex === index) setOverIndex(null);
+            }}
+            onDrop={() => handleDrop(index)}
+          >
             <span className="text-[10px] font-mono text-gray-600 w-4">{index + 1}</span>
+            <span className="material-symbols-outlined text-gray-600 text-sm cursor-grab">drag_indicator</span>
             <div className="w-12 h-12 bg-black rounded overflow-hidden flex-shrink-0 elevation-1">
               <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
             </div>
@@ -139,7 +191,8 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
               />
               <MarqueeText 
                 text={item.author || 'Unknown Artist'} 
-                className="text-[10px] text-gray-400 font-medium" 
+                className="text-[10px] text-gray-400 font-medium uppercase tracking-[0.2em]" 
+                forceAnimate
               />
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 motion-standard">
@@ -161,6 +214,22 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
+              <div className="flex flex-col">
+                <button
+                  onClick={() => handleMove(index, index - 1)}
+                  className="w-6 h-4 flex items-center justify-center text-gray-500 hover:text-white"
+                  title="Move up"
+                >
+                  <span className="material-symbols-outlined text-sm">keyboard_arrow_up</span>
+                </button>
+                <button
+                  onClick={() => handleMove(index, index + 1)}
+                  className="w-6 h-4 flex items-center justify-center text-gray-500 hover:text-white"
+                  title="Move down"
+                >
+                  <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                </button>
+              </div>
             </div>
           </div>
         ))}
