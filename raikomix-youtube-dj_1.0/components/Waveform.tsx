@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 interface WaveformProps {
   isPlaying: boolean;
@@ -19,6 +19,9 @@ interface WaveformProps {
 }
 
 const defaultCueColors = ['#FFD700', '#00E5FF', '#FF4081', '#76FF03'];
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 6;
+const ZOOM_STEP = 1.15;
 
 const Waveform: React.FC<WaveformProps> = ({
   isPlaying,
@@ -41,6 +44,7 @@ const Waveform: React.FC<WaveformProps> = ({
   const requestRef = useRef<number>(null);
   const offsetRef = useRef(0);
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
+  const [zoomLevel, setZoomLevel] = useState(MIN_ZOOM);
 
   const resizeCanvas = () => {
     const canvas = canvasRef.current;
@@ -56,12 +60,19 @@ const Waveform: React.FC<WaveformProps> = ({
     }
   };
 
-  const drawMarkers = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    if (duration <= 0) return;
+  const drawMarkers = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    visibleStart: number,
+    visibleDuration: number
+  ) => {
+    if (duration <= 0 || visibleDuration <= 0) return;
+    const toX = (time: number) => ((time - visibleStart) / visibleDuration) * width;
 
     if (loop?.active && loop.end > loop.start) {
-      const startX = Math.max(0, (loop.start / duration) * width);
-      const endX = Math.min(width, (loop.end / duration) * width);
+      const startX = Math.max(0, toX(loop.start));
+      const endX = Math.min(width, toX(loop.end));
       ctx.save();
       ctx.globalAlpha = 0.18;
       ctx.fillStyle = color;
@@ -71,7 +82,8 @@ const Waveform: React.FC<WaveformProps> = ({
 
     hotCues.forEach((cue, index) => {
       if (cue === null || cue === undefined) return;
-      const x = Math.min(width, Math.max(0, (cue / duration) * width));
+      if (cue < visibleStart || cue > visibleStart + visibleDuration) return;
+      const x = Math.min(width, Math.max(0, toX(cue)));
       ctx.save();
       ctx.strokeStyle = cueColors[index] || color;
       ctx.lineWidth = 2;
@@ -85,10 +97,22 @@ const Waveform: React.FC<WaveformProps> = ({
     });
   };
 
-  const drawPeaks = (ctx: CanvasRenderingContext2D, width: number, height: number, progress: number) => {
+  const drawPeaks = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    progress: number,
+    visibleStart: number,
+    visibleDuration: number
+  ) => {
     if (!peaks || peaks.length === 0) return;
+    const totalPeaks = peaks.length;
+    const startIndex = Math.max(0, Math.floor((visibleStart / duration) * totalPeaks));
+    const endIndex = Math.min(totalPeaks, Math.ceil(((visibleStart + visibleDuration) / duration) * totalPeaks));
+    const visiblePeaks = peaks.slice(startIndex, endIndex);
+    if (visiblePeaks.length === 0) return;
     const centerY = height / 2;
-    const barWidth = width / peaks.length;
+    const barWidth = width / visiblePeaks.length;
     const baseLineWidth = Math.max(1, barWidth * 0.7);
 
     ctx.lineCap = 'round';
@@ -97,7 +121,7 @@ const Waveform: React.FC<WaveformProps> = ({
     ctx.shadowBlur = 0;
     ctx.beginPath();
 
-    peaks.forEach((peak, index) => {
+    visiblePeaks.forEach((peak, index) => {
       const x = index * barWidth + barWidth / 2;
       const amplitude = peak * (height * 0.42);
       ctx.moveTo(x, centerY - amplitude);
@@ -116,7 +140,7 @@ const Waveform: React.FC<WaveformProps> = ({
       ctx.shadowBlur = 6;
       ctx.shadowColor = color;
       ctx.beginPath();
-      peaks.forEach((peak, index) => {
+      visiblePeaks.forEach((peak, index) => {
         const x = index * barWidth + barWidth / 2;
         const amplitude = peak * (height * 0.42);
         ctx.moveTo(x, centerY - amplitude);
@@ -126,7 +150,7 @@ const Waveform: React.FC<WaveformProps> = ({
       ctx.restore();
     }
 
-    drawMarkers(ctx, width, height);
+    drawMarkers(ctx, width, height, visibleStart, visibleDuration);
 
     ctx.shadowBlur = 8;
     ctx.shadowColor = color;
@@ -139,6 +163,16 @@ const Waveform: React.FC<WaveformProps> = ({
     ctx.stroke();
   };
 
+  const visibleWindow = useMemo(() => {
+    if (duration <= 0) {
+      return { start: 0, length: 0 };
+    }
+    const windowLength = duration / zoomLevel;
+    const maxStart = Math.max(0, duration - windowLength);
+    const start = Math.min(Math.max(0, currentTime - windowLength / 2), maxStart);
+    return { start, length: windowLength };
+  }, [currentTime, duration, zoomLevel]);
+
   const draw = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -149,10 +183,12 @@ const Waveform: React.FC<WaveformProps> = ({
     const width = canvas.width;
     const height = canvas.height;
     ctx.clearRect(0, 0, width, height);
-    const progress = duration > 0 ? currentTime / duration : 0;
+    const visibleProgress = visibleWindow.length > 0
+      ? (currentTime - visibleWindow.start) / visibleWindow.length
+      : 0;
 
     if (peaks && peaks.length > 0) {
-      drawPeaks(ctx, width, height, progress);
+      drawPeaks(ctx, width, height, visibleProgress, visibleWindow.start, visibleWindow.length);
       requestRef.current = requestAnimationFrame(draw);
       return;
     }
@@ -195,7 +231,7 @@ const Waveform: React.FC<WaveformProps> = ({
     ctx.stroke();
     ctx.globalAlpha = 1.0;
 
-    drawMarkers(ctx, width, height);
+    drawMarkers(ctx, width, height, 0, duration);
 
     if (sourceType === 'youtube') {
       ctx.strokeStyle = 'rgba(255,255,255,0.1)';
@@ -215,7 +251,7 @@ const Waveform: React.FC<WaveformProps> = ({
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
-  }, [isPlaying, volume, playbackRate, color, peaks, currentTime, duration, sourceType, hotCues, cueColors, loop]);
+  }, [isPlaying, volume, playbackRate, color, peaks, currentTime, duration, sourceType, hotCues, cueColors, loop, visibleWindow]);
 
   return (
     <div
@@ -225,7 +261,18 @@ const Waveform: React.FC<WaveformProps> = ({
         if (!onSeek || duration <= 0) return;
         const rect = event.currentTarget.getBoundingClientRect();
         const pct = (event.clientX - rect.left) / rect.width;
-        onSeek(pct * duration);
+        const baseStart = peaks && peaks.length > 0 ? visibleWindow.start : 0;
+        const baseDuration = peaks && peaks.length > 0 ? visibleWindow.length : duration;
+        onSeek(baseStart + pct * baseDuration);
+      }}
+      onWheel={(event) => {
+        if (!peaks || peaks.length === 0) return;
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        setZoomLevel((currentZoom) => {
+          const nextZoom = event.deltaY > 0 ? currentZoom / ZOOM_STEP : currentZoom * ZOOM_STEP;
+          return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
+        });
       }}
     >
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/4 to-transparent pointer-events-none" />
