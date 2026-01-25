@@ -16,16 +16,16 @@ interface QueuePanelProps {
   onReorder: (from: number, to: number) => void;
 }
 
-const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, className }) => {
+const MarqueeText: React.FC<{ text: string; className: string; forceAnimate?: boolean }> = ({ text, className, forceAnimate = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const [shouldAnimate, setShouldAnimate] = useState(false);
 
   useEffect(() => {
     if (containerRef.current && textRef.current) {
-      setShouldAnimate(textRef.current.scrollWidth > containerRef.current.clientWidth);
+      setShouldAnimate(forceAnimate || textRef.current.scrollWidth > containerRef.current.clientWidth);
     }
-  }, [text]);
+  }, [forceAnimate, text]);
 
   return (
     <div ref={containerRef} className="marquee-container w-full">
@@ -191,7 +191,8 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
               />
               <MarqueeText 
                 text={item.author || 'Unknown Artist'} 
-                className="text-[10px] text-gray-400 font-medium" 
+                className="text-[10px] text-gray-400 font-medium uppercase tracking-[0.2em]" 
+                forceAnimate
               />
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 motion-standard">
