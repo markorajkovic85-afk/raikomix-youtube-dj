@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { QueueItem, DeckId } from '../types';
 import { exportQueue } from '../utils/queueStorage';
 
@@ -15,30 +15,6 @@ interface QueuePanelProps {
   onClear: () => void;
   onReorder: (from: number, to: number) => void;
 }
-
-const MarqueeText: React.FC<{ text: string; className: string; forceAnimate?: boolean }> = ({ text, className, forceAnimate = false }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const textRef = useRef<HTMLDivElement>(null);
-  const [shouldAnimate, setShouldAnimate] = useState(false);
-
-  useEffect(() => {
-    if (containerRef.current && textRef.current) {
-      setShouldAnimate(forceAnimate || textRef.current.scrollWidth > containerRef.current.clientWidth);
-    }
-  }, [forceAnimate, text]);
-
-  return (
-    <div ref={containerRef} className="marquee-container w-full">
-      <div 
-        ref={textRef} 
-        className={`${className} marquee-text ${shouldAnimate ? 'animate-marquee' : ''}`}
-      >
-        {text}
-        {shouldAnimate && <span className="ml-12">{text}</span>}
-      </div>
-    </div>
-  );
-};
 
 const QueuePanel: React.FC<QueuePanelProps> = ({
   queue,
@@ -161,78 +137,79 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
         {queue.map((item, index) => {
           const addedDate = new Date(item.addedAt).toLocaleDateString();
           return (
-          <div
-            key={item.id}
-            className={`m3-card group p-3 grid gap-2 bg-[#1C1B1F]/40 hover:bg-[#2B2930] motion-standard border-dashed elevation-1 hover:elevation-2 relative ${
-              overIndex === index ? 'ring-1 ring-[#D0BCFF]/40' : ''
-            }`}
-            draggable
-            onDragStart={(event) => {
-              event.dataTransfer.effectAllowed = 'move';
-              handleDragStart(index);
-            }}
-            onDragEnd={handleDragEnd}
-            onDragOver={(event) => {
-              event.preventDefault();
-              if (overIndex !== index) setOverIndex(index);
-            }}
-            onDragLeave={() => {
-              if (overIndex === index) setOverIndex(null);
-            }}
-            onDrop={() => handleDrop(index)}
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-[10px] font-mono text-gray-600 w-4">{index + 1}</span>
-                <span className="material-symbols-outlined text-gray-600 text-sm cursor-grab">drag_indicator</span>
+            <div
+              key={item.id}
+              className={`m3-card group px-2 py-1.5 grid gap-1 bg-[#1C1B1F]/40 hover:bg-[#2B2930] motion-standard border-dashed elevation-1 hover:elevation-2 relative ${
+                overIndex === index ? 'ring-1 ring-[#D0BCFF]/40' : ''
+              }`}
+              draggable
+              onDragStart={(event) => {
+                event.dataTransfer.effectAllowed = 'move';
+                handleDragStart(index);
+              }}
+              onDragEnd={handleDragEnd}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (overIndex !== index) setOverIndex(index);
+              }}
+              onDragLeave={() => {
+                if (overIndex === index) setOverIndex(null);
+              }}
+              onDrop={() => handleDrop(index)}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-[9px] font-mono text-gray-500 w-4 text-right">{index + 1}</span>
+                  <span className="material-symbols-outlined text-gray-600 text-sm cursor-grab">drag_indicator</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold text-[#E6E1E5] truncate">
+                    {item.title}
+                  </div>
+                </div>
               </div>
-              <div className="w-28 h-12 rounded-lg border border-white/10 bg-black/50 px-2 py-1 flex items-center overflow-hidden flex-shrink-0 elevation-1">
-                <MarqueeText
-                  text={item.title}
-                  className="text-[9px] text-gray-200 font-semibold uppercase tracking-[0.2em]"
-                  forceAnimate
-                />
-              </div>
-              <div className="flex-1 min-w-[140px]">
-                <MarqueeText
-                  text={item.title}
-                  className="text-sm font-semibold text-[#E6E1E5] leading-tight"
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap gap-1">
-                <button
-                  onClick={() => onLoadToDeck(item, 'A')}
-                  className="px-2 py-1 rounded bg-[#D0BCFF]/10 text-[#D0BCFF] text-[10px] font-black motion-emphasized elevation-1 hover:elevation-2"
-                >
-                  A
-                </button>
-                <button
-                  onClick={() => onLoadToDeck(item, 'B')}
-                  className="px-2 py-1 rounded bg-[#F2B8B5]/10 text-[#F2B8B5] text-[10px] font-black motion-emphasized elevation-1 hover:elevation-2"
-                >
-                  B
-                </button>
-              </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 motion-standard">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => onLoadToDeck(item, 'A')}
+                    className="px-2 py-1 rounded bg-[#D0BCFF]/10 text-[#D0BCFF] text-[10px] font-black motion-emphasized elevation-1 hover:elevation-2"
+                  >
+                    A
+                  </button>
+                  <button
+                    onClick={() => onLoadToDeck(item, 'B')}
+                    className="px-2 py-1 rounded bg-[#F2B8B5]/10 text-[#F2B8B5] text-[10px] font-black motion-emphasized elevation-1 hover:elevation-2"
+                  >
+                    B
+                  </button>
+                </div>
                 <button
                   onClick={() => onRemove(item.id)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-red-400 motion-standard"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-gray-500 hover:text-red-400 motion-standard"
+                  title="Remove"
                 >
-                  <span className="material-symbols-outlined text-lg">close</span>
+                  <span className="material-symbols-outlined text-base">close</span>
                 </button>
-                <div className="flex flex-col">
+              </div>
+              <div className="pointer-events-none absolute left-12 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-black/90 p-3 text-[9px] text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                <div className="font-bold text-[#D0BCFF] mb-1">Track Details</div>
+                <div className="space-y-1 text-gray-200">
+                  <div><span className="text-gray-500">Title:</span> {item.title || 'Unknown Title'}</div>
+                  <div><span className="text-gray-500">Artist:</span> {item.author || 'Unknown Artist'}</div>
+                  <div><span className="text-gray-500">Source:</span> {item.sourceType || 'youtube'}</div>
+                  <div><span className="text-gray-500">Added:</span> {addedDate}</div>
+                </div>
+                <div className="mt-2 flex items-center gap-1">
                   <button
                     onClick={() => handleMove(index, index - 1)}
-                    className="w-6 h-4 flex items-center justify-center text-gray-500 hover:text-white"
+                    className="pointer-events-auto w-6 h-5 flex items-center justify-center text-gray-500 hover:text-white"
                     title="Move up"
                   >
                     <span className="material-symbols-outlined text-sm">keyboard_arrow_up</span>
                   </button>
                   <button
                     onClick={() => handleMove(index, index + 1)}
-                    className="w-6 h-4 flex items-center justify-center text-gray-500 hover:text-white"
+                    className="pointer-events-auto w-6 h-5 flex items-center justify-center text-gray-500 hover:text-white"
                     title="Move down"
                   >
                     <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
@@ -240,16 +217,6 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
                 </div>
               </div>
             </div>
-            <div className="pointer-events-none absolute left-12 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-black/90 p-3 text-[9px] text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-              <div className="font-bold text-[#D0BCFF] mb-1">Track Details</div>
-              <div className="space-y-1 text-gray-200">
-                <div><span className="text-gray-500">Title:</span> {item.title || 'Unknown Title'}</div>
-                <div><span className="text-gray-500">Artist:</span> {item.author || 'Unknown Artist'}</div>
-                <div><span className="text-gray-500">Source:</span> {item.sourceType || 'youtube'}</div>
-                <div><span className="text-gray-500">Added:</span> {addedDate}</div>
-              </div>
-            </div>
-          </div>
           );
         })}
       </div>
