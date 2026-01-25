@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PerformancePadConfig, PerformancePadMode, YouTubeLoadingState, YouTubeSearchResult } from '../types';
 import { searchYouTube } from '../utils/youtubeApi';
@@ -77,11 +77,19 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const [previewingType, setPreviewingType] = useState<'youtube' | 'local' | null>(null);
   const [previewErrors, setPreviewErrors] = useState<Record<string, string>>({});
   const [generalPreviewError, setGeneralPreviewError] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingMs, setRecordingMs] = useState(0);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
   const searchAbortRef = React.useRef<AbortController | null>(null);
+  const recorderRef = React.useRef<MediaRecorder | null>(null);
+  const recorderChunksRef = React.useRef<Blob[]>([]);
+  const recorderStreamRef = React.useRef<MediaStream | null>(null);
+  const recorderTimerRef = React.useRef<number | null>(null);
 
   const duration = draft.duration ?? 0;
   const maxTrim = duration > 0 ? duration : Math.max(draft.trimEnd, 5);
   const trimLength = getTrimLength(draft);
+  const recordingTime = formatTime(recordingMs / 1000);
 
   const selectedYouTubeState =
     draft.sourceType === 'youtube' && draft.sourceId ? youtubeStates[draft.sourceId]?.state : null;
@@ -176,11 +184,37 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     setGeneralPreviewError(null);
   }, [activeTab, onCancelYouTube, onStopPreview]);
 
+  useEffect(() => {
+    if (activeTab !== 'local' && isRecording) {
+      stopRecording();
+    }
+  }, [activeTab, isRecording, stopRecording]);
+
+  useEffect(() => {
+    if (!isRecording) return;
+    const startedAt = performance.now();
+    recorderTimerRef.current = window.setInterval(() => {
+      setRecordingMs(performance.now() - startedAt);
+    }, 200);
+    return () => {
+      if (recorderTimerRef.current) {
+        window.clearInterval(recorderTimerRef.current);
+        recorderTimerRef.current = null;
+      }
+    };
+  }, [isRecording]);
+
   useEffect(
     () => () => {
       onStopPreview();
       onCancelYouTube();
       searchAbortRef.current?.abort();
+      if (recorderRef.current?.state === 'recording') {
+        recorderRef.current.stop();
+      }
+      recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recorderStreamRef.current = null;
+      recorderChunksRef.current = [];
     },
     [onCancelYouTube, onStopPreview]
   );
@@ -266,6 +300,11 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     onStopPreview();
     onCancelYouTube();
     searchAbortRef.current?.abort();
+    if (recorderRef.current?.state === 'recording') {
+      recorderRef.current.stop();
+    }
+    recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recorderStreamRef.current = null;
     onClose();
   };
 
@@ -298,6 +337,81 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     setPreviewingId(nextDraft.sourceId ?? null);
     setPreviewingType(nextDraft.sourceType === 'youtube' ? 'youtube' : 'local');
   };
+
+  const stopRecording = useCallback(() => {
+    if (recorderRef.current?.state === 'recording') {
+      recorderRef.current.stop();
+    }
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    setRecordingError(null);
+    if (recorderRef.current?.state === 'recording') return;
+    try {
+      if (typeof MediaRecorder === 'undefined') {
+        setRecordingError('Recording is not supported in this browser.');
+        return;
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setRecordingError('Microphone access is unavailable.');
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+      recorderStreamRef.current = stream;
+      const preferredTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+      const supportsType = typeof MediaRecorder.isTypeSupported === 'function';
+      const mimeType = supportsType ? preferredTypes.find((type) => MediaRecorder.isTypeSupported(type)) ?? '' : '';
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recorderChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recorderChunksRef.current.push(event.data);
+      };
+      recorder.onstop = async () => {
+        setIsRecording(false);
+        const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        recorderChunksRef.current = [];
+        recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+        recorderStreamRef.current = null;
+        if (!blob.size) {
+          setRecordingError('No audio captured. Try again.');
+          return;
+        }
+        const extension = blob.type.includes('mp4') ? 'm4a' : 'webm';
+        const file = new File([blob], `mic-recording-${Date.now()}.${extension}`, { type: blob.type });
+        try {
+          const meta = await onLocalFileSelected(file);
+          setDraft((prev) => ({
+            ...prev,
+            sourceType: 'local',
+            sourceId: meta.sourceId,
+            sampleName: 'Mic Recording',
+            sourceLabel: 'Microphone',
+            duration: meta.duration,
+            trimStart: 0,
+            trimEnd: meta.duration,
+            trimLength: meta.duration,
+            trimLock: false,
+          }));
+        } catch (error) {
+          setRecordingError('Unable to save the recording. Try again.');
+        }
+      };
+      recorder.onerror = () => {
+        recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+        recorderStreamRef.current = null;
+        setRecordingError('Recording failed. Please check mic permissions.');
+        setIsRecording(false);
+      };
+      recorderRef.current = recorder;
+      setRecordingMs(0);
+      setIsRecording(true);
+      recorder.start();
+    } catch (error) {
+      setRecordingError('Microphone access denied or unavailable.');
+      setIsRecording(false);
+    }
+  }, [onLocalFileSelected]);
 
   const dialog = (
     <div
@@ -522,30 +636,64 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="m3-card bg-[#15131A]/80 border border-white/10 rounded-2xl p-5 space-y-4">
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500">Upload</label>
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    onChange={async (event) => {
-                      const file = event.target.files?.[0];
-                      if (!file) return;
-                      const meta = await onLocalFileSelected(file);
-                      setDraft((prev) => ({
-                        ...prev,
-                        sourceType: 'local',
-                        sourceId: meta.sourceId,
-                        sampleName: meta.sampleName,
-                        sourceLabel: 'Local File',
-                        duration: meta.duration,
-                        trimStart: 0,
-                        trimEnd: meta.duration,
-                        trimLength: meta.duration,
-                        trimLock: false,
-                      }));
-                    }}
-                    className="w-full text-xs text-gray-400 file:bg-[#2B2930] file:text-white file:border-none file:px-4 file:py-2 file:rounded-full file:text-[10px] file:font-black file:uppercase file:tracking-widest"
-                  />
+                <div className="space-y-4">
+                  <div className="m3-card bg-[#15131A]/80 border border-white/10 rounded-2xl p-5 space-y-4">
+                    <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500">Upload</label>
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        const meta = await onLocalFileSelected(file);
+                        setDraft((prev) => ({
+                          ...prev,
+                          sourceType: 'local',
+                          sourceId: meta.sourceId,
+                          sampleName: meta.sampleName,
+                          sourceLabel: 'Local File',
+                          duration: meta.duration,
+                          trimStart: 0,
+                          trimEnd: meta.duration,
+                          trimLength: meta.duration,
+                          trimLock: false,
+                        }));
+                      }}
+                      className="w-full text-xs text-gray-400 file:bg-[#2B2930] file:text-white file:border-none file:px-4 file:py-2 file:rounded-full file:text-[10px] file:font-black file:uppercase file:tracking-widest"
+                    />
+                  </div>
+                  <div className="m3-card bg-[#15131A]/80 border border-white/10 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">Record</p>
+                        <p className="text-[11px] text-white/60">Capture a microphone sample for this pad.</p>
+                      </div>
+                      <span className="text-[9px] uppercase tracking-[0.3em] text-white/30">Mic</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/40 px-4 py-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-white/60">
+                          {isRecording ? 'Recording' : 'Ready'}
+                        </p>
+                        <p className="text-xs text-white">{recordingTime}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={isRecording ? stopRecording : startRecording}
+                        className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition ${
+                          isRecording
+                            ? 'bg-[#F2B8B5] text-black shadow-[0_0_18px_rgba(242,184,181,0.5)]'
+                            : 'bg-[#D0BCFF] text-black shadow-[0_0_18px_rgba(208,188,255,0.4)]'
+                        }`}
+                      >
+                        {isRecording ? 'Stop' : 'Record'}
+                      </button>
+                    </div>
+                    {recordingError && <p className="text-[10px] text-[#F2B8B5]">{recordingError}</p>}
+                    <p className="text-[10px] text-white/40">
+                      Your recording will save to the pad and can be trimmed like any local sample.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
