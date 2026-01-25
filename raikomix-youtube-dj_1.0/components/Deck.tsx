@@ -624,7 +624,7 @@ const effectNodesRef = useRef<{
     : undefined;
 
   return (
-    <div className="m3-card bg-[#1D1B20] border-white/5 flex flex-col gap-[clamp(10px,1.6vh,16px)] shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden flex-none w-[clamp(220px,24vw,320px)] aspect-[4/5] p-[clamp(12px,1.6vh,18px)]">
+    <div className="m3-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-[320px] max-w-[520px] h-[clamp(480px,70vh,720px)]">
       <div id={containerId} className="h-0 w-0 overflow-hidden" />
       <audio
         ref={localAudioRef}
@@ -789,7 +789,7 @@ const effectNodesRef = useRef<{
           </div>
           <div className="grid grid-cols-4 gap-1">
             {[2, 4, 8, 16].map((b) => (
-              <button key={b} onClick={() => handleToggleLoop(b)} className={`h-[clamp(28px,4.2vh,32px)] rounded-lg text-[10px] font-black border transition-all ${state.loopActive && Math.abs((state.loopEnd - state.loopStart) - b * (60 / state.bpm)) < 0.1 ? 'bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'border-white/5 text-gray-500 hover:text-white hover:border-white/20'}`}>{b}</button>
+              <button key={b} onClick={() => handleToggleLoop(b)} className={`h-8 rounded-lg text-[10px] font-black border transition-all ${state.loopActive && Math.abs((state.loopEnd - state.loopStart) - b * (60 / state.bpm)) < 0.1 ? 'bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'border-white/5 text-gray-500 hover:text-white hover:border-white/20'}`}>{b}</button>
             ))}
           </div>
         </div>
