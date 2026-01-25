@@ -229,8 +229,7 @@ const Waveform: React.FC<WaveformProps> = ({
       }}
     >
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/4 to-transparent pointer-events-none" />
-      <div className="absolute top-2 left-3 text-[9px] uppercase font-black tracking-[0.2em] text-white/30">Waveform</div>
-      <button
+           <button
         type="button"
         className="absolute top-2 right-3 text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors"
         onClick={(event) => {
