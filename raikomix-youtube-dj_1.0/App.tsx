@@ -201,6 +201,8 @@ const App: React.FC = () => {
       thumbnailUrl: track.thumbnailUrl,
       addedAt: Date.now(),
       author: 'addedAt' in track ? track.author : (track as YouTubeSearchResult).channelTitle,
+      album: 'addedAt' in track ? track.album : undefined,
+      fileName: 'addedAt' in track ? track.fileName : undefined,
       sourceType: 'sourceType' in track ? track.sourceType : 'youtube'
     };
     setQueue(prev => [...prev, item]);
