@@ -10,10 +10,30 @@ interface WaveformProps {
   duration: number;
   peaks?: number[];
   sourceType?: 'youtube' | 'local';
+  hotCues?: Array<number | null>;
+  cueColors?: string[];
+  loop?: { active: boolean; start: number; end: number };
+  onSeek?: (time: number) => void;
 }
 
-const Waveform: React.FC<WaveformProps> = ({ isPlaying, volume, color, playbackRate, currentTime, duration, peaks, sourceType = 'youtube' }) => {
+const defaultCueColors = ['#FFD700', '#00E5FF', '#FF4081', '#76FF03'];
+
+const Waveform: React.FC<WaveformProps> = ({
+  isPlaying,
+  volume,
+  color,
+  playbackRate,
+  currentTime,
+  duration,
+  peaks,
+  sourceType = 'youtube',
+  hotCues = [],
+  cueColors = defaultCueColors,
+  loop,
+  onSeek
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number>(null);
   const offsetRef = useRef(0);
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
@@ -32,6 +52,44 @@ const Waveform: React.FC<WaveformProps> = ({ isPlaying, volume, color, playbackR
     }
   };
 
+  const drawMarkers = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    if (duration <= 0) return;
+
+    if (loop?.active && loop.end > loop.start) {
+      const startX = Math.max(0, (loop.start / duration) * width);
+      const endX = Math.min(width, (loop.end / duration) * width);
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = color;
+      ctx.fillRect(startX, 0, endX - startX, height);
+      ctx.restore();
+    }
+
+    hotCues.forEach((cue, index) => {
+      if (cue === null || cue === undefined) return;
+      const x = Math.min(width, Math.max(0, (cue / duration) * width));
+      ctx.save();
+      const cueColor = cueColors[index] || color;
+      ctx.strokeStyle = cueColor;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = cueColors[index] || color;
+      ctx.beginPath();
+      ctx.moveTo(x, height * 0.15);
+      ctx.lineTo(x, height * 0.85);
+      ctx.stroke();
+      ctx.fillStyle = cueColor;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(x, height * 0.05);
+      ctx.lineTo(x - 4, height * 0.12);
+      ctx.lineTo(x + 4, height * 0.12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    });
+  };
+
   const drawPeaks = (ctx: CanvasRenderingContext2D, width: number, height: number, progress: number) => {
     if (!peaks || peaks.length === 0) return;
     const centerY = height / 2;
@@ -40,7 +98,7 @@ const Waveform: React.FC<WaveformProps> = ({ isPlaying, volume, color, playbackR
 
     ctx.lineCap = 'round';
     ctx.lineWidth = baseLineWidth;
-    ctx.strokeStyle = `${color}88`;
+    ctx.strokeStyle = `${color}55`;
     ctx.shadowBlur = 0;
     ctx.beginPath();
 
@@ -60,12 +118,12 @@ const Waveform: React.FC<WaveformProps> = ({ isPlaying, volume, color, playbackR
       ctx.rect(0, 0, progressWidth, height);
       ctx.clip();
       ctx.strokeStyle = color;
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 6;
       ctx.shadowColor = color;
       ctx.beginPath();
       peaks.forEach((peak, index) => {
         const x = index * barWidth + barWidth / 2;
-        const amplitude = peak * (height * 0.46);
+        const amplitude = peak * (height * 0.42);
         ctx.moveTo(x, centerY - amplitude);
         ctx.lineTo(x, centerY + amplitude);
       });
@@ -73,10 +131,12 @@ const Waveform: React.FC<WaveformProps> = ({ isPlaying, volume, color, playbackR
       ctx.restore();
     }
 
-    ctx.shadowBlur = 12;
+    drawMarkers(ctx, width, height);
+
+    ctx.shadowBlur = 8;
     ctx.shadowColor = color;
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.2;
     const playheadX = Math.min(width, Math.max(0, progress * width));
     ctx.beginPath();
     ctx.moveTo(playheadX, height * 0.1);
@@ -103,17 +163,17 @@ const Waveform: React.FC<WaveformProps> = ({ isPlaying, volume, color, playbackR
     }
 
     const centerY = height / 2;
-    const amplitude = isPlaying ? (height / 3) * (volume / 100) : 2;
+    const amplitude = isPlaying ? (height / 3.5) * (volume / 100) : 2;
     const frequency = 0.015;
     const speed = isPlaying ? 0.15 * playbackRate : 0.01;
 
     offsetRef.current += speed;
 
     ctx.beginPath();
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = `${color}cc`;
     ctx.lineCap = 'round';
-    ctx.shadowBlur = isPlaying ? 10 : 0;
+    ctx.shadowBlur = isPlaying ? 6 : 0;
     ctx.shadowColor = color;
 
     for (let x = 0; x < width; x += 3) {
@@ -131,7 +191,7 @@ const Waveform: React.FC<WaveformProps> = ({ isPlaying, volume, color, playbackR
     ctx.beginPath();
     ctx.lineWidth = 1;
     ctx.strokeStyle = color;
-    ctx.globalAlpha = 0.3;
+    ctx.globalAlpha = 0.18;
     for (let x = 0; x < width; x += 5) {
       const yOffset = Math.cos(x * frequency * 0.8 - offsetRef.current * 0.5) * (amplitude * 0.6);
       if (x === 0) ctx.moveTo(x, centerY + yOffset);
@@ -140,8 +200,10 @@ const Waveform: React.FC<WaveformProps> = ({ isPlaying, volume, color, playbackR
     ctx.stroke();
     ctx.globalAlpha = 1.0;
 
+    drawMarkers(ctx, width, height);
+
     if (sourceType === 'youtube') {
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.1)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, height * 0.5);
@@ -158,11 +220,20 @@ const Waveform: React.FC<WaveformProps> = ({ isPlaying, volume, color, playbackR
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
-  }, [isPlaying, volume, playbackRate, color, peaks, currentTime, duration, sourceType]);
+  }, [isPlaying, volume, playbackRate, color, peaks, currentTime, duration, sourceType, hotCues, cueColors, loop]);
 
   return (
-    <div className="w-full h-24 bg-black/60 rounded-lg overflow-hidden border border-white/5 shadow-inner relative">
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent pointer-events-none" />
+    <div
+      ref={containerRef}
+      className="w-full h-24 bg-black/70 rounded-xl overflow-hidden border border-white/5 shadow-inner relative"
+      onClick={(event) => {
+        if (!onSeek || duration <= 0) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const pct = (event.clientX - rect.left) / rect.width;
+        onSeek(pct * duration);
+      }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/4 to-transparent pointer-events-none" />
       <canvas 
         ref={canvasRef} 
         className="w-full h-full"
