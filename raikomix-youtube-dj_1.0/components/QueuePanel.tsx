@@ -163,7 +163,7 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
           return (
           <div
             key={item.id}
-            className={`m3-card group p-3 flex gap-4 items-center bg-[#1C1B1F]/40 hover:bg-[#2B2930] motion-standard border-dashed elevation-1 hover:elevation-2 overflow-hidden relative ${
+            className={`m3-card group p-3 grid gap-2 bg-[#1C1B1F]/40 hover:bg-[#2B2930] motion-standard border-dashed elevation-1 hover:elevation-2 relative ${
               overIndex === index ? 'ring-1 ring-[#D0BCFF]/40' : ''
             }`}
             draggable
@@ -181,55 +181,63 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
             }}
             onDrop={() => handleDrop(index)}
           >
-            <span className="text-[10px] font-mono text-gray-600 w-4">{index + 1}</span>
-            <span className="material-symbols-outlined text-gray-600 text-sm cursor-grab">drag_indicator</span>
-            <div className="w-28 h-12 rounded-lg border border-white/10 bg-black/50 px-2 py-1 flex items-center overflow-hidden flex-shrink-0 elevation-1">
-              <MarqueeText
-                text={item.title}
-                className="text-[9px] text-gray-200 font-semibold uppercase tracking-[0.2em]"
-                forceAnimate
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-[10px] font-mono text-gray-600 w-4">{index + 1}</span>
+                <span className="material-symbols-outlined text-gray-600 text-sm cursor-grab">drag_indicator</span>
+              </div>
+              <div className="w-28 h-12 rounded-lg border border-white/10 bg-black/50 px-2 py-1 flex items-center overflow-hidden flex-shrink-0 elevation-1">
+                <MarqueeText
+                  text={item.title}
+                  className="text-[9px] text-gray-200 font-semibold uppercase tracking-[0.2em]"
+                  forceAnimate
+                />
+              </div>
+              <div className="flex-1 min-w-[140px]">
+                <MarqueeText
+                  text={item.title}
+                  className="text-sm font-semibold text-[#E6E1E5] leading-tight"
+                />
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <MarqueeText 
-                text={item.title} 
-                className="text-sm font-semibold text-[#E6E1E5] leading-tight" 
-              />
-            </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 motion-standard">
-              <button 
-                onClick={() => onLoadToDeck(item, 'A')}
-                className="px-2 py-1 rounded bg-[#D0BCFF]/10 text-[#D0BCFF] text-[10px] font-black motion-emphasized elevation-1 hover:elevation-2"
-              >
-                A
-              </button>
-              <button 
-                onClick={() => onLoadToDeck(item, 'B')}
-                className="px-2 py-1 rounded bg-[#F2B8B5]/10 text-[#F2B8B5] text-[10px] font-black motion-emphasized elevation-1 hover:elevation-2"
-              >
-                B
-              </button>
-              <button 
-                onClick={() => onRemove(item.id)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-red-400 motion-standard"
-              >
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-              <div className="flex flex-col">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-1">
                 <button
-                  onClick={() => handleMove(index, index - 1)}
-                  className="w-6 h-4 flex items-center justify-center text-gray-500 hover:text-white"
-                  title="Move up"
+                  onClick={() => onLoadToDeck(item, 'A')}
+                  className="px-2 py-1 rounded bg-[#D0BCFF]/10 text-[#D0BCFF] text-[10px] font-black motion-emphasized elevation-1 hover:elevation-2"
                 >
-                  <span className="material-symbols-outlined text-sm">keyboard_arrow_up</span>
+                  A
                 </button>
                 <button
-                  onClick={() => handleMove(index, index + 1)}
-                  className="w-6 h-4 flex items-center justify-center text-gray-500 hover:text-white"
-                  title="Move down"
+                  onClick={() => onLoadToDeck(item, 'B')}
+                  className="px-2 py-1 rounded bg-[#F2B8B5]/10 text-[#F2B8B5] text-[10px] font-black motion-emphasized elevation-1 hover:elevation-2"
                 >
-                  <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                  B
                 </button>
+              </div>
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 motion-standard">
+                <button
+                  onClick={() => onRemove(item.id)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:text-red-400 motion-standard"
+                >
+                  <span className="material-symbols-outlined text-lg">close</span>
+                </button>
+                <div className="flex flex-col">
+                  <button
+                    onClick={() => handleMove(index, index - 1)}
+                    className="w-6 h-4 flex items-center justify-center text-gray-500 hover:text-white"
+                    title="Move up"
+                  >
+                    <span className="material-symbols-outlined text-sm">keyboard_arrow_up</span>
+                  </button>
+                  <button
+                    onClick={() => handleMove(index, index + 1)}
+                    className="w-6 h-4 flex items-center justify-center text-gray-500 hover:text-white"
+                    title="Move down"
+                  >
+                    <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                  </button>
+                </div>
               </div>
             </div>
             <div className="pointer-events-none absolute left-12 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-black/90 p-3 text-[9px] text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">

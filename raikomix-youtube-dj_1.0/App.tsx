@@ -664,11 +664,13 @@ useEffect(() => {
 
              {viewMode === 'LIBRARY' && (
             <>
-              <aside className={`bg-black/10 flex-none border-l border-white/5 flex flex-col transition-all duration-300 overflow-hidden ${queueOpen ? 'w-80 p-4' : 'w-0 p-0 border-none'}`}>
+              <aside className={`bg-black/10 flex-none border-l border-white/5 flex flex-col transition-all duration-300 overflow-x-hidden ${queueOpen ? 'w-80 p-4' : 'w-0 p-0 border-none'}`}>
                 <div className={`h-full min-w-[280px] ${!queueOpen ? 'opacity-0 invisible' : 'opacity-100 visible transition-opacity'}`}>
-                  <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2">
+                  <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2 pr-1">
                     <span className="text-[10px] font-black uppercase text-gray-500 tracking-[0.2em]">Queue Console</span>
-                    <button onClick={() => setQueueOpen(false)} className="text-gray-500 hover:text-white"><span className="material-symbols-outlined text-sm">close</span></button>
+                    <button onClick={() => setQueueOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:text-white hover:bg-white/5">
+                      <span className="material-symbols-outlined text-sm leading-none">close</span>
+                    </button>
                   </div>
                   <QueuePanel 
                     queue={queue} 
