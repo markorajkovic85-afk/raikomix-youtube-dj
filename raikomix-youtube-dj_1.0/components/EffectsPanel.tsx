@@ -231,8 +231,7 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
 
       <div className="border-t border-white/5 pt-3">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Pads</span>
-          <span className="text-[8px] text-white/30 uppercase tracking-widest">Double-tap / click</span>
+          <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Pads</span>    
         </div>
         <PerformancePads
           masterVolume={masterVolume}
