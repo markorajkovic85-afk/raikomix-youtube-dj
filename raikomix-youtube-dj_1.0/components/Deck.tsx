@@ -47,10 +47,10 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
   }, [text]);
 
   return (
-    <div ref={containerRef} className="marquee-container w-full">
+    <div ref={containerRef} className="marquee-container w-full min-w-0">
       <div 
         ref={textRef} 
-        className={`${className} marquee-text ${shouldAnimate ? 'animate-marquee' : ''}`}
+        className={`${className} marquee-text ${shouldAnimate ? 'animate-marquee' : 'truncate'}`}
       >
         {text}
         {shouldAnimate && <span className="ml-12">{text}</span>}
