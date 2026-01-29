@@ -256,7 +256,7 @@ const Waveform: React.FC<WaveformProps> = ({
   return (
     <div
       ref={containerRef}
-      className="w-full h-24 bg-black/70 rounded-xl overflow-hidden border border-white/5 shadow-inner relative"
+      className="waveform-display w-full h-24 bg-black/70 rounded-xl overflow-hidden border border-white/5 shadow-inner relative"
       onClick={(event) => {
         if (!onSeek || duration <= 0) return;
         const rect = event.currentTarget.getBoundingClientRect();
