@@ -47,10 +47,10 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
   }, [text]);
 
   return (
-    <div ref={containerRef} className="marquee-container w-full">
+    <div ref={containerRef} className="marquee-container w-full min-w-0">
       <div 
         ref={textRef} 
-        className={`${className} marquee-text ${shouldAnimate ? 'animate-marquee' : ''}`}
+        className={`${className} marquee-text ${shouldAnimate ? 'animate-marquee' : 'truncate'}`}
       >
         {text}
         {shouldAnimate && <span className="ml-12">{text}</span>}
@@ -624,7 +624,7 @@ const effectNodesRef = useRef<{
     : undefined;
 
   return (
-    <div className="m3-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-[320px] max-w-[520px] h-auto">
+    <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-[320px] max-w-[520px] h-auto max-h-full min-h-0">
       <div id={containerId} className="h-0 w-0 overflow-hidden" />
       <audio
         ref={localAudioRef}
@@ -637,10 +637,10 @@ const effectNodesRef = useRef<{
         }}
       />
       
-      <div className="flex gap-4">
+      <div className="flex gap-4 min-w-0">
         {/* Main Deck Controls Area */}
-        <div className="flex-1 flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 flex flex-col gap-4 min-w-0">
+          <div className="flex items-center justify-between gap-4 min-w-0">
             <div className="flex items-center gap-3 shrink-0">
               <div className={`w-3 h-3 rounded-full ${state.playing ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
               <div className="text-4xl font-black" style={{ color }}>{id}</div>
@@ -708,7 +708,7 @@ const effectNodesRef = useRef<{
         {/* Improved Pitch / Tempo Fader */}
         <div 
           ref={tempoContainerRef}
-          className="w-12 bg-black/20 rounded-xl border border-white/5 flex flex-col items-center py-4 gap-2 relative group select-none transition-all hover:border-white/20 active:border-[#D0BCFF]/30"
+          className="w-12 shrink-0 bg-black/20 rounded-xl border border-white/5 flex flex-col items-center py-4 gap-2 relative group select-none transition-all hover:border-white/20 active:border-[#D0BCFF]/30"
           onDoubleClick={() => updatePlaybackRate(1.0)}
       onPointerDown={handleTempoPointerDown}
           onPointerMove={handleTempoPointerMove}

@@ -503,7 +503,7 @@ useEffect(() => {
 
   return (
     <ErrorBoundary>
-       <div className="h-screen bg-[#1C1B1F] text-white flex overflow-hidden font-['Roboto']" data-theme={theme}>
+       <div className="app-shell h-screen bg-[#1C1B1F] text-white flex overflow-hidden font-['Roboto']" data-theme={theme}>
         <nav className="w-16 bg-black/40 border-r border-white/5 flex flex-col items-center py-8 gap-10 shrink-0">
           <button onClick={() => setViewMode('PERFORM')} className={`flex flex-col items-center gap-1 transition-all ${viewMode === 'PERFORM' ? 'text-[#D0BCFF] scale-110' : 'text-gray-600 hover:text-gray-400'}`}>
             <span className="material-icons text-3xl">speed</span>
@@ -626,8 +626,8 @@ useEffect(() => {
             </section>
           )}
 
-          <section className="flex-1 flex flex-col items-center justify-center overflow-auto min-h-0 perform-stage">
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-start justify-center gap-6 w-full px-4 perform-stage__inner">
+          <section className="flex-1 flex flex-col items-center justify-center overflow-hidden min-h-0 min-w-0 perform-stage">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-start justify-center gap-6 w-full px-4 min-h-0 min-w-0 h-full max-h-full perform-stage__inner">
              <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
             <Mixer
                 crossfader={crossfader}
