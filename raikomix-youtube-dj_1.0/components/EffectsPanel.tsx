@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { EffectType } from '../types';
 import PerformancePads from './PerformancePads';
 import RotaryKnob from './RotaryKnob';
@@ -57,6 +57,7 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
   padEffectIntensity,
   onNotify,
 }) => {
+  const effectTitleClass = 'text-[11px] font-black uppercase tracking-[0.3em] text-white/80';
   const effectSections: {
     label: string;
     effects: { label: string; value: EffectType | null; description: string }[];
@@ -122,6 +123,13 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
     },
   ];
 
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() =>
+    effectSections.reduce((acc, section) => {
+      acc[section.label] = false;
+      return acc;
+    }, {} as Record<string, boolean>)
+  );
+
   const renderEffectButton = (
     fx: { label: string; value: EffectType | null; description: string },
     accent: string
@@ -147,9 +155,7 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">FX Engine</p>
-          <p className="text-[11px] font-semibold text-white/80">
-            {mixedEffect ? 'Mixed effects' : activeEffect ? activeEffect : 'No effect'}
-          </p>
+          <p className={effectTitleClass}>EFFECTS</p>
         </div>
         <div className="flex items-center gap-1 bg-black/40 rounded-full border border-white/10 p-1">
           {(['A', 'B', 'AB', 'PADS'] as const).map((option) => (
@@ -168,31 +174,58 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
       </div>
       
       <div className="space-y-3">
-        {effectSections.map((section) => (
-          <div
-            key={section.label}
-            className="border border-white/5 rounded-lg p-2 bg-black/20 space-y-1.5"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[8px] font-black uppercase tracking-[0.25em] text-gray-500">
-                {section.label}
-              </span>
-              <span
-                className="text-[8px] uppercase tracking-[0.25em]"
-                style={{ color: section.accent }}
-              >
-                FX
-              </span>
-            </div>
+        {effectSections.map((section) => {
+          const isCollapsed = collapsedSections[section.label];
+          return (
             <div
-              className={`grid gap-1.5 ${section.columns === 1 ? 'grid-cols-1' : ''} ${
-                section.columns === 2 ? 'grid-cols-2' : ''
-              } ${section.columns === 3 ? 'grid-cols-3' : ''}`}
+              key={section.label}
+              className="border border-white/5 rounded-lg p-2 bg-black/20 space-y-1.5"
             >
-              {section.effects.map((fx) => renderEffectButton(fx, section.accent))}
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCollapsedSections((prev) => ({
+                      ...prev,
+                      [section.label]: !prev[section.label],
+                    }))
+                  }
+                  className="flex items-center gap-2 text-left cursor-pointer group"
+                  aria-expanded={!isCollapsed}
+                  aria-controls={`fx-section-${section.label}`}
+                >
+                  <span className="text-[8px] font-black uppercase tracking-[0.25em] text-gray-500 transition group-hover:text-gray-300">
+                    {section.label}
+                  </span>
+                  <span
+                    className={`text-[10px] text-gray-500 transition-transform ${
+                      isCollapsed ? '-rotate-90' : 'rotate-0'
+                    }`}
+                    aria-hidden="true"
+                  >
+                    ▾
+                  </span>
+                </button>
+                <span
+                  className="text-[8px] uppercase tracking-[0.25em]"
+                  style={{ color: section.accent }}
+                >
+                  FX
+                </span>
+              </div>
+              {!isCollapsed && (
+                <div
+                  id={`fx-section-${section.label}`}
+                  className={`grid gap-1.5 ${section.columns === 1 ? 'grid-cols-1' : ''} ${
+                    section.columns === 2 ? 'grid-cols-2' : ''
+                  } ${section.columns === 3 ? 'grid-cols-3' : ''}`}
+                >
+                  {section.effects.map((fx) => renderEffectButton(fx, section.accent))}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="border-t border-white/5 pt-3">
@@ -231,7 +264,7 @@ const EffectsPanel: React.FC<EffectsPanelProps> = ({
 
       <div className="border-t border-white/5 pt-3">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Pads</span>    
+          <span className={effectTitleClass}>Pads</span>
         </div>
         <PerformancePads
           masterVolume={masterVolume}
