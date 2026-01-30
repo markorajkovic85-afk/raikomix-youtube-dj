@@ -185,6 +185,12 @@ const App: React.FC = () => {
   ];
   const [keyboardMappings, setKeyboardMappings] = useState(defaultKeyboardMappings);
   const [midiMappings, setMidiMappings] = useState(defaultMidiMappings);
+  const [midiAccess, setMidiAccess] = useState<MIDIAccess | null>(null);
+  const [midiInputs, setMidiInputs] = useState<MIDIInput[]>([]);
+  const [midiStatus, setMidiStatus] = useState<'idle' | 'scanning' | 'ready' | 'error'>('idle');
+  const [midiError, setMidiError] = useState<string | null>(null);
+  const [lastMidiMessage, setLastMidiMessage] = useState<string | null>(null);
+  const midiInputHandlersRef = useRef<Map<string, (event: MIDIMessageEvent) => void>>(new Map());
 
   const updateKeyboardMapping = (index: number, value: string) => {
     setKeyboardMappings(prev => prev.map((item, i) => (i === index ? { ...item, keys: value } : item)));
@@ -195,6 +201,83 @@ const App: React.FC = () => {
   };
 
   useEffect(() => { saveLibrary(library); }, [library]);
+
+  const formatMidiMessage = (event: MIDIMessageEvent) => {
+    const [status, data1, data2] = event.data;
+    const messageType = status & 0xf0;
+    const channel = (status & 0x0f) + 1;
+    if (messageType === 0x90 && data2 > 0) {
+      return `Note ${data1} • Ch ${channel}`;
+    }
+    if (messageType === 0x80 || (messageType === 0x90 && data2 === 0)) {
+      return `Note Off ${data1} • Ch ${channel}`;
+    }
+    if (messageType === 0xb0) {
+      return `CC ${data1} (${data2}) • Ch ${channel}`;
+    }
+    if (messageType === 0xe0) {
+      const value = ((data2 ?? 0) << 7) + (data1 ?? 0);
+      return `Pitch ${value} • Ch ${channel}`;
+    }
+    return `MIDI ${status?.toString(16).toUpperCase()} ${data1 ?? ''} ${data2 ?? ''} • Ch ${channel}`;
+  };
+
+  const attachMidiInputListeners = useCallback((inputs: MIDIInput[]) => {
+    midiInputHandlersRef.current.forEach((handler, id) => {
+      const input = inputs.find((entry) => entry.id === id);
+      if (input) input.onmidimessage = null;
+    });
+    midiInputHandlersRef.current.clear();
+
+    inputs.forEach((input) => {
+      const handler = (event: MIDIMessageEvent) => {
+        setLastMidiMessage(`${input.name ?? 'MIDI'}: ${formatMidiMessage(event)}`);
+      };
+      input.onmidimessage = handler;
+      midiInputHandlersRef.current.set(input.id, handler);
+    });
+  }, []);
+
+  const syncMidiInputs = useCallback(
+    (access: MIDIAccess) => {
+      const inputs = Array.from(access.inputs.values());
+      setMidiInputs(inputs);
+      attachMidiInputListeners(inputs);
+      setMidiStatus(inputs.length ? 'ready' : 'idle');
+      setMidiError(null);
+    },
+    [attachMidiInputListeners]
+  );
+
+  const handleScanMidiDevices = useCallback(async () => {
+    if (!navigator.requestMIDIAccess) {
+      setMidiStatus('error');
+      setMidiError('Web MIDI not supported in this browser.');
+      return;
+    }
+    setMidiStatus('scanning');
+    setMidiError(null);
+    try {
+      const access = await navigator.requestMIDIAccess({ sysex: false });
+      setMidiAccess(access);
+      syncMidiInputs(access);
+      access.onstatechange = () => syncMidiInputs(access);
+    } catch (error) {
+      setMidiStatus('error');
+      setMidiError('MIDI access was denied or unavailable.');
+    }
+  }, [syncMidiInputs]);
+
+  useEffect(() => {
+    return () => {
+      midiInputHandlersRef.current.forEach((_, id) => {
+        const input = midiInputs.find((entry) => entry.id === id);
+        if (input) input.onmidimessage = null;
+      });
+      midiInputHandlersRef.current.clear();
+      if (midiAccess) midiAccess.onstatechange = null;
+    };
+  }, [midiAccess, midiInputs]);
 
   const showNotification = (msg: string, type: ToastType = 'info') => setToast({ msg, type });
 
@@ -836,13 +919,34 @@ useEffect(() => {
                       <p className="text-[10px] font-black uppercase tracking-widest text-[#D0BCFF]">MIDI Mapping</p>
                       <p className="text-xs text-white/60">Route controller knobs, faders, and pads to mix actions.</p>
                     </div>
-                    <button className="text-[10px] font-black uppercase tracking-widest text-white/60 border border-white/10 px-3 py-1 rounded-full hover:text-white">
-                      Scan Devices
+                    <button
+                      onClick={handleScanMidiDevices}
+                      className="text-[10px] font-black uppercase tracking-widest text-white/60 border border-white/10 px-3 py-1 rounded-full hover:text-white"
+                    >
+                      {midiStatus === 'scanning' ? 'Scanning...' : 'Scan Devices'}
                     </button>
                   </div>
                   <div className="bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
                     <p className="text-xs text-white/70">Status</p>
-                    <p className="text-sm font-semibold text-white mt-1">No MIDI device connected</p>
+                    <p className="text-sm font-semibold text-white mt-1">
+                      {midiStatus === 'error' && (midiError || 'MIDI unavailable')}
+                      {midiStatus !== 'error' && midiInputs.length === 0 && 'No MIDI device connected'}
+                      {midiStatus !== 'error' && midiInputs.length > 0 && `Connected: ${midiInputs.length} device${midiInputs.length > 1 ? 's' : ''}`}
+                    </p>
+                    {midiInputs.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {midiInputs.map((input) => (
+                          <div key={input.id} className="text-[11px] text-white/60">
+                            {input.name || 'Unnamed MIDI Device'}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {lastMidiMessage && (
+                      <div className="mt-2 text-[10px] text-white/50">
+                        Last input: <span className="text-white/80">{lastMidiMessage}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2 scrollbar-slim">
                     {midiMappings.map((item, index) => {
