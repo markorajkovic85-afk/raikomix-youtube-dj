@@ -273,7 +273,7 @@ const Mixer: React.FC<MixerProps> = ({
         <h2 className="text-[8px] font-black uppercase tracking-[0.4em] text-[#D0BCFF]">Mixing Console</h2>
       </div>
 
-      <div className="mixer-channels flex-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-1 min-h-0">
+      <div className="mixer-channels flex-1 grid items-end gap-1 min-h-0">
         {/* Channel A Section */}
         <div className="mixer-channel flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0">
           <div className="flex flex-col items-center gap-1.5 w-full">
