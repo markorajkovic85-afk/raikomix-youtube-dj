@@ -204,6 +204,33 @@
       padding: clamp(12px, 1.6vh, 20px);
     }
 
+    .mixer-card {
+      max-height: min(82vh, 760px);
+    }
+
+    .mixer-shell {
+      width: clamp(200px, 16vw, 260px);
+      height: auto;
+      align-self: flex-start;
+    }
+
+    .mixer-main {
+      flex: 0 0 auto;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      overflow: visible;
+      min-height: 0;
+    }
+
+    .mixer-channel {
+      flex: 1 1 0;
+      min-width: 82px;
+    }
+
+    .mixer-master {
+      flex: 0 0 44px;
+    }
+
     .deck-card {
       gap: clamp(10px, 1.4vh, 16px);
     }
