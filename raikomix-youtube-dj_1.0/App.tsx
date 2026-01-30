@@ -129,15 +129,59 @@ const App: React.FC = () => {
     { action: 'Help Overlay', keys: '? / /', detail: 'Toggle help overlay' }
   ];
   const defaultMidiMappings = [
-    { action: 'Crossfader', channel: '1', control: 'CC 8', detail: 'Full-range crossfader' },
-    { action: 'Deck A Volume', channel: '1', control: 'CC 12', detail: 'Channel fader A' },
-    { action: 'Deck B Volume', channel: '1', control: 'CC 13', detail: 'Channel fader B' },
-    { action: 'Master Volume', channel: '1', control: 'CC 14', detail: 'Master output' },
-    { action: 'Deck A Play/Pause', channel: '1', control: 'Note 36', detail: 'Transport A' },
-    { action: 'Deck B Play/Pause', channel: '1', control: 'Note 37', detail: 'Transport B' },
-    { action: 'FX Toggle', channel: '1', control: 'Note 40', detail: 'Engage FX' },
-    { action: 'Hot Cues A', channel: '1', control: 'Notes 48-51', detail: 'Trigger cues 1-4' },
-    { action: 'Hot Cues B', channel: '1', control: 'Notes 52-55', detail: 'Trigger cues 1-4' }
+    { group: 'Mixer', action: 'Crossfader', channel: '1', control: 'CC 8', detail: 'Full-range crossfader' },
+    { group: 'Mixer', action: 'Crossfader Curve', channel: '1', control: 'Notes 20-22', detail: 'Smooth/Cut/Dip select' },
+    { group: 'Mixer', action: 'Deck A Volume', channel: '1', control: 'CC 12', detail: 'Channel fader A' },
+    { group: 'Mixer', action: 'Deck B Volume', channel: '1', control: 'CC 13', detail: 'Channel fader B' },
+    { group: 'Mixer', action: 'Master Volume', channel: '1', control: 'CC 14', detail: 'Master output' },
+    { group: 'Mixer', action: 'Deck A Trim', channel: '1', control: 'CC 16', detail: 'Input gain A' },
+    { group: 'Mixer', action: 'Deck B Trim', channel: '1', control: 'CC 17', detail: 'Input gain B' },
+    { group: 'Mixer', action: 'Deck A EQ High', channel: '1', control: 'CC 20', detail: 'High shelf A' },
+    { group: 'Mixer', action: 'Deck A EQ Mid', channel: '1', control: 'CC 21', detail: 'Mid peaking A' },
+    { group: 'Mixer', action: 'Deck A EQ Low', channel: '1', control: 'CC 22', detail: 'Low shelf A' },
+    { group: 'Mixer', action: 'Deck A Filter', channel: '1', control: 'CC 23', detail: 'Color filter A' },
+    { group: 'Mixer', action: 'Deck B EQ High', channel: '1', control: 'CC 24', detail: 'High shelf B' },
+    { group: 'Mixer', action: 'Deck B EQ Mid', channel: '1', control: 'CC 25', detail: 'Mid peaking B' },
+    { group: 'Mixer', action: 'Deck B EQ Low', channel: '1', control: 'CC 26', detail: 'Low shelf B' },
+    { group: 'Mixer', action: 'Deck B Filter', channel: '1', control: 'CC 27', detail: 'Color filter B' },
+    { group: 'Mixer', action: 'Auto DJ Toggle', channel: '1', control: 'Note 41', detail: 'Enable/disable Auto DJ' },
+    { group: 'Mixer', action: 'Mix Lead Time', channel: '1', control: 'CC 30', detail: 'Mix lead seconds' },
+    { group: 'Mixer', action: 'Mix Duration', channel: '1', control: 'CC 31', detail: 'Mix duration seconds' },
+    { group: 'Deck A', action: 'Deck A Play/Pause', channel: '1', control: 'Note 36', detail: 'Transport A' },
+    { group: 'Deck A', action: 'Deck A Tap BPM', channel: '1', control: 'Note 37', detail: 'Tap tempo' },
+    { group: 'Deck A', action: 'Deck A Tempo Fader', channel: '1', control: 'CC 40', detail: 'Pitch/tempo control' },
+    { group: 'Deck A', action: 'Deck A Pitch Reset', channel: '1', control: 'Note 38', detail: 'Reset tempo to 0%' },
+    { group: 'Deck A', action: 'Deck A Hot Cue 1', channel: '1', control: 'Note 48', detail: 'Trigger cue 1' },
+    { group: 'Deck A', action: 'Deck A Hot Cue 2', channel: '1', control: 'Note 49', detail: 'Trigger cue 2' },
+    { group: 'Deck A', action: 'Deck A Hot Cue 3', channel: '1', control: 'Note 50', detail: 'Trigger cue 3' },
+    { group: 'Deck A', action: 'Deck A Hot Cue 4', channel: '1', control: 'Note 51', detail: 'Trigger cue 4' },
+    { group: 'Deck A', action: 'Deck A Loop 2', channel: '1', control: 'Note 56', detail: 'Trigger 2-beat loop' },
+    { group: 'Deck A', action: 'Deck A Loop 4', channel: '1', control: 'Note 57', detail: 'Trigger 4-beat loop' },
+    { group: 'Deck A', action: 'Deck A Loop 8', channel: '1', control: 'Note 58', detail: 'Trigger 8-beat loop' },
+    { group: 'Deck A', action: 'Deck A Loop 16', channel: '1', control: 'Note 59', detail: 'Trigger 16-beat loop' },
+    { group: 'Effects', action: 'FX Toggle', channel: '1', control: 'Note 40', detail: 'Engage FX' },
+    { group: 'Effects', action: 'FX Target A', channel: '1', control: 'Note 60', detail: 'Route FX to deck A' },
+    { group: 'Effects', action: 'FX Target B', channel: '1', control: 'Note 61', detail: 'Route FX to deck B' },
+    { group: 'Effects', action: 'FX Target A+B', channel: '1', control: 'Note 62', detail: 'Route FX to both decks' },
+    { group: 'Effects', action: 'FX Target Pads', channel: '1', control: 'Note 63', detail: 'Route FX to pads' },
+    { group: 'Effects', action: 'FX Select Previous', channel: '1', control: 'Note 64', detail: 'Previous effect' },
+    { group: 'Effects', action: 'FX Select Next', channel: '1', control: 'Note 65', detail: 'Next effect' },
+    { group: 'Effects', action: 'FX Wet/Dry', channel: '1', control: 'CC 70', detail: 'Blend dry vs wet' },
+    { group: 'Effects', action: 'FX Intensity', channel: '1', control: 'CC 71', detail: 'Effect depth' },
+    { group: 'Effects', action: 'Pad FX Wet/Dry', channel: '1', control: 'CC 72', detail: 'Pads wet/dry' },
+    { group: 'Effects', action: 'Pad FX Intensity', channel: '1', control: 'CC 73', detail: 'Pads intensity' },
+    { group: 'Pads', action: 'Pad 1 Trigger', channel: '1', control: 'Note 72', detail: 'Fire pad 1' },
+    { group: 'Pads', action: 'Pad 2 Trigger', channel: '1', control: 'Note 73', detail: 'Fire pad 2' },
+    { group: 'Pads', action: 'Pad 3 Trigger', channel: '1', control: 'Note 74', detail: 'Fire pad 3' },
+    { group: 'Pads', action: 'Pad 4 Trigger', channel: '1', control: 'Note 75', detail: 'Fire pad 4' },
+    { group: 'Pads', action: 'Pad 5 Trigger', channel: '1', control: 'Note 76', detail: 'Fire pad 5' },
+    { group: 'Pads', action: 'Pad 6 Trigger', channel: '1', control: 'Note 77', detail: 'Fire pad 6' },
+    { group: 'Pads', action: 'Pad 7 Trigger', channel: '1', control: 'Note 78', detail: 'Fire pad 7' },
+    { group: 'Pads', action: 'Pad 8 Trigger', channel: '1', control: 'Note 79', detail: 'Fire pad 8' },
+    { group: 'Pads', action: 'Pad 9 Trigger', channel: '1', control: 'Note 80', detail: 'Fire pad 9' },
+    { group: 'Pads', action: 'Pad 10 Trigger', channel: '1', control: 'Note 81', detail: 'Fire pad 10' },
+    { group: 'Pads', action: 'Pad 11 Trigger', channel: '1', control: 'Note 82', detail: 'Fire pad 11' },
+    { group: 'Pads', action: 'Pad 12 Trigger', channel: '1', control: 'Note 83', detail: 'Fire pad 12' }
   ];
   const [keyboardMappings, setKeyboardMappings] = useState(defaultKeyboardMappings);
   const [midiMappings, setMidiMappings] = useState(defaultMidiMappings);
@@ -801,26 +845,38 @@ useEffect(() => {
                     <p className="text-sm font-semibold text-white mt-1">No MIDI device connected</p>
                   </div>
                   <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2 scrollbar-slim">
-                    {midiMappings.map((item, index) => (
-                      <div key={`${item.action}-${index}`} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-white">{item.action}</p>
-                          <p className="text-[11px] text-white/50">{item.detail}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            value={item.channel}
-                            onChange={(event) => updateMidiMapping(index, 'channel', event.target.value)}
-                            className="w-12 bg-[#0F0E13] border border-white/10 rounded-xl px-2 py-2 text-xs text-white text-center focus:border-[#D0BCFF] focus:outline-none"
-                          />
-                          <input
-                            value={item.control}
-                            onChange={(event) => updateMidiMapping(index, 'control', event.target.value)}
-                            className="w-24 bg-[#0F0E13] border border-white/10 rounded-xl px-2 py-2 text-xs text-white text-center uppercase focus:border-[#D0BCFF] focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                    ))}
+                    {midiMappings.map((item, index) => {
+                      const previousGroup = index > 0 ? midiMappings[index - 1].group : null;
+                      const showGroup = item.group && item.group !== previousGroup;
+                      return (
+                        <React.Fragment key={`${item.action}-${index}`}>
+                          {showGroup && (
+                            <div className={`flex items-center gap-2 px-1 ${index === 0 ? '' : 'pt-2'}`}>
+                              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-gray-500">{item.group}</span>
+                              <div className="flex-1 h-px bg-white/5" />
+                            </div>
+                          )}
+                          <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-white">{item.action}</p>
+                              <p className="text-[11px] text-white/50">{item.detail}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                value={item.channel}
+                                onChange={(event) => updateMidiMapping(index, 'channel', event.target.value)}
+                                className="w-12 bg-[#0F0E13] border border-white/10 rounded-xl px-2 py-2 text-xs text-white text-center focus:border-[#D0BCFF] focus:outline-none"
+                              />
+                              <input
+                                value={item.control}
+                                onChange={(event) => updateMidiMapping(index, 'control', event.target.value)}
+                                className="w-24 bg-[#0F0E13] border border-white/10 rounded-xl px-2 py-2 text-xs text-white text-center uppercase focus:border-[#D0BCFF] focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </React.Fragment>
+                      );
+                    })}
                   </div>
                   <p className="text-[11px] text-white/40">Tip: match your controller layout to keep performance muscle memory intact.</p>
                 </section>
