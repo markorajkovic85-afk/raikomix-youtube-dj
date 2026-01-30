@@ -647,7 +647,7 @@ const effectNodesRef = useRef<{
               <div className={`w-3 h-3 rounded-full ${state.playing ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
               <div className="text-4xl font-black" style={{ color }}>{id}</div>
             </div>
-            <div className="text-right min-w-0 flex-1 overflow-hidden">
+            <div className="deck-title-stack text-right min-w-0 flex-1 overflow-hidden">
               <MarqueeText text={state.title || 'Deck Ready'} className="text-sm font-bold text-white uppercase tracking-tight" />
               <MarqueeText 
                 text={state.author || (state.sourceType === 'local' ? 'Local Media' : 'Insert Media')} 
