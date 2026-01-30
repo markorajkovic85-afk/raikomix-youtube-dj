@@ -26,21 +26,38 @@ interface PerformancePadDialogProps {
 
 const formatTime = (time: number) => {
   if (!Number.isFinite(time)) return '0:00.00';
-  const minutes = Math.floor(time / 60);
-  const seconds = Math.floor(time % 60);
-  const ms = Math.floor((time % 1) * 100);
-  return `${minutes}:${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+  const safeTime = Math.max(0, time);
+  const hours = Math.floor(safeTime / 3600);
+  const minutes = Math.floor((safeTime % 3600) / 60);
+  const seconds = Math.floor(safeTime % 60);
+  const ms = Math.floor((safeTime % 1) * 100);
+  const secondsLabel = `${seconds.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secondsLabel}`;
+  }
+  return `${minutes}:${secondsLabel}`;
 };
 
 const parseTime = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return null;
   const parts = trimmed.split(':');
-  if (parts.length > 2) return null;
-  const minutes = parts.length === 2 ? Number(parts[0]) : 0;
-  const seconds = Number(parts.length === 2 ? parts[1] : parts[0]);
-  if (Number.isNaN(minutes) || Number.isNaN(seconds)) return null;
-  return minutes * 60 + seconds;
+  if (parts.length > 3) return null;
+  const numbers = parts.map((part) => Number(part));
+  if (numbers.some((num) => Number.isNaN(num))) return null;
+  if (parts.length === 3) {
+    const [hours, minutes, seconds] = numbers;
+    if (hours < 0 || minutes < 0 || seconds < 0) return null;
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+  if (parts.length === 2) {
+    const [minutes, seconds] = numbers;
+    if (minutes < 0 || seconds < 0) return null;
+    return minutes * 60 + seconds;
+  }
+  const [seconds] = numbers;
+  if (seconds < 0) return null;
+  return seconds;
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -106,7 +123,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [searchState, setSearchState] = useState<YouTubeLoadingState>('idle');
   const [searchMessage, setSearchMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'youtube' | 'local'>('youtube');
+  const [activeTab, setActiveTab] = useState<'youtube' | 'local'>('local');
   const [listeningKey, setListeningKey] = useState(false);
   const [startInput, setStartInput] = useState(formatTime(pad.trimStart));
   const [endInput, setEndInput] = useState(formatTime(pad.trimEnd));
@@ -293,9 +310,8 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   }, [pad]);
 
   useEffect(() => {
-    if (pad.sourceType === 'local') setActiveTab('local');
-    if (pad.sourceType === 'youtube') setActiveTab('youtube');
-  }, [pad.sourceType]);
+    setActiveTab('local');
+  }, [pad.id]);
 
   useEffect(() => {
     setStartInput(formatTime(draft.trimStart));
@@ -402,9 +418,25 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const handleTrimChange = (field: 'trimStart' | 'trimEnd', value: number) => {
     if (!Number.isFinite(value)) return;
     setDraft((prev) => {
+      const minGap = 0.1;
       const nextValue = clamp(value, 0, maxTrim);
       if (!prev.trimLock) {
-        return { ...prev, [field]: nextValue };
+        let nextTrimStart = field === 'trimStart' ? nextValue : prev.trimStart;
+        let nextTrimEnd = field === 'trimEnd' ? nextValue : prev.trimEnd;
+        if (nextTrimStart >= nextTrimEnd) {
+          if (field === 'trimStart') {
+            nextTrimEnd = clamp(nextTrimStart + minGap, 0, maxTrim);
+            if (nextTrimEnd === maxTrim) {
+              nextTrimStart = clamp(nextTrimEnd - minGap, 0, maxTrim);
+            }
+          } else {
+            nextTrimStart = clamp(nextTrimEnd - minGap, 0, maxTrim);
+            if (nextTrimStart === 0) {
+              nextTrimEnd = clamp(nextTrimStart + minGap, 0, maxTrim);
+            }
+          }
+        }
+        return { ...prev, trimStart: nextTrimStart, trimEnd: nextTrimEnd };
       }
       const length = Math.min(getTrimLength(prev), maxTrim);
       if (field === 'trimStart') {
@@ -427,6 +459,18 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       };
     });
   };
+
+  const handleTrimWheel = useCallback(
+    (field: 'trimStart' | 'trimEnd') => (event: React.WheelEvent<HTMLInputElement>) => {
+      if (draft.sourceType === 'empty') return;
+      event.preventDefault();
+      const step = event.altKey ? 5 : event.shiftKey ? 0.1 : 1;
+      const direction = event.deltaY < 0 ? 1 : -1;
+      const baseValue = field === 'trimStart' ? draft.trimStart : draft.trimEnd;
+      handleTrimChange(field, baseValue + direction * step);
+    },
+    [draft.sourceType, draft.trimEnd, draft.trimStart, handleTrimChange]
+  );
 
   const handleTrimLengthChange = (value: number) => {
     if (!Number.isFinite(value)) return;
@@ -569,7 +613,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
           <button
             type="button"
             onClick={handleClose}
-            className="text-gray-500 hover:text-white bg-white/5 hover:bg-white/10 rounded-full p-2"
+            className="text-gray-500 hover:text-white bg-white/5 hover:bg-white/10 rounded-full h-10 w-10 flex items-center justify-center shrink-0"
             aria-label="Close dialog"
           >
             <span className="material-symbols-outlined">close</span>
@@ -874,6 +918,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                   step={0.1}
                   value={draft.trimStart}
                   onChange={(event) => handleTrimChange('trimStart', parseFloat(event.target.value))}
+                  onWheel={handleTrimWheel('trimStart')}
                   className="w-full accent-[#D0BCFF]"
                   disabled={draft.sourceType === 'empty'}
                 />
@@ -887,6 +932,8 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                     if (parsed !== null) handleTrimChange('trimStart', parsed);
                   }}
                   onBlur={() => setStartInput(formatTime(draft.trimStart))}
+                  onWheel={handleTrimWheel('trimStart')}
+                  inputMode="decimal"
                   className="w-full bg-[#0F0E13] border border-white/10 rounded-xl p-2.5 text-xs text-white"
                   placeholder="0:00.00"
                   disabled={draft.sourceType === 'empty'}
@@ -904,6 +951,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                   step={0.1}
                   value={draft.trimEnd}
                   onChange={(event) => handleTrimChange('trimEnd', parseFloat(event.target.value))}
+                  onWheel={handleTrimWheel('trimEnd')}
                   className="w-full accent-[#D0BCFF]"
                   disabled={draft.sourceType === 'empty'}
                 />
@@ -917,6 +965,8 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                     if (parsed !== null) handleTrimChange('trimEnd', parsed);
                   }}
                   onBlur={() => setEndInput(formatTime(draft.trimEnd))}
+                  onWheel={handleTrimWheel('trimEnd')}
+                  inputMode="decimal"
                   className="w-full bg-[#0F0E13] border border-white/10 rounded-xl p-2.5 text-xs text-white"
                   placeholder="0:00.00"
                   disabled={draft.sourceType === 'empty'}
