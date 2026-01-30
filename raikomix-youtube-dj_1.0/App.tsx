@@ -237,6 +237,63 @@ const App: React.FC = () => {
     'GATE',
   ];
 
+  const handleMixLeadChange = useCallback((value: number) => {
+    if (!Number.isFinite(value)) return;
+    setMixLeadSeconds(Math.min(30, Math.max(4, value)));
+  }, []);
+
+  const handleMixDurationChange = useCallback((value: number) => {
+    if (!Number.isFinite(value)) return;
+    setMixDurationSeconds(Math.min(20, Math.max(2, value)));
+  }, []);
+
+  const toggleEffect = (deck: 'A' | 'B', effect: EffectType | null) => {
+    if (deck === 'A') {
+      setDeckAEffect(prev => (prev === effect ? null : effect));
+    } else {
+      setDeckBEffect(prev => (prev === effect ? null : effect));
+    }
+  };
+
+  const togglePadEffect = (effect: EffectType | null) => {
+    setPadEffect(prev => (prev === effect ? null : effect));
+  };
+
+  const targetEffect = fxTarget === 'A'
+    ? deckAEffect
+    : fxTarget === 'B'
+      ? deckBEffect
+      : fxTarget === 'PADS'
+        ? padEffect
+        : deckAEffect === deckBEffect
+          ? deckAEffect
+          : null;
+  const targetWet = fxTarget === 'A'
+    ? deckAEffectWet
+    : fxTarget === 'B'
+      ? deckBEffectWet
+      : fxTarget === 'PADS'
+        ? padEffectWet
+        : (deckAEffectWet + deckBEffectWet) / 2;
+  const targetIntensity = fxTarget === 'A'
+    ? deckAEffectIntensity
+    : fxTarget === 'B'
+      ? deckBEffectIntensity
+      : fxTarget === 'PADS'
+        ? padEffectIntensity
+        : (deckAEffectIntensity + deckBEffectIntensity) / 2;
+  const isMixedEffect = fxTarget === 'AB' && deckAEffect !== deckBEffect;
+  const isMixedWet = fxTarget === 'AB' && Math.abs(deckAEffectWet - deckBEffectWet) > 0.01;
+  const isMixedIntensity = fxTarget === 'AB' && Math.abs(deckAEffectIntensity - deckBEffectIntensity) > 0.01;
+  const targetColor = fxTarget === 'A' ? '#D0BCFF' : fxTarget === 'B' ? '#F2B8B5' : fxTarget === 'PADS' ? '#B0E3D3' : '#E5D0F7';
+  const streamingNotice = fxTarget === 'A'
+    ? deckAState?.sourceType === 'youtube'
+    : fxTarget === 'B'
+      ? deckBState?.sourceType === 'youtube'
+      : fxTarget === 'PADS'
+        ? false
+        : deckAState?.sourceType === 'youtube' || deckBState?.sourceType === 'youtube';
+
   const formatMidiMessage = (event: MIDIMessageEvent) => {
     const [status, data1, data2] = event.data;
     const messageType = status & 0xf0;
@@ -759,16 +816,6 @@ const App: React.FC = () => {
     queueAutoMix(deckId);
   }, [autoDjEnabled, queueAutoMix]);
 
-  const handleMixLeadChange = useCallback((value: number) => {
-    if (!Number.isFinite(value)) return;
-    setMixLeadSeconds(Math.min(30, Math.max(4, value)));
-  }, []);
-
-  const handleMixDurationChange = useCallback((value: number) => {
-    if (!Number.isFinite(value)) return;
-    setMixDurationSeconds(Math.min(20, Math.max(2, value)));
-  }, []);
-
   const muteDeck = (id: 'A' | 'B') => {
     if (id === 'A') setDeckAVolume(prev => prev > 0 ? 0 : 0.8);
     else setDeckBVolume(prev => prev > 0 ? 0 : 0.8);
@@ -787,53 +834,6 @@ const App: React.FC = () => {
     setDeckBEq({ hi: 1, mid: 1, low: 1, filter: 0 });
     showNotification('EQs Reset', 'info');
   };
-
-  const toggleEffect = (deck: 'A' | 'B', effect: EffectType | null) => {
-    if (deck === 'A') {
-      setDeckAEffect(prev => (prev === effect ? null : effect));
-    } else {
-      setDeckBEffect(prev => (prev === effect ? null : effect));
-    }
-  };
-
-  const togglePadEffect = (effect: EffectType | null) => {
-    setPadEffect(prev => (prev === effect ? null : effect));
-  };
-
-  const targetEffect = fxTarget === 'A'
-    ? deckAEffect
-    : fxTarget === 'B'
-      ? deckBEffect
-      : fxTarget === 'PADS'
-        ? padEffect
-        : deckAEffect === deckBEffect
-          ? deckAEffect
-          : null;
-  const targetWet = fxTarget === 'A'
-    ? deckAEffectWet
-    : fxTarget === 'B'
-      ? deckBEffectWet
-      : fxTarget === 'PADS'
-        ? padEffectWet
-        : (deckAEffectWet + deckBEffectWet) / 2;
-  const targetIntensity = fxTarget === 'A'
-    ? deckAEffectIntensity
-    : fxTarget === 'B'
-      ? deckBEffectIntensity
-      : fxTarget === 'PADS'
-        ? padEffectIntensity
-        : (deckAEffectIntensity + deckBEffectIntensity) / 2;
-  const isMixedEffect = fxTarget === 'AB' && deckAEffect !== deckBEffect;
-  const isMixedWet = fxTarget === 'AB' && Math.abs(deckAEffectWet - deckBEffectWet) > 0.01;
-  const isMixedIntensity = fxTarget === 'AB' && Math.abs(deckAEffectIntensity - deckBEffectIntensity) > 0.01;
-  const targetColor = fxTarget === 'A' ? '#D0BCFF' : fxTarget === 'B' ? '#F2B8B5' : fxTarget === 'PADS' ? '#B0E3D3' : '#E5D0F7';
-  const streamingNotice = fxTarget === 'A'
-    ? deckAState?.sourceType === 'youtube'
-    : fxTarget === 'B'
-      ? deckBState?.sourceType === 'youtube'
-      : fxTarget === 'PADS'
-        ? false
-        : deckAState?.sourceType === 'youtube' || deckBState?.sourceType === 'youtube';
 
   const handleRemoveMultiple = useCallback((ids: string[]) => {
     setLibrary(prev => prev.filter(track => !ids.includes(track.id)));
