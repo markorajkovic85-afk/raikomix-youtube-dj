@@ -268,14 +268,14 @@ const Mixer: React.FC<MixerProps> = ({
   };
 
   return (
-    <div className="m3-card mixer-card h-full flex flex-col bg-[#1D1B20] shadow-2xl border-white/5 shrink-0 p-2 select-none" role="region" aria-label="Mixer Controls">
+    <div className="m3-card mixer-card mixer-shell flex flex-col bg-[#1D1B20] shadow-2xl border-white/5 shrink-0 p-2 select-none" role="region" aria-label="Mixer Controls">
       <div className="flex flex-col items-center gap-0 border-b border-white/5 pb-1 mb-2">
         <h2 className="text-[8px] font-black uppercase tracking-[0.4em] text-[#D0BCFF]">Mixing Console</h2>
       </div>
 
-      <div className="flex-1 flex justify-between gap-1 overflow-hidden">
+      <div className="mixer-main flex justify-between gap-1">
         {/* Channel A Section */}
-        <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl flex-1 border border-white/5">
+        <div className="mixer-channel flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5">
           <div className="flex flex-col items-center gap-1.5 w-full">
            <Knob label="Trim" value={deckATrim} onChange={onDeckATrimChange} color="#D0BCFF" size="sm" defaultValue={1} />
             <div className="w-full h-px bg-white/5" />
@@ -298,7 +298,7 @@ const Mixer: React.FC<MixerProps> = ({
         </div>
 
         {/* Master Section */}
-        <div className="flex flex-col items-center gap-2 py-2 px-0.5 w-10 bg-black/30 rounded-xl border border-white/5 mx-0.5">
+        <div className="mixer-master flex flex-col items-center gap-2 py-2 px-0.5 w-10 bg-black/30 rounded-xl border border-white/5 mx-0.5">
            <div className="flex flex-col gap-0.5 items-center flex-1 py-1">
              {[...Array(20)].reverse().map((_, i) => {
                const isActive = (deckAPlaying || deckBPlaying) && (Math.random() > (i / 20));
@@ -316,7 +316,7 @@ const Mixer: React.FC<MixerProps> = ({
         </div>
 
         {/* Channel B Section */}
-        <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl flex-1 border border-white/5">
+        <div className="mixer-channel flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5">
           <div className="flex flex-col items-center gap-1.5 w-full">
             <Knob label="Trim" value={deckBTrim} onChange={onDeckBTrimChange} color="#F2B8B5" size="sm" defaultValue={1} />
             <div className="w-full h-px bg-white/5" />
