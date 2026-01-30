@@ -273,7 +273,7 @@ const Mixer: React.FC<MixerProps> = ({
         <h2 className="text-[8px] font-black uppercase tracking-[0.4em] text-[#D0BCFF]">Mixing Console</h2>
       </div>
 
-      <div className="flex-1 flex flex-nowrap justify-between gap-1 overflow-hidden">
+      <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-stretch gap-1 overflow-hidden">
         {/* Channel A Section */}
         <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl flex-1 border border-white/5">
           <div className="flex flex-col items-center gap-1.5 w-full">
@@ -298,7 +298,7 @@ const Mixer: React.FC<MixerProps> = ({
         </div>
 
         {/* Master Section */}
-        <div className="flex flex-col items-center gap-2 py-2 px-0.5 w-10 bg-black/30 rounded-xl border border-white/5 mx-0.5">
+        <div className="flex flex-col items-center gap-2 py-2 px-0.5 w-10 bg-black/30 rounded-xl border border-white/5 mx-0.5 justify-self-center">
            <div className="flex flex-col gap-0.5 items-center flex-1 py-1">
              {[...Array(20)].reverse().map((_, i) => {
                const isActive = (deckAPlaying || deckBPlaying) && (Math.random() > (i / 20));
