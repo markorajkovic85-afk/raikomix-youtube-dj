@@ -273,7 +273,7 @@ const Mixer: React.FC<MixerProps> = ({
         <h2 className="text-[8px] font-black uppercase tracking-[0.4em] text-[#D0BCFF]">Mixing Console</h2>
       </div>
 
-      <div className="flex-1 flex justify-between gap-1 overflow-hidden">
+      <div className="flex-1 flex flex-nowrap justify-between gap-1 overflow-hidden">
         {/* Channel A Section */}
         <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl flex-1 border border-white/5">
           <div className="flex flex-col items-center gap-1.5 w-full">
