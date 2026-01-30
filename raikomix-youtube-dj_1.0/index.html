@@ -62,17 +62,16 @@
     .marquee-text {
       display: inline-block;
       flex-shrink: 0;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      width: max-content;
+      max-width: none;
     }
     .animate-marquee {
       animation: marquee-scroll 10s linear infinite;
     }
     @keyframes marquee-scroll {
       0% { transform: translateX(0); }
-      20% { transform: translateX(0); }
-      80% { transform: translateX(-50%); }
+      30% { transform: translateX(0); }
+      90% { transform: translateX(-50%); }
       100% { transform: translateX(-50%); }
     }
 
@@ -209,26 +208,30 @@
     }
 
     .mixer-shell {
-      width: clamp(200px, 16vw, 260px);
+      width: clamp(260px, 22vw, 320px);
+      min-width: 260px;
+      max-width: 320px;
+      min-height: 360px;
       height: auto;
-      align-self: flex-start;
+      max-height: min(520px, 72vh);
+      align-self: center;
+      box-sizing: border-box;
     }
 
-    .mixer-main {
-      flex: 0 0 auto;
-      flex-wrap: nowrap;
-      align-items: stretch;
+    .mixer-channels {
       overflow: visible;
-      min-height: 0;
+      grid-template-columns: minmax(112px, 1fr) 60px minmax(112px, 1fr);
+      align-items: end;
     }
 
     .mixer-channel {
-      flex: 1 1 0;
-      min-width: 82px;
+      min-width: 112px;
+      flex: 0 0 auto;
     }
 
     .mixer-master {
-      flex: 0 0 44px;
+      flex: 0 0 auto;
+      min-width: 60px;
     }
 
     .deck-card {
