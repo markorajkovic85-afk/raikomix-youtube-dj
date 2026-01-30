@@ -628,7 +628,9 @@ useEffect(() => {
 
           <section className="flex-1 flex flex-col items-center justify-center overflow-hidden min-h-0 min-w-0 perform-stage">
             <div className="flex flex-col lg:flex-row items-stretch lg:items-start justify-center gap-6 w-full px-4 min-h-0 min-w-0 h-full max-h-full perform-stage__inner">
-             <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
+             <div className="perform-stage__deck">
+               <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
+             </div>
             <Mixer
                 crossfader={crossfader}
                 onCrossfaderChange={setCrossfader}
@@ -658,7 +660,9 @@ useEffect(() => {
                 onDeckAEqChange={(k, v) => setDeckAEq(p => ({...p, [k]: v}))}
                 onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))}
               />
-                 <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} onTrackEnd={() => handleTrackEnd('B')} />
+                 <div className="perform-stage__deck">
+                   <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} onTrackEnd={() => handleTrackEnd('B')} />
+                 </div>
             </div>
           </section>
 

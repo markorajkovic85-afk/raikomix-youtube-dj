@@ -273,9 +273,9 @@ const Mixer: React.FC<MixerProps> = ({
         <h2 className="text-[8px] font-black uppercase tracking-[0.4em] text-[#D0BCFF]">Mixing Console</h2>
       </div>
 
-      <div className="mixer-main flex justify-between gap-1">
+      <div className="flex-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 overflow-hidden">
         {/* Channel A Section */}
-        <div className="mixer-channel flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5">
+        <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0">
           <div className="flex flex-col items-center gap-1.5 w-full">
            <Knob label="Trim" value={deckATrim} onChange={onDeckATrimChange} color="#D0BCFF" size="sm" defaultValue={1} />
             <div className="w-full h-px bg-white/5" />
@@ -298,7 +298,7 @@ const Mixer: React.FC<MixerProps> = ({
         </div>
 
         {/* Master Section */}
-        <div className="mixer-master flex flex-col items-center gap-2 py-2 px-0.5 w-10 bg-black/30 rounded-xl border border-white/5 mx-0.5">
+        <div className="flex flex-col items-center gap-2 py-2 px-0.5 w-10 bg-black/30 rounded-xl border border-white/5 mx-0.5 justify-self-center">
            <div className="flex flex-col gap-0.5 items-center flex-1 py-1">
              {[...Array(20)].reverse().map((_, i) => {
                const isActive = (deckAPlaying || deckBPlaying) && (Math.random() > (i / 20));
@@ -316,7 +316,7 @@ const Mixer: React.FC<MixerProps> = ({
         </div>
 
         {/* Channel B Section */}
-        <div className="mixer-channel flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5">
+        <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0">
           <div className="flex flex-col items-center gap-1.5 w-full">
             <Knob label="Trim" value={deckBTrim} onChange={onDeckBTrimChange} color="#F2B8B5" size="sm" defaultValue={1} />
             <div className="w-full h-px bg-white/5" />
