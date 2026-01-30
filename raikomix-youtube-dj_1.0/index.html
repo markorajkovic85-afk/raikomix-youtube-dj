@@ -58,13 +58,15 @@
       white-space: nowrap;
       position: relative;
       display: flex;
+      min-width: 0;
+      max-width: 100%;
     }
     .marquee-text {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
       flex-shrink: 0;
       max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .animate-marquee {
       animation: marquee-scroll 10s linear infinite;
@@ -196,6 +198,16 @@
 
     .perform-stage__deck {
       margin-top: clamp(16px, 2.2vh, 22px);
+      flex: 0 0 clamp(320px, 36vw, 520px);
+      max-width: clamp(320px, 36vw, 520px);
+      min-width: clamp(320px, 36vw, 520px);
+    }
+
+    .deck-title-stack {
+      min-height: 2.75rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
 
     .deck-card,
@@ -206,29 +218,34 @@
 
     .mixer-card {
       max-height: min(82vh, 760px);
+      min-height: 0;
     }
 
     .mixer-shell {
       width: clamp(200px, 16vw, 260px);
       height: auto;
       align-self: flex-start;
+      min-width: 0;
     }
 
     .mixer-main {
-      flex: 0 0 auto;
-      flex-wrap: nowrap;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(48px, auto) minmax(0, 1fr);
+      gap: clamp(4px, 0.6vw, 8px);
       align-items: stretch;
-      overflow: visible;
+      justify-items: stretch;
       min-height: 0;
     }
 
     .mixer-channel {
-      flex: 1 1 0;
-      min-width: 82px;
+      min-width: 0;
+      min-height: 0;
     }
 
     .mixer-master {
-      flex: 0 0 44px;
+      min-width: 48px;
+      max-width: 60px;
+      min-height: 0;
     }
 
     .deck-card {
