@@ -192,6 +192,11 @@ const App: React.FC = () => {
   const [lastMidiMessage, setLastMidiMessage] = useState<string | null>(null);
   const [midiLearnIndex, setMidiLearnIndex] = useState<number | null>(null);
   const midiInputHandlersRef = useRef<Map<string, (event: MIDIMessageEvent) => void>>(new Map());
+  const lastEffectRef = useRef<{ A: EffectType | null; B: EffectType | null; PADS: EffectType | null }>({
+    A: null,
+    B: null,
+    PADS: null,
+  });
 
   const updateKeyboardMapping = (index: number, value: string) => {
     setKeyboardMappings(prev => prev.map((item, i) => (i === index ? { ...item, keys: value } : item)));
@@ -202,8 +207,35 @@ const App: React.FC = () => {
   };
 
   useEffect(() => { saveLibrary(library); }, [library]);
+  useEffect(() => {
+    if (deckAEffect) lastEffectRef.current.A = deckAEffect;
+  }, [deckAEffect]);
+  useEffect(() => {
+    if (deckBEffect) lastEffectRef.current.B = deckBEffect;
+  }, [deckBEffect]);
+  useEffect(() => {
+    if (padEffect) lastEffectRef.current.PADS = padEffect;
+  }, [padEffect]);
 
   const showNotification = (msg: string, type: ToastType = 'info') => setToast({ msg, type });
+  const effectCycle: EffectType[] = [
+    'HIGH_PASS',
+    'LOW_PASS',
+    'BAND_PASS',
+    'ECHO',
+    'DELAY',
+    'REVERB',
+    'FLANGER',
+    'PHASER',
+    'CHORUS',
+    'TREMOLO',
+    'AUTO_PAN',
+    'CRUSH',
+    'BITCRUSH',
+    'OVERDRIVE',
+    'FILTER_SWEEP',
+    'GATE',
+  ];
 
   const formatMidiMessage = (event: MIDIMessageEvent) => {
     const [status, data1, data2] = event.data;
@@ -241,6 +273,261 @@ const App: React.FC = () => {
     return null;
   };
 
+  const parseMidiControl = (control: string) => {
+    const trimmed = control.trim();
+    const ccMatch = /^CC\s*(\d+)/i.exec(trimmed);
+    if (ccMatch) return { type: 'cc' as const, value: Number(ccMatch[1]) };
+    const noteRangeMatch = /^Notes?\s*(\d+)\s*-\s*(\d+)/i.exec(trimmed);
+    if (noteRangeMatch) {
+      return { type: 'note-range' as const, start: Number(noteRangeMatch[1]), end: Number(noteRangeMatch[2]) };
+    }
+    const noteMatch = /^Note\s*(\d+)/i.exec(trimmed);
+    if (noteMatch) return { type: 'note' as const, value: Number(noteMatch[1]) };
+    return null;
+  };
+
+  const toMidiRange = (value: number, min: number, max: number) => min + (value / 127) * (max - min);
+
+  const applyEffectToTarget = (effect: EffectType | null) => {
+    if (fxTarget === 'A') toggleEffect('A', effect);
+    else if (fxTarget === 'B') toggleEffect('B', effect);
+    else if (fxTarget === 'PADS') togglePadEffect(effect);
+    else {
+      toggleEffect('A', effect);
+      toggleEffect('B', effect);
+    }
+  };
+
+  const handleMidiAction = useCallback((action: string, data1: number, data2: number) => {
+    const velocity = data2 ?? 0;
+    const isNoteOn = velocity > 0;
+    const normalizedValue = Math.max(0, Math.min(127, data2 ?? 0));
+    switch (action) {
+      case 'Crossfader':
+        setCrossfader(toMidiRange(normalizedValue, -1, 1));
+        return;
+      case 'Crossfader Curve':
+        if (!isNoteOn) return;
+        if (data1 === 20) setXFaderCurve('SMOOTH');
+        if (data1 === 21) setXFaderCurve('CUT');
+        if (data1 === 22) setXFaderCurve('DIP');
+        return;
+      case 'Deck A Volume':
+        setDeckAVolume(toMidiRange(normalizedValue, 0, 1));
+        return;
+      case 'Deck B Volume':
+        setDeckBVolume(toMidiRange(normalizedValue, 0, 1));
+        return;
+      case 'Master Volume':
+        setMasterVolume(toMidiRange(normalizedValue, 0, 1));
+        return;
+      case 'Deck A Trim':
+        setDeckAEffectWet(toMidiRange(normalizedValue, 0, 1));
+        return;
+      case 'Deck B Trim':
+        setDeckBEffectWet(toMidiRange(normalizedValue, 0, 1));
+        return;
+      case 'Deck A EQ High':
+        setDeckAEq(prev => ({ ...prev, hi: toMidiRange(normalizedValue, 0, 2) }));
+        return;
+      case 'Deck A EQ Mid':
+        setDeckAEq(prev => ({ ...prev, mid: toMidiRange(normalizedValue, 0, 2) }));
+        return;
+      case 'Deck A EQ Low':
+        setDeckAEq(prev => ({ ...prev, low: toMidiRange(normalizedValue, 0, 2) }));
+        return;
+      case 'Deck A Filter':
+        setDeckAEq(prev => ({ ...prev, filter: toMidiRange(normalizedValue, -1, 1) }));
+        return;
+      case 'Deck B EQ High':
+        setDeckBEq(prev => ({ ...prev, hi: toMidiRange(normalizedValue, 0, 2) }));
+        return;
+      case 'Deck B EQ Mid':
+        setDeckBEq(prev => ({ ...prev, mid: toMidiRange(normalizedValue, 0, 2) }));
+        return;
+      case 'Deck B EQ Low':
+        setDeckBEq(prev => ({ ...prev, low: toMidiRange(normalizedValue, 0, 2) }));
+        return;
+      case 'Deck B Filter':
+        setDeckBEq(prev => ({ ...prev, filter: toMidiRange(normalizedValue, -1, 1) }));
+        return;
+      case 'Auto DJ Toggle':
+        if (isNoteOn) setAutoDjEnabled(prev => !prev);
+        return;
+      case 'Mix Lead Time':
+        handleMixLeadChange(toMidiRange(normalizedValue, 4, 30));
+        return;
+      case 'Mix Duration':
+        handleMixDurationChange(toMidiRange(normalizedValue, 2, 20));
+        return;
+      case 'Deck A Play/Pause':
+        if (isNoteOn) deckARef.current?.togglePlay();
+        return;
+      case 'Deck A Tap BPM':
+        if (isNoteOn) deckARef.current?.tapBpm();
+        return;
+      case 'Deck A Tempo Fader':
+        deckARef.current?.setPlaybackRate(toMidiRange(normalizedValue, 0.5, 1.5));
+        return;
+      case 'Deck A Pitch Reset':
+        if (isNoteOn) deckARef.current?.setPlaybackRate(1);
+        return;
+      case 'Deck A Hot Cue 1':
+        if (isNoteOn) deckARef.current?.triggerHotCue(0);
+        return;
+      case 'Deck A Hot Cue 2':
+        if (isNoteOn) deckARef.current?.triggerHotCue(1);
+        return;
+      case 'Deck A Hot Cue 3':
+        if (isNoteOn) deckARef.current?.triggerHotCue(2);
+        return;
+      case 'Deck A Hot Cue 4':
+        if (isNoteOn) deckARef.current?.triggerHotCue(3);
+        return;
+      case 'Deck A Loop 2':
+        if (isNoteOn) deckARef.current?.toggleLoop(2);
+        return;
+      case 'Deck A Loop 4':
+        if (isNoteOn) deckARef.current?.toggleLoop(4);
+        return;
+      case 'Deck A Loop 8':
+        if (isNoteOn) deckARef.current?.toggleLoop(8);
+        return;
+      case 'Deck A Loop 16':
+        if (isNoteOn) deckARef.current?.toggleLoop(16);
+        return;
+      case 'FX Toggle': {
+        if (!isNoteOn) return;
+        if (fxTarget === 'PADS') {
+          const next = padEffect ? null : (lastEffectRef.current.PADS ?? effectCycle[0]);
+          togglePadEffect(next);
+          return;
+        }
+        if (fxTarget === 'AB') {
+          const nextA = deckAEffect ? null : (lastEffectRef.current.A ?? effectCycle[0]);
+          const nextB = deckBEffect ? null : (lastEffectRef.current.B ?? effectCycle[0]);
+          toggleEffect('A', nextA);
+          toggleEffect('B', nextB);
+          return;
+        }
+        const current = fxTarget === 'A' ? deckAEffect : deckBEffect;
+        const next = current ? null : (lastEffectRef.current[fxTarget] ?? effectCycle[0]);
+        toggleEffect(fxTarget, next);
+        return;
+      }
+      case 'FX Target A':
+        if (isNoteOn) setFxTarget('A');
+        return;
+      case 'FX Target B':
+        if (isNoteOn) setFxTarget('B');
+        return;
+      case 'FX Target A+B':
+        if (isNoteOn) setFxTarget('AB');
+        return;
+      case 'FX Target Pads':
+        if (isNoteOn) setFxTarget('PADS');
+        return;
+      case 'FX Select Previous':
+      case 'FX Select Next': {
+        if (!isNoteOn) return;
+        const direction = action === 'FX Select Next' ? 1 : -1;
+        const current = fxTarget === 'A'
+          ? deckAEffect
+          : fxTarget === 'B'
+            ? deckBEffect
+            : fxTarget === 'PADS'
+              ? padEffect
+              : targetEffect;
+        const currentIndex = effectCycle.findIndex(effect => effect === current);
+        const nextIndex = currentIndex === -1
+          ? (direction === 1 ? 0 : effectCycle.length - 1)
+          : (currentIndex + direction + effectCycle.length) % effectCycle.length;
+        applyEffectToTarget(effectCycle[nextIndex]);
+        return;
+      }
+      case 'FX Wet/Dry': {
+        const amount = toMidiRange(normalizedValue, 0, 1);
+        if (fxTarget === 'A') setDeckAEffectWet(amount);
+        else if (fxTarget === 'B') setDeckBEffectWet(amount);
+        else if (fxTarget === 'PADS') setPadEffectWet(amount);
+        else {
+          setDeckAEffectWet(amount);
+          setDeckBEffectWet(amount);
+        }
+        return;
+      }
+      case 'FX Intensity': {
+        const amount = toMidiRange(normalizedValue, 0, 1);
+        if (fxTarget === 'A') setDeckAEffectIntensity(amount);
+        else if (fxTarget === 'B') setDeckBEffectIntensity(amount);
+        else if (fxTarget === 'PADS') setPadEffectIntensity(amount);
+        else {
+          setDeckAEffectIntensity(amount);
+          setDeckBEffectIntensity(amount);
+        }
+        return;
+      }
+      case 'Pad FX Wet/Dry':
+        setPadEffectWet(toMidiRange(normalizedValue, 0, 1));
+        return;
+      case 'Pad FX Intensity':
+        setPadEffectIntensity(toMidiRange(normalizedValue, 0, 1));
+        return;
+      case 'Pad 1 Trigger':
+      case 'Pad 2 Trigger':
+      case 'Pad 3 Trigger':
+      case 'Pad 4 Trigger':
+      case 'Pad 5 Trigger':
+      case 'Pad 6 Trigger':
+      case 'Pad 7 Trigger':
+      case 'Pad 8 Trigger':
+      case 'Pad 9 Trigger':
+      case 'Pad 10 Trigger':
+      case 'Pad 11 Trigger':
+      case 'Pad 12 Trigger': {
+        if (!isNoteOn) return;
+        const padIndex = Number(action.replace('Pad ', '').replace(' Trigger', '')) - 1;
+        if (padIndex >= 0) {
+          window.dispatchEvent(new CustomEvent('performance-pad-trigger', { detail: { padId: padIndex } }));
+        }
+        return;
+      }
+      default:
+        return;
+    }
+  }, [
+    applyEffectToTarget,
+    deckAEffect,
+    deckBEffect,
+    fxTarget,
+    handleMixDurationChange,
+    handleMixLeadChange,
+    padEffect,
+    targetEffect,
+    toggleEffect,
+    togglePadEffect,
+  ]);
+
+  const matchMidiMapping = useCallback((mapping: { channel: string; control: string }, event: MIDIMessageEvent) => {
+    const [status, data1, data2] = event.data;
+    const messageType = status & 0xf0;
+    const channel = (status & 0x0f) + 1;
+    const mappingChannel = Number(mapping.channel);
+    if (Number.isFinite(mappingChannel) && mappingChannel > 0 && mappingChannel !== channel) return false;
+    const control = parseMidiControl(mapping.control);
+    if (!control) return false;
+    if (control.type === 'cc') {
+      return messageType === 0xb0 && data1 === control.value;
+    }
+    if (control.type === 'note') {
+      return messageType === 0x90 && data1 === control.value && data2 > 0;
+    }
+    if (control.type === 'note-range') {
+      return messageType === 0x90 && data1 >= control.start && data1 <= control.end && data2 > 0;
+    }
+    return false;
+  }, []);
+
   const attachMidiInputListeners = useCallback((inputs: MIDIInput[]) => {
     midiInputHandlersRef.current.forEach((handler, id) => {
       const input = inputs.find((entry) => entry.id === id);
@@ -260,12 +547,17 @@ const App: React.FC = () => {
             setMidiLearnIndex(null);
             showNotification(`Mapped ${mapping.control} on channel ${mapping.channel}`, 'success');
           }
+          return;
         }
+        const [, data1, data2] = event.data;
+        const matches = midiMappings.filter((mapping) => matchMidiMapping(mapping, event));
+        if (!matches.length) return;
+        matches.forEach((mapping) => handleMidiAction(mapping.action, data1, data2 ?? 0));
       };
       input.onmidimessage = handler;
       midiInputHandlersRef.current.set(input.id, handler);
     });
-  }, [extractMappingFromMessage, formatMidiMessage, midiLearnIndex, showNotification]);
+  }, [extractMappingFromMessage, formatMidiMessage, handleMidiAction, matchMidiMapping, midiLearnIndex, midiMappings, showNotification]);
 
   const syncMidiInputs = useCallback(
     (access: MIDIAccess) => {

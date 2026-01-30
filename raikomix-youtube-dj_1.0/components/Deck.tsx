@@ -26,6 +26,7 @@ export interface DeckHandle {
   triggerHotCue: (index: number, clear?: boolean) => void;
   toggleLoop: (beats?: number) => void;
   setPlaybackRate: (rate: number) => void;
+  tapBpm: () => void;
 }
 
 const CUE_COLORS = [
@@ -552,6 +553,18 @@ const effectNodesRef = useRef<{
     }
   };
 
+  const handleTap = useCallback(() => {
+    const now = Date.now();
+    const newHistory = [...tapHistory, now].slice(-4);
+    setTapHistory(newHistory);
+    if (newHistory.length >= 2) {
+      const intervals = [];
+      for (let i = 1; i < newHistory.length; i++) intervals.push(newHistory[i] - newHistory[i - 1]);
+      const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+      setState(s => ({ ...s, bpm: Math.round(60000 / avgInterval) }));
+    }
+  }, [tapHistory]);
+
   useImperativeHandle(ref, () => ({
     loadVideo: (url: string, sourceType: TrackSourceType = 'youtube', metadata?: { title?: string, author?: string }) => {
       if (sourceType === 'local') {
@@ -582,8 +595,9 @@ const effectNodesRef = useRef<{
     togglePlay,
     triggerHotCue: handleHotCue,
     toggleLoop: handleToggleLoop,
-    setPlaybackRate: updatePlaybackRate
-  }), [initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, initAudioEngine]);
+    setPlaybackRate: updatePlaybackRate,
+    tapBpm: handleTap
+  }), [handleTap, initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, initAudioEngine]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -606,18 +620,6 @@ const effectNodesRef = useRef<{
   }, [state.isReady, state.loopActive, state.loopStart, state.loopEnd, state.sourceType]);
 
   useEffect(() => { onStateUpdate(state); }, [state, onStateUpdate]);
-
-  const handleTap = () => {
-    const now = Date.now();
-    const newHistory = [...tapHistory, now].slice(-4);
-    setTapHistory(newHistory);
-    if (newHistory.length >= 2) {
-      const intervals = [];
-      for (let i = 1; i < newHistory.length; i++) intervals.push(newHistory[i] - newHistory[i - 1]);
-      const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
-      setState(s => ({ ...s, bpm: Math.round(60000 / avgInterval) }));
-    }
-  };
 
   const playRingStyle = state.playing
     ? { borderColor: color, boxShadow: `0 0 24px ${color}55` }

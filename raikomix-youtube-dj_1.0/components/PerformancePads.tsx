@@ -595,6 +595,17 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
     [pads, startLocalPlayback, startYouTubePlayback, stopPad, onNotify, updateYouTubeState]
   );
 
+  useEffect(() => {
+    if (!isActive) return;
+    const handleExternalTrigger = (event: Event) => {
+      const detail = (event as CustomEvent<{ padId?: number }>).detail;
+      if (detail?.padId === undefined) return;
+      void triggerPad(detail.padId);
+    };
+    window.addEventListener('performance-pad-trigger', handleExternalTrigger);
+    return () => window.removeEventListener('performance-pad-trigger', handleExternalTrigger);
+  }, [isActive, triggerPad]);
+
   const previewPad = useCallback(
     async (pad: PerformancePadConfig) => {
       if (!pad || pad.sourceType === 'empty') {
