@@ -273,9 +273,9 @@ const Mixer: React.FC<MixerProps> = ({
         <h2 className="text-[8px] font-black uppercase tracking-[0.4em] text-[#D0BCFF]">Mixing Console</h2>
       </div>
 
-      <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-stretch gap-1 overflow-hidden">
+      <div className="flex-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 overflow-hidden">
         {/* Channel A Section */}
-        <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl flex-1 border border-white/5">
+        <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0">
           <div className="flex flex-col items-center gap-1.5 w-full">
            <Knob label="Trim" value={deckATrim} onChange={onDeckATrimChange} color="#D0BCFF" size="sm" defaultValue={1} />
             <div className="w-full h-px bg-white/5" />
@@ -316,7 +316,7 @@ const Mixer: React.FC<MixerProps> = ({
         </div>
 
         {/* Channel B Section */}
-        <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl flex-1 border border-white/5">
+        <div className="flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0">
           <div className="flex flex-col items-center gap-1.5 w-full">
             <Knob label="Trim" value={deckBTrim} onChange={onDeckBTrimChange} color="#F2B8B5" size="sm" defaultValue={1} />
             <div className="w-full h-px bg-white/5" />
