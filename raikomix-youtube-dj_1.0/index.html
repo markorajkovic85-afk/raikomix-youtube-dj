@@ -70,10 +70,30 @@
       animation: marquee-scroll 10s linear infinite;
     }
     @keyframes marquee-scroll {
-      0% { transform: translateX(0); }
-      20% { transform: translateX(0); }
-      80% { transform: translateX(-50%); }
+      0% { transform: translateX(100%); }
+      15% { transform: translateX(0); }
+      85% { transform: translateX(-50%); }
       100% { transform: translateX(-50%); }
+    }
+
+    .mixer-shell {
+      width: clamp(220px, 22vw, 280px);
+      height: clamp(360px, 52vh, 440px);
+      max-height: clamp(360px, 52vh, 440px);
+      align-self: center;
+    }
+
+    .mixer-channels {
+      overflow: visible;
+    }
+
+    .mixer-channel {
+      min-width: 88px;
+      flex: 0 0 auto;
+    }
+
+    .mixer-master {
+      flex: 0 0 auto;
     }
 
     /* Accessibility skip link */
