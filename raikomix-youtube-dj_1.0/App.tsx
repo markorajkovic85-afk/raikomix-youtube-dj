@@ -190,6 +190,7 @@ const App: React.FC = () => {
   const [midiStatus, setMidiStatus] = useState<'idle' | 'scanning' | 'ready' | 'error'>('idle');
   const [midiError, setMidiError] = useState<string | null>(null);
   const [lastMidiMessage, setLastMidiMessage] = useState<string | null>(null);
+  const [midiLearnIndex, setMidiLearnIndex] = useState<number | null>(null);
   const midiInputHandlersRef = useRef<Map<string, (event: MIDIMessageEvent) => void>>(new Map());
 
   const updateKeyboardMapping = (index: number, value: string) => {
@@ -201,6 +202,8 @@ const App: React.FC = () => {
   };
 
   useEffect(() => { saveLibrary(library); }, [library]);
+
+  const showNotification = (msg: string, type: ToastType = 'info') => setToast({ msg, type });
 
   const formatMidiMessage = (event: MIDIMessageEvent) => {
     const [status, data1, data2] = event.data;
@@ -222,6 +225,22 @@ const App: React.FC = () => {
     return `MIDI ${status?.toString(16).toUpperCase()} ${data1 ?? ''} ${data2 ?? ''} • Ch ${channel}`;
   };
 
+  const extractMappingFromMessage = (event: MIDIMessageEvent) => {
+    const [status, data1, data2] = event.data;
+    const messageType = status & 0xf0;
+    const channel = (status & 0x0f) + 1;
+    if (messageType === 0xb0) {
+      return { channel: String(channel), control: `CC ${data1}` };
+    }
+    if (messageType === 0x90 && data2 > 0) {
+      return { channel: String(channel), control: `Note ${data1}` };
+    }
+    if (messageType === 0x80) {
+      return { channel: String(channel), control: `Note ${data1}` };
+    }
+    return null;
+  };
+
   const attachMidiInputListeners = useCallback((inputs: MIDIInput[]) => {
     midiInputHandlersRef.current.forEach((handler, id) => {
       const input = inputs.find((entry) => entry.id === id);
@@ -232,11 +251,21 @@ const App: React.FC = () => {
     inputs.forEach((input) => {
       const handler = (event: MIDIMessageEvent) => {
         setLastMidiMessage(`${input.name ?? 'MIDI'}: ${formatMidiMessage(event)}`);
+        if (midiLearnIndex !== null) {
+          const mapping = extractMappingFromMessage(event);
+          if (mapping) {
+            setMidiMappings((prev) =>
+              prev.map((item, i) => (i === midiLearnIndex ? { ...item, ...mapping } : item))
+            );
+            setMidiLearnIndex(null);
+            showNotification(`Mapped ${mapping.control} on channel ${mapping.channel}`, 'success');
+          }
+        }
       };
       input.onmidimessage = handler;
       midiInputHandlersRef.current.set(input.id, handler);
     });
-  }, []);
+  }, [extractMappingFromMessage, formatMidiMessage, midiLearnIndex, showNotification]);
 
   const syncMidiInputs = useCallback(
     (access: MIDIAccess) => {
@@ -268,6 +297,10 @@ const App: React.FC = () => {
     }
   }, [syncMidiInputs]);
 
+  const handleLearnMidi = (index: number) => {
+    setMidiLearnIndex((prev) => (prev === index ? null : index));
+  };
+
   useEffect(() => {
     return () => {
       midiInputHandlersRef.current.forEach((_, id) => {
@@ -278,8 +311,6 @@ const App: React.FC = () => {
       if (midiAccess) midiAccess.onstatechange = null;
     };
   }, [midiAccess, midiInputs]);
-
-  const showNotification = (msg: string, type: ToastType = 'info') => setToast({ msg, type });
 
   const getActiveDeck = useCallback(() => {
     if (deckAState?.playing && !deckBState?.playing) return 'A';
@@ -933,6 +964,11 @@ useEffect(() => {
                       {midiStatus !== 'error' && midiInputs.length === 0 && 'No MIDI device connected'}
                       {midiStatus !== 'error' && midiInputs.length > 0 && `Connected: ${midiInputs.length} device${midiInputs.length > 1 ? 's' : ''}`}
                     </p>
+                    {midiLearnIndex !== null && (
+                      <div className="mt-2 text-[10px] text-[#D0BCFF] uppercase tracking-widest font-black">
+                        Learning: {midiMappings[midiLearnIndex]?.action || 'MIDI Control'}
+                      </div>
+                    )}
                     {midiInputs.length > 0 && (
                       <div className="mt-2 space-y-1">
                         {midiInputs.map((input) => (
@@ -966,6 +1002,17 @@ useEffect(() => {
                               <p className="text-[11px] text-white/50">{item.detail}</p>
                             </div>
                             <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleLearnMidi(index)}
+                                className={`text-[9px] font-black uppercase tracking-widest px-2 py-2 rounded-xl border transition ${
+                                  midiLearnIndex === index
+                                    ? 'bg-[#D0BCFF] text-black border-[#D0BCFF]'
+                                    : 'text-white/60 border-white/10 hover:text-white'
+                                }`}
+                              >
+                                {midiLearnIndex === index ? 'Listening' : 'Learn'}
+                              </button>
                               <input
                                 value={item.channel}
                                 onChange={(event) => updateMidiMapping(index, 'channel', event.target.value)}
