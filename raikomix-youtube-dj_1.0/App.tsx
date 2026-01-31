@@ -986,7 +986,7 @@ useEffect(() => {
 
   return (
     <ErrorBoundary>
-       <div className="app-shell h-screen bg-[#1C1B1F] text-white flex overflow-hidden font-['Roboto']" data-theme={theme}>
+       <div className="app-shell bg-[#1C1B1F] text-white overflow-hidden font-['Roboto']" data-theme={theme}>
         <nav className="w-16 bg-black/40 border-r border-white/5 flex flex-col items-center py-8 gap-10 shrink-0">
           <button onClick={() => setViewMode('PERFORM')} className={`flex flex-col items-center gap-1 transition-all ${viewMode === 'PERFORM' ? 'text-[#D0BCFF] scale-110' : 'text-gray-600 hover:text-gray-400'}`}>
             <span className="material-icons text-3xl">speed</span>
@@ -1013,10 +1013,20 @@ useEffect(() => {
           </div>
         </nav>
 
-        <div className="flex-1 flex overflow-hidden relative min-h-0">
+        <div
+          className="app-shell__main min-h-0"
+          style={{
+            '--left-w': libraryOpen ? 'clamp(280px,22vw,360px)' : '0px',
+            '--right-w': viewMode === 'LIBRARY' && queueOpen ? 'clamp(240px,18vw,300px)' : '0px'
+          } as React.CSSProperties}
+        >
              {viewMode === 'LIBRARY' ? (
-            <section className={`bg-black/20 border-r border-white/5 overflow-hidden flex flex-col transition-all duration-300 flex-none h-full ${libraryOpen ? 'w-[420px]' : 'w-0 border-none'}`}>
-              <div className={`p-4 flex flex-col gap-4 h-full min-w-[380px] min-h-0 ${!libraryOpen ? 'opacity-0' : 'opacity-100 transition-opacity'}`}>
+            <section
+              className={`app-shell__panel app-shell__panel--left bg-black/20 flex flex-col transition-all duration-300 flex-none h-full ${
+                libraryOpen ? 'app-shell__panel--open border-r border-white/5' : 'app-shell__panel--closed'
+              }`}
+            >
+              <div className={`flex flex-col gap-4 h-full min-h-0 ${libraryOpen ? 'p-4 opacity-100 transition-opacity' : 'p-0 opacity-0'}`}>
                 <SearchPanel 
                   onLoadToDeck={(vid, url, deck, title, author) => handleLoadVideo(vid, url, deck, 'youtube', title, author)} 
                   onAddToQueue={handleAddToQueue} 
@@ -1058,8 +1068,10 @@ useEffect(() => {
               </div>
             </section>
           ) : (
-           <section className="bg-black/20 border-r border-white/5 flex flex-col h-full w-[clamp(320px,25vw,420px)] shrink-0 overflow-hidden">
-              <div className="p-3 flex flex-col gap-3 h-full min-h-0 overflow-y-auto scrollbar-slim">
+           <section className={`app-shell__panel app-shell__panel--left bg-black/20 flex flex-col h-full shrink-0 ${
+            libraryOpen ? 'app-shell__panel--open border-r border-white/5' : 'app-shell__panel--closed'
+           }`}>
+              <div className={`flex flex-col gap-3 h-full min-h-0 overflow-y-auto scrollbar-slim ${libraryOpen ? 'p-3 opacity-100' : 'p-0 opacity-0'}`}>
                 <EffectsPanel
                    activeEffect={targetEffect}
                   effectAmount={targetWet}
@@ -1109,8 +1121,8 @@ useEffect(() => {
             </section>
           )}
 
-          <section className="flex-1 flex flex-col items-center justify-center overflow-x-hidden overflow-y-auto min-h-0 min-w-0 perform-stage">
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-start justify-center gap-6 w-full px-4 min-h-0 min-w-0 h-full max-h-full perform-stage__inner">
+          <section className="perform-stage min-h-0 min-w-0">
+            <div className="perform-stage__inner w-full min-h-0">
              <div className="perform-stage__deck">
                <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
              </div>
@@ -1151,8 +1163,12 @@ useEffect(() => {
 
              {viewMode === 'LIBRARY' && (
             <>
-              <aside className={`bg-black/10 flex-none border-l border-white/5 flex flex-col transition-all duration-300 overflow-x-hidden ${queueOpen ? 'w-80 p-4' : 'w-0 p-0 border-none'}`}>
-                <div className={`h-full min-w-[280px] ${!queueOpen ? 'opacity-0 invisible' : 'opacity-100 visible transition-opacity'}`}>
+          <aside
+            className={`app-shell__panel app-shell__panel--right bg-black/10 flex-none flex flex-col transition-all duration-300 overflow-x-hidden ${
+              queueOpen ? 'app-shell__panel--open border-l border-white/5' : 'app-shell__panel--closed'
+            }`}
+          >
+                <div className={`h-full ${queueOpen ? 'p-4 opacity-100 visible transition-opacity' : 'p-0 opacity-0 invisible'}`}>
                   <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-2 pr-1">
                     <span className="text-[10px] font-black uppercase text-gray-500 tracking-[0.2em]">Queue Console</span>
                     <button onClick={() => setQueueOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:text-white hover:bg-white/5">

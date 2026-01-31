@@ -62,7 +62,7 @@ const SearchPanel: React.FC<SearchPanelProps> = ({ onLoadToDeck, onAddToQueue, o
         )}
       </div>
 
-      <div className="flex flex-col gap-2 max-h-[240px] overflow-y-auto scrollbar-hide">
+      <div className="flex flex-col gap-2 max-h-[240px] overflow-y-auto scrollbar-slim">
         {results.length === 0 && !loading && query.length > 0 && (
           <div className="text-center py-6 text-gray-600 text-[9px] font-black uppercase tracking-widest">No matching tracks found</div>
         )}
