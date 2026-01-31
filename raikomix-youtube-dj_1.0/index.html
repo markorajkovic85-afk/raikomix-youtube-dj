@@ -324,18 +324,19 @@
       align-self: stretch;
       min-width: 0;
       display: grid;
-      grid-template-rows: auto auto 1fr;
+      grid-template-rows: auto 1fr auto;
     }
 
     .mixer-upper {
-      flex: 1 1 auto;
       min-height: 0;
-      overflow: hidden;
+      overflow: visible;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
 
     .mixer-lower {
-      flex: 0 0 auto;
-      margin-top: clamp(10px, 1.2vh, 14px);
+      margin-top: 0;
     }
 
     .mixer-main {

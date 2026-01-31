@@ -336,17 +336,17 @@ const Mixer: React.FC<MixerProps> = ({
           </div>
         </div>
 
-        <div className="mixer-faderbank">
-          <div className="mixer-fadercell mixer-fadercell--a">
-            <Fader label="A" value={deckAVolume} onChange={onDeckAVolumeChange} color="#D0BCFF" height="h-24" />
-          </div>
-          <div className="mixer-fadercell mixer-fadercell--m">
+          <div className="mixer-faderbank">
+            <div className="mixer-fadercell mixer-fadercell--a">
+            <Fader label="A" value={deckAVolume} onChange={onDeckAVolumeChange} color="#D0BCFF" height="h-28" />
+            </div>
+            <div className="mixer-fadercell mixer-fadercell--m">
             <Fader label="MST" value={masterVolume} onChange={onMasterVolumeChange} color="#FFFFFF" height="h-24" />
+            </div>
+            <div className="mixer-fadercell mixer-fadercell--b">
+            <Fader label="B" value={deckBVolume} onChange={onDeckBVolumeChange} color="#F2B8B5" height="h-28" />
+            </div>
           </div>
-          <div className="mixer-fadercell mixer-fadercell--b">
-            <Fader label="B" value={deckBVolume} onChange={onDeckBVolumeChange} color="#F2B8B5" height="h-24" />
-          </div>
-        </div>
       </div>
 
       <div className="mixer-lower">
