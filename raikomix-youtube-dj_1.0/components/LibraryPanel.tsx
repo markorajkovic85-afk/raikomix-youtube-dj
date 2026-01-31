@@ -445,7 +445,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-slim">
         <button 
           onClick={handleSelectAll} 
           className={`px-3 py-1.5 rounded-full text-[8px] font-black uppercase border transition-all shrink-0 ${selectedTracks.size === filtered.length && filtered.length > 0 ? 'bg-white text-black border-white' : 'bg-white/5 text-gray-500 border-white/5'}`}
@@ -459,7 +459,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         ))}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 scrollbar-hide">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 scrollbar-slim">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 opacity-20 text-center">
             <span className="material-symbols-outlined text-4xl mb-2">inventory_2</span>
