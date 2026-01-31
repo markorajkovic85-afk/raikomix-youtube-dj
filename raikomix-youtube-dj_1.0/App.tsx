@@ -1109,7 +1109,7 @@ useEffect(() => {
             </section>
           )}
 
-          <section className="flex-1 flex flex-col items-center justify-center overflow-hidden min-h-0 min-w-0 perform-stage">
+          <section className="flex-1 flex flex-col items-center justify-center overflow-x-hidden overflow-y-auto min-h-0 min-w-0 perform-stage">
             <div className="flex flex-col lg:flex-row items-stretch lg:items-start justify-center gap-6 w-full px-4 min-h-0 min-w-0 h-full max-h-full perform-stage__inner">
              <div className="perform-stage__deck">
                <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
