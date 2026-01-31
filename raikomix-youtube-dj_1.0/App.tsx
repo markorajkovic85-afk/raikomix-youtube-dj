@@ -194,6 +194,8 @@ const App: React.FC = () => {
   const [midiError, setMidiError] = useState<string | null>(null);
   const [lastMidiMessage, setLastMidiMessage] = useState<string | null>(null);
   const [midiLearnIndex, setMidiLearnIndex] = useState<number | null>(null);
+  const midiLearnIndexRef = useRef<number | null>(null);
+  const midiMappingsRef = useRef(defaultMidiMappings);
   const midiInputHandlersRef = useRef<Map<string, (event: MIDIMessageEvent) => void>>(new Map());
   const lastEffectRef = useRef<{ A: EffectType | null; B: EffectType | null; PADS: EffectType | null }>({
     A: null,
@@ -210,6 +212,12 @@ const App: React.FC = () => {
   };
 
   useEffect(() => { saveLibrary(library); }, [library]);
+  useEffect(() => {
+    midiLearnIndexRef.current = midiLearnIndex;
+  }, [midiLearnIndex]);
+  useEffect(() => {
+    midiMappingsRef.current = midiMappings;
+  }, [midiMappings]);
   useEffect(() => {
     if (deckAEffect) lastEffectRef.current.A = deckAEffect;
   }, [deckAEffect]);
@@ -598,11 +606,12 @@ const App: React.FC = () => {
     inputs.forEach((input) => {
       const handler = (event: MIDIMessageEvent) => {
         setLastMidiMessage(`${input.name ?? 'MIDI'}: ${formatMidiMessage(event)}`);
-        if (midiLearnIndex !== null) {
+        if (midiLearnIndexRef.current !== null) {
           const mapping = extractMappingFromMessage(event);
           if (mapping) {
+            const learnIndex = midiLearnIndexRef.current;
             setMidiMappings((prev) =>
-              prev.map((item, i) => (i === midiLearnIndex ? { ...item, ...mapping } : item))
+              prev.map((item, i) => (i === learnIndex ? { ...item, ...mapping } : item))
             );
             setMidiLearnIndex(null);
             showNotification(`Mapped ${mapping.control} on channel ${mapping.channel}`, 'success');
@@ -610,14 +619,14 @@ const App: React.FC = () => {
           return;
         }
         const [, data1, data2] = event.data;
-        const matches = midiMappings.filter((mapping) => matchMidiMapping(mapping, event));
+        const matches = midiMappingsRef.current.filter((mapping) => matchMidiMapping(mapping, event));
         if (!matches.length) return;
         matches.forEach((mapping) => handleMidiAction(mapping.action, data1, data2 ?? 0));
       };
       input.onmidimessage = handler;
       midiInputHandlersRef.current.set(input.id, handler);
     });
-  }, [extractMappingFromMessage, formatMidiMessage, handleMidiAction, matchMidiMapping, midiLearnIndex, midiMappings, showNotification]);
+  }, [extractMappingFromMessage, formatMidiMessage, handleMidiAction, matchMidiMapping, showNotification]);
 
   const syncMidiInputs = useCallback(
     (access: MIDIAccess) => {
