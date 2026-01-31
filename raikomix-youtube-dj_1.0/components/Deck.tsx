@@ -705,6 +705,19 @@ const effectNodesRef = useRef<{
             </button>
           </div>
 
+          <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-[0.2em] text-gray-500 px-1">
+            <span>Waveform</span>
+            <button
+              type="button"
+              onClick={() => setShowRemaining(prev => !prev)}
+              className="mono text-gray-400 hover:text-white transition-colors"
+              title="Toggle time display"
+            >
+              {showRemaining
+                ? `-${formatTime(state.duration - state.currentTime)}`
+                : formatTime(state.currentTime)}
+            </button>
+          </div>
           <Waveform 
             isPlaying={state.playing} 
             volume={state.volume * (0.5 + state.eqLow * 0.5)} 
