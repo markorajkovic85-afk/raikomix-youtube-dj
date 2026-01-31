@@ -110,6 +110,7 @@ const App: React.FC = () => {
   const preloadedTrackRef = useRef<{ deck: DeckId; itemId: string; videoId: string } | null>(null);
   const manualPauseRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const prevPlayingRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
+  const autoStopRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const { theme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const defaultKeyboardMappings = [
@@ -677,13 +678,18 @@ const App: React.FC = () => {
     }
     const prevPlaying = prevPlayingRef.current[id];
     if (prevPlaying && !state.playing) {
-      const nearEnd = state.duration > 0 && state.currentTime >= state.duration - 0.5;
-      if (!nearEnd) {
-        manualPauseRef.current[id] = true;
+      if (autoStopRef.current[id]) {
+        autoStopRef.current[id] = false;
+      } else {
+        const nearEnd = state.duration > 0 && state.currentTime >= state.duration - 0.5;
+        if (!nearEnd) {
+          manualPauseRef.current[id] = true;
+        }
       }
     }
     if (!prevPlaying && state.playing) {
       manualPauseRef.current[id] = false;
+      autoStopRef.current[id] = false;
     }
     prevPlayingRef.current[id] = state.playing;
     if (state.isReady && state.title && state.videoId && state.sourceType === 'youtube') {
@@ -745,6 +751,7 @@ const App: React.FC = () => {
     const state = deckId === 'A' ? deckAState : deckBState;
     const ref = deckId === 'A' ? deckARef : deckBRef;
     if (state?.playing) {
+      autoStopRef.current[deckId] = true;
       ref.current?.togglePlay();
     }
   }, [deckAState, deckBState]);
@@ -917,6 +924,7 @@ const App: React.FC = () => {
     preloadedTrackRef.current = null;
     manualPauseRef.current = { A: false, B: false };
     prevPlayingRef.current = { A: false, B: false };
+    autoStopRef.current = { A: false, B: false };
   }, [autoDjEnabled]);
 
   useEffect(() => {

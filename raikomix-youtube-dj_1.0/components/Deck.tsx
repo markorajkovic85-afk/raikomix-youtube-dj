@@ -633,6 +633,19 @@ const effectNodesRef = useRef<{
 
   useEffect(() => { onStateUpdate(state); }, [state, onStateUpdate]);
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden || !state.playing) return;
+      if (state.sourceType === 'youtube') {
+        playerRef.current?.playVideo?.();
+      } else {
+        localAudioRef.current?.play?.().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [state.playing, state.sourceType]);
+
   const playRingStyle = state.playing
     ? { borderColor: color, boxShadow: `0 0 24px ${color}55` }
     : undefined;
