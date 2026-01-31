@@ -108,6 +108,8 @@ const App: React.FC = () => {
   const autoLoadDeckRef = useRef<DeckId | null>(null);
   const lastMixVideoRef = useRef<{ A?: string | null; B?: string | null }>({});
   const preloadedTrackRef = useRef<{ deck: DeckId; itemId: string; videoId: string } | null>(null);
+  const manualPauseRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
+  const prevPlayingRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const { theme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const defaultKeyboardMappings = [
@@ -673,6 +675,17 @@ const App: React.FC = () => {
     if (state.playing && autoLoadDeckRef.current === id) {
       autoLoadDeckRef.current = null;
     }
+    const prevPlaying = prevPlayingRef.current[id];
+    if (prevPlaying && !state.playing) {
+      const nearEnd = state.duration > 0 && state.currentTime >= state.duration - 0.5;
+      if (!nearEnd) {
+        manualPauseRef.current[id] = true;
+      }
+    }
+    if (!prevPlaying && state.playing) {
+      manualPauseRef.current[id] = false;
+    }
+    prevPlayingRef.current[id] = state.playing;
     if (state.isReady && state.title && state.videoId && state.sourceType === 'youtube') {
       setLibrary(prev => updateTrackMetadata(state.videoId, { title: state.title, author: state.author }, prev));
     }
@@ -851,6 +864,7 @@ const App: React.FC = () => {
       const deckAPlaying = deckAState?.playing || false;
       const deckBPlaying = deckBState?.playing || false;
       if (!deckAPlaying && !deckBPlaying) {
+        if (manualPauseRef.current.A || manualPauseRef.current.B) return;
         if (autoLoadDeckRef.current) return;
         const nextDeck = lastAutoDeckRef.current === 'A' ? 'B' : 'A';
         const preloaded = preloadedTrackRef.current;
@@ -901,6 +915,8 @@ const App: React.FC = () => {
     setPendingMix(null);
     lastMixVideoRef.current = {};
     preloadedTrackRef.current = null;
+    manualPauseRef.current = { A: false, B: false };
+    prevPlayingRef.current = { A: false, B: false };
   }, [autoDjEnabled]);
 
   useEffect(() => {
