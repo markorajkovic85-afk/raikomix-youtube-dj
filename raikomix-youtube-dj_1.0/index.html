@@ -213,11 +213,13 @@
 
     .perform-stage {
       flex: 1 1 auto;
+      overflow-y: auto;
     }
 
     .perform-stage__inner {
-      height: 100%;
-      max-height: 100%;
+      height: auto;
+      min-height: 100%;
+      max-height: none;
       align-items: stretch;
       gap: clamp(12px, 2vw, 24px);
       margin-top: clamp(4px, 0.8vh, 10px);
@@ -246,7 +248,7 @@
     }
 
     .mixer-card {
-      max-height: min(82vh, 760px);
+      max-height: none;
       min-height: 0;
     }
 
