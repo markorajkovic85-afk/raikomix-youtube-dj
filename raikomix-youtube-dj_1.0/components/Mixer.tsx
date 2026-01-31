@@ -273,184 +273,194 @@ const Mixer: React.FC<MixerProps> = ({
         <h2 className="text-[8px] font-black uppercase tracking-[0.4em] text-[#D0BCFF]">Mixing Console</h2>
       </div>
 
-      <div className="mixer-main flex-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 min-h-0">
-        {/* Channel A Section */}
-        <div className="mixer-channel flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0">
-          <div className="flex flex-col items-center gap-1.5 w-full">
-           <Knob label="Trim" value={deckATrim} onChange={onDeckATrimChange} color="#D0BCFF" size="sm" defaultValue={1} />
-            <div className="w-full h-px bg-white/5" />
-            <div className="flex flex-col gap-1.5">
-              <Knob label="Hi" value={deckAEq.hi} onChange={(v) => onDeckAEqChange('hi', v)} color="#D0BCFF" />
-              <Knob label="Mid" value={deckAEq.mid} onChange={(v) => onDeckAEqChange('mid', v)} color="#D0BCFF" />
-              <Knob label="Low" value={deckAEq.low} onChange={(v) => onDeckAEqChange('low', v)} color="#D0BCFF" />
-              <Knob label="Color" value={deckAEq.filter} onChange={(v) => onDeckAEqChange('filter', v)} color="#D0BCFF" min={-1} max={1} defaultValue={0} />
+      <div className="mixer-upper">
+        <div className="mixer-main flex-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 min-h-0">
+          {/* Channel A Section */}
+          <div className="mixer-channel flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0">
+            <div className="flex flex-col items-center gap-1.5 w-full">
+             <Knob label="Trim" value={deckATrim} onChange={onDeckATrimChange} color="#D0BCFF" size="sm" defaultValue={1} />
+              <div className="w-full h-px bg-white/5" />
+              <div className="flex flex-col gap-1.5">
+                <Knob label="Hi" value={deckAEq.hi} onChange={(v) => onDeckAEqChange('hi', v)} color="#D0BCFF" />
+                <Knob label="Mid" value={deckAEq.mid} onChange={(v) => onDeckAEqChange('mid', v)} color="#D0BCFF" />
+                <Knob label="Low" value={deckAEq.low} onChange={(v) => onDeckAEqChange('low', v)} color="#D0BCFF" />
+                <Knob label="Color" value={deckAEq.filter} onChange={(v) => onDeckAEqChange('filter', v)} color="#D0BCFF" min={-1} max={1} defaultValue={0} />
+              </div>
             </div>
-          </div>
 
-          <button 
-            onClick={() => setCueA(!cueA)}
-            className={`w-10 h-5 rounded-md text-[7px] font-black uppercase tracking-tighter transition-all border ${cueA ? 'bg-orange-500 border-orange-400 text-white shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-black/40 border-white/5 text-gray-500'}`}
-          >
-            Cue
-          </button>
-          
-          <Fader label="A" value={deckAVolume} onChange={onDeckAVolumeChange} color="#D0BCFF" />
-        </div>
-
-        {/* Master Section */}
-        <div className="mixer-master flex flex-col items-center gap-2 py-2 px-0.5 w-10 bg-black/30 rounded-xl border border-white/5 mx-0.5 justify-self-center">
-           <div className="flex flex-col gap-0.5 items-center flex-1 py-1">
-             {[...Array(20)].reverse().map((_, i) => {
-               const isActive = (deckAPlaying || deckBPlaying) && (Math.random() > (i / 20));
-               let barColor = 'bg-green-900/10';
-               if (isActive) {
-                 if (i > 16) barColor = 'bg-red-500 shadow-[0_0_6px_red]';
-                 else if (i > 12) barColor = 'bg-orange-500 shadow-[0_0_4px_orange]';
-                 else barColor = 'bg-green-500 shadow-[0_0_3px_#22c55e]';
-               }
-               return <div key={i} className={`w-2 h-0.5 rounded-[0.5px] transition-all duration-75 ${barColor}`} />;
-             })}
-           </div>
-           
-           <Fader label="MST" value={masterVolume} onChange={onMasterVolumeChange} color="#FFFFFF" height="h-20" />
-        </div>
-
-        {/* Channel B Section */}
-        <div className="mixer-channel flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0">
-          <div className="flex flex-col items-center gap-1.5 w-full">
-            <Knob label="Trim" value={deckBTrim} onChange={onDeckBTrimChange} color="#F2B8B5" size="sm" defaultValue={1} />
-            <div className="w-full h-px bg-white/5" />
-            <div className="flex flex-col gap-1.5">
-              <Knob label="Hi" value={deckBEq.hi} onChange={(v) => onDeckBEqChange('hi', v)} color="#F2B8B5" />
-              <Knob label="Mid" value={deckBEq.mid} onChange={(v) => onDeckBEqChange('mid', v)} color="#F2B8B5" />
-              <Knob label="Low" value={deckBEq.low} onChange={(v) => onDeckBEqChange('low', v)} color="#F2B8B5" />
-              <Knob label="Color" value={deckBEq.filter} onChange={(v) => onDeckBEqChange('filter', v)} color="#F2B8B5" min={-1} max={1} defaultValue={0} />
-            </div>
-          </div>
-
-          <button 
-            onClick={() => setCueB(!cueB)}
-            className={`w-10 h-5 rounded-md text-[7px] font-black uppercase tracking-tighter transition-all border ${cueB ? 'bg-orange-500 border-orange-400 text-white shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-black/40 border-white/5 text-gray-500'}`}
-          >
-            Cue
-          </button>
-
-          <Fader label="B" value={deckBVolume} onChange={onDeckBVolumeChange} color="#F2B8B5" />
-        </div>
-      </div>
-
-      {/* Crossfader Section - Enhanced visual design */}
-      <div className="mt-4 space-y-2 pt-2 border-t border-white/5 relative">
-        <div className="flex justify-between gap-1 p-0.5 bg-black/30 rounded-lg mb-1">
-          {['SMOOTH', 'CUT', 'DIP'].map(curve => (
             <button 
-              key={curve} 
-              onClick={() => onCurveChange(curve as CrossfaderCurve)} 
-              className={`flex-1 py-1 text-[6px] font-black rounded-md transition-all ${crossfaderCurve === curve ? 'bg-[#D0BCFF] text-black shadow-lg' : 'text-gray-600 hover:text-gray-300'}`}
+              onClick={() => setCueA(!cueA)}
+              className={`w-10 h-5 rounded-md text-[7px] font-black uppercase tracking-tighter transition-all border ${cueA ? 'bg-orange-500 border-orange-400 text-white shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-black/40 border-white/5 text-gray-500'}`}
             >
-              {curve}
+              Cue
             </button>
-          ))}
-        </div>
-        
-        {/* Redesigned Professional Crossfader with tactile feel */}
-        <div 
-          ref={crossfaderRef}
-              className="bg-black/80 h-14 rounded-xl relative group flex items-center px-4 border border-white/10 shadow-[inset_0_4px_12px_rgba(0,0,0,0.8)] cursor-pointer overflow-hidden transition-all hover:border-white/20 touch-none"
-          onDoubleClick={() => onCrossfaderChange(0)}
-          title="Scroll to Mix • Double-click to Center (50/0)"
-        >
-           {/* Precision Center indicator marker */}
-           <div className="absolute left-1/2 -translate-x-1/2 w-[2px] h-6 bg-white/10 z-0 rounded-full" />
-           
-           {/* Visual track guides */}
-           <div className="absolute inset-x-8 h-[1px] bg-white/5 top-1/2 -translate-y-1/2 pointer-events-none" />
-           <div className="absolute left-10 w-[1px] h-3 bg-white/5 pointer-events-none" />
-           <div className="absolute right-10 w-[1px] h-3 bg-white/5 pointer-events-none" />
+            
+            <div className="mixer-fader-slot">
+              <Fader label="A" value={deckAVolume} onChange={onDeckAVolumeChange} color="#D0BCFF" />
+            </div>
+          </div>
 
-           {/* Professional Aluminum-style Crossfader Handle */}
-           <div 
-             className="absolute top-1/2 -translate-y-1/2 w-20 h-11 bg-[#323038] rounded-md border border-white/20 shadow-[0_12px_24px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.1)] flex items-center justify-center transition-all duration-150 z-10 group-hover:border-[#D0BCFF]/40 active:scale-95 active:shadow-inner"
-             style={{ 
-               left: `calc(1rem + ${(crossfader + 1) / 2} * (100% - 2rem - 5rem))`,
-             }}
-           >
-             {/* Tactile Handle Ridges */}
-             <div className="flex gap-[3px]">
-               <div className="w-[1.5px] h-6 bg-black/60 rounded-full" />
-               <div className="w-[1.5px] h-6 bg-white/20 rounded-full" />
-               <div className="w-[1.5px] h-6 bg-black/60 rounded-full" />
+          {/* Master Section */}
+          <div className="mixer-master flex flex-col items-center gap-2 py-2 px-0.5 w-10 bg-black/30 rounded-xl border border-white/5 mx-0.5 justify-self-center">
+             <div className="flex flex-col gap-0.5 items-center flex-1 py-1">
+               {[...Array(20)].reverse().map((_, i) => {
+                 const isActive = (deckAPlaying || deckBPlaying) && (Math.random() > (i / 20));
+                 let barColor = 'bg-green-900/10';
+                 if (isActive) {
+                   if (i > 16) barColor = 'bg-red-500 shadow-[0_0_6px_red]';
+                   else if (i > 12) barColor = 'bg-orange-500 shadow-[0_0_4px_orange]';
+                   else barColor = 'bg-green-500 shadow-[0_0_3px_#22c55e]';
+                 }
+                 return <div key={i} className={`w-2 h-0.5 rounded-[0.5px] transition-all duration-75 ${barColor}`} />;
+               })}
              </div>
              
-             {/* Visual percentage badge (appears on hover) */}
-             <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-[#D0BCFF] text-black text-[9px] font-black px-2.5 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-all transform group-hover:-translate-y-1 pointer-events-none shadow-2xl border border-white/20 uppercase tracking-tighter whitespace-nowrap">
-               {Math.abs(crossfader) < 0.01 ? '50% Center' : `${Math.round(((crossfader + 1) / 2) * 100)}%`}
+             <div className="mixer-fader-slot">
+               <Fader label="MST" value={masterVolume} onChange={onMasterVolumeChange} color="#FFFFFF" height="h-20" />
              </div>
-           </div>
+          </div>
 
-           {/* Hidden range input for standard touch/click interactions */}
-           <input 
-             type="range" min="-1" max="1" step="0.001" value={crossfader} 
-             onChange={(e) => onCrossfaderChange(parseFloat(e.target.value))} 
-             className="absolute inset-0 opacity-0 cursor-pointer z-20"
-              onPointerDown={handleCrossfaderPointerDown}
-             onPointerMove={handleCrossfaderPointerMove}
-             onPointerUp={handleCrossfaderPointerUp}
-             onPointerCancel={handleCrossfaderPointerUp}
-           />
-        </div>
+          {/* Channel B Section */}
+          <div className="mixer-channel flex flex-col items-center gap-2 bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0">
+            <div className="flex flex-col items-center gap-1.5 w-full">
+              <Knob label="Trim" value={deckBTrim} onChange={onDeckBTrimChange} color="#F2B8B5" size="sm" defaultValue={1} />
+              <div className="w-full h-px bg-white/5" />
+              <div className="flex flex-col gap-1.5">
+                <Knob label="Hi" value={deckBEq.hi} onChange={(v) => onDeckBEqChange('hi', v)} color="#F2B8B5" />
+                <Knob label="Mid" value={deckBEq.mid} onChange={(v) => onDeckBEqChange('mid', v)} color="#F2B8B5" />
+                <Knob label="Low" value={deckBEq.low} onChange={(v) => onDeckBEqChange('low', v)} color="#F2B8B5" />
+                <Knob label="Color" value={deckBEq.filter} onChange={(v) => onDeckBEqChange('filter', v)} color="#F2B8B5" min={-1} max={1} defaultValue={0} />
+              </div>
+            </div>
 
-        {/* Labels below the fader as seen in screenshots */}
-        <div className="flex justify-between items-center px-1 mt-1 font-black uppercase tracking-[0.25em]">
-           <span className={`text-[7px] transition-colors ${crossfader < -0.8 ? 'text-[#D0BCFF]' : 'text-gray-600'}`}>Deck A</span>
-           <div className="flex flex-col items-center">
-             <span className={`text-[9px] font-mono transition-all duration-200 ${Math.abs(crossfader) < 0.05 ? 'text-white scale-125 glow-white' : 'text-gray-700'}`}>0</span>
-             <div className={`w-1 h-1 rounded-full transition-colors ${Math.abs(crossfader) < 0.05 ? 'bg-white shadow-[0_0_5px_white]' : 'bg-transparent'}`} />
-           </div>
-           <span className={`text-[7px] transition-colors ${crossfader > 0.8 ? 'text-[#F2B8B5]' : 'text-gray-600'}`}>Deck B</span>
+            <button 
+              onClick={() => setCueB(!cueB)}
+              className={`w-10 h-5 rounded-md text-[7px] font-black uppercase tracking-tighter transition-all border ${cueB ? 'bg-orange-500 border-orange-400 text-white shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-black/40 border-white/5 text-gray-500'}`}
+            >
+              Cue
+            </button>
+
+            <div className="mixer-fader-slot">
+              <Fader label="B" value={deckBVolume} onChange={onDeckBVolumeChange} color="#F2B8B5" />
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-3 rounded-lg border border-white/5 bg-black/30 p-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex flex-col">
-            <span className="text-[8px] font-black uppercase tracking-widest text-gray-400">Auto DJ</span>
-            <span className="text-[7px] text-gray-500">Queue: {queueLength}</span>
+      <div className="mixer-lower">
+        {/* Crossfader Section - Enhanced visual design */}
+        <div className="mt-4 space-y-2 pt-2 border-t border-white/5 relative">
+          <div className="flex justify-between gap-1 p-0.5 bg-black/30 rounded-lg mb-1">
+            {['SMOOTH', 'CUT', 'DIP'].map(curve => (
+              <button 
+                key={curve} 
+                onClick={() => onCurveChange(curve as CrossfaderCurve)} 
+                className={`flex-1 py-1 text-[6px] font-black rounded-md transition-all ${crossfaderCurve === curve ? 'bg-[#D0BCFF] text-black shadow-lg' : 'text-gray-600 hover:text-gray-300'}`}
+              >
+                {curve}
+              </button>
+            ))}
           </div>
-          <button
-            onClick={onToggleAutoDj}
-            className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${
-              autoDjEnabled
-                ? 'bg-[#D0BCFF]/20 text-[#D0BCFF] border-[#D0BCFF]/40'
-                : 'bg-black/40 text-gray-500 border-white/10'
-            }`}
+          
+          {/* Redesigned Professional Crossfader with tactile feel */}
+          <div 
+            ref={crossfaderRef}
+                className="bg-black/80 h-14 rounded-xl relative group flex items-center px-4 border border-white/10 shadow-[inset_0_4px_12px_rgba(0,0,0,0.8)] cursor-pointer overflow-hidden transition-all hover:border-white/20 touch-none"
+            onDoubleClick={() => onCrossfaderChange(0)}
+            title="Scroll to Mix • Double-click to Center (50/0)"
           >
-            {autoDjEnabled ? 'On' : 'Off'}
-          </button>
+             {/* Precision Center indicator marker */}
+             <div className="absolute left-1/2 -translate-x-1/2 w-[2px] h-6 bg-white/10 z-0 rounded-full" />
+             
+             {/* Visual track guides */}
+             <div className="absolute inset-x-8 h-[1px] bg-white/5 top-1/2 -translate-y-1/2 pointer-events-none" />
+             <div className="absolute left-10 w-[1px] h-3 bg-white/5 pointer-events-none" />
+             <div className="absolute right-10 w-[1px] h-3 bg-white/5 pointer-events-none" />
+
+             {/* Professional Aluminum-style Crossfader Handle */}
+             <div 
+               className="absolute top-1/2 -translate-y-1/2 w-20 h-11 bg-[#323038] rounded-md border border-white/20 shadow-[0_12px_24px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.1)] flex items-center justify-center transition-all duration-150 z-10 group-hover:border-[#D0BCFF]/40 active:scale-95 active:shadow-inner"
+               style={{ 
+                 left: `calc(1rem + ${(crossfader + 1) / 2} * (100% - 2rem - 5rem))`,
+               }}
+             >
+               {/* Tactile Handle Ridges */}
+               <div className="flex gap-[3px]">
+                 <div className="w-[1.5px] h-6 bg-black/60 rounded-full" />
+                 <div className="w-[1.5px] h-6 bg-white/20 rounded-full" />
+                 <div className="w-[1.5px] h-6 bg-black/60 rounded-full" />
+               </div>
+               
+               {/* Visual percentage badge (appears on hover) */}
+               <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-[#D0BCFF] text-black text-[9px] font-black px-2.5 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-all transform group-hover:-translate-y-1 pointer-events-none shadow-2xl border border-white/20 uppercase tracking-tighter whitespace-nowrap">
+                 {Math.abs(crossfader) < 0.01 ? '50% Center' : `${Math.round(((crossfader + 1) / 2) * 100)}%`}
+               </div>
+             </div>
+
+             {/* Hidden range input for standard touch/click interactions */}
+             <input 
+               type="range" min="-1" max="1" step="0.001" value={crossfader} 
+               onChange={(e) => onCrossfaderChange(parseFloat(e.target.value))} 
+               className="absolute inset-0 opacity-0 cursor-pointer z-20"
+                onPointerDown={handleCrossfaderPointerDown}
+               onPointerMove={handleCrossfaderPointerMove}
+               onPointerUp={handleCrossfaderPointerUp}
+               onPointerCancel={handleCrossfaderPointerUp}
+             />
+          </div>
+
+          {/* Labels below the fader as seen in screenshots */}
+          <div className="flex justify-between items-center px-1 mt-1 font-black uppercase tracking-[0.25em]">
+             <span className={`text-[7px] transition-colors ${crossfader < -0.8 ? 'text-[#D0BCFF]' : 'text-gray-600'}`}>Deck A</span>
+             <div className="flex flex-col items-center">
+               <span className={`text-[9px] font-mono transition-all duration-200 ${Math.abs(crossfader) < 0.05 ? 'text-white scale-125 glow-white' : 'text-gray-700'}`}>0</span>
+               <div className={`w-1 h-1 rounded-full transition-colors ${Math.abs(crossfader) < 0.05 ? 'bg-white shadow-[0_0_5px_white]' : 'bg-transparent'}`} />
+             </div>
+             <span className={`text-[7px] transition-colors ${crossfader > 0.8 ? 'text-[#F2B8B5]' : 'text-gray-600'}`}>Deck B</span>
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-[7px] uppercase tracking-widest text-gray-500 mt-2">
-          <label className="flex flex-col gap-1">
-            Mix Lead
-            <input
-              type="number"
-              min={4}
-              max={30}
-              value={mixLeadSeconds}
-              onChange={(e) => onMixLeadChange(Number(e.target.value))}
-              className="mix-number-input w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[9px] text-white"
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            Duration
-            <input
-              type="number"
-              min={2}
-              max={20}
-              value={mixDurationSeconds}
-              onChange={(e) => onMixDurationChange(Number(e.target.value))}
-              className="mix-number-input w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[9px] text-white"
-            />
-          </label>
+
+        <div className="mt-3 rounded-lg border border-white/5 bg-black/30 p-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col">
+              <span className="text-[8px] font-black uppercase tracking-widest text-gray-400">Auto DJ</span>
+              <span className="text-[7px] text-gray-500">Queue: {queueLength}</span>
+            </div>
+            <button
+              onClick={onToggleAutoDj}
+              className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${
+                autoDjEnabled
+                  ? 'bg-[#D0BCFF]/20 text-[#D0BCFF] border-[#D0BCFF]/40'
+                  : 'bg-black/40 text-gray-500 border-white/10'
+              }`}
+            >
+              {autoDjEnabled ? 'On' : 'Off'}
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[7px] uppercase tracking-widest text-gray-500 mt-2">
+            <label className="flex flex-col gap-1">
+              Mix Lead
+              <input
+                type="number"
+                min={4}
+                max={30}
+                value={mixLeadSeconds}
+                onChange={(e) => onMixLeadChange(Number(e.target.value))}
+                className="mix-number-input w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[9px] text-white"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              Duration
+              <input
+                type="number"
+                min={2}
+                max={20}
+                value={mixDurationSeconds}
+                onChange={(e) => onMixDurationChange(Number(e.target.value))}
+                className="mix-number-input w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[9px] text-white"
+              />
+            </label>
+          </div>
         </div>
       </div>
     </div>
