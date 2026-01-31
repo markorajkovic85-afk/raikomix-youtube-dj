@@ -316,7 +316,6 @@
       min-height: 0;
       display: flex;
       flex-direction: column;
-      --fader-row-h: clamp(200px, 28vh, 260px);
     }
 
     .mixer-shell {
@@ -324,6 +323,8 @@
       height: 100%;
       align-self: stretch;
       min-width: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
     }
 
     .mixer-upper {
@@ -349,23 +350,53 @@
     .mixer-channel {
       min-width: 0;
       min-height: 0;
-      display: grid;
-      grid-template-rows: 1fr var(--fader-row-h);
     }
 
     .mixer-master {
       min-width: 48px;
       max-width: 60px;
       min-height: 0;
-      display: grid;
-      grid-template-rows: 1fr var(--fader-row-h);
     }
 
-    .mixer-fader-slot {
-      grid-row: 2;
-      height: var(--fader-row-h);
-      align-self: end;
+    .mixer-top {
       min-height: 0;
+    }
+
+    .mixer-meter {
+      height: clamp(92px, 14vh, 120px);
+      overflow: hidden;
+    }
+
+    .mixer-faderbank {
+      margin-top: 10px;
+      padding: 0 2px;
+      height: clamp(170px, 24vh, 220px);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: end;
+      justify-items: center;
+      gap: 12px;
+    }
+
+    .mixer-fadercell {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+
+    .mixer-fadercell--a,
+    .mixer-fadercell--b {
+      background: rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 8px 6px;
+    }
+
+    .mixer-fadercell--m {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 8px 6px;
     }
 
     .deck-card {
