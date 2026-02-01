@@ -1016,7 +1016,7 @@ useEffect(() => {
         <div
           className="app-shell__main min-h-0"
           style={{
-            '--left-w': libraryOpen ? 'clamp(280px,22vw,360px)' : '0px',
+            '--left-w': libraryOpen ? 'clamp(320px,26vw,420px)' : '0px',
             '--right-w': viewMode === 'LIBRARY' && queueOpen ? 'clamp(240px,18vw,300px)' : '0px'
           } as React.CSSProperties}
         >
