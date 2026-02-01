@@ -499,9 +499,14 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 <div className="absolute -top-1 -right-1 bg-blue-500 border border-black w-2.5 h-2.5 rounded-full" title="Local File" />
               )}
             </div>
-            <div className="flex-1 min-w-0" onDoubleClick={() => setEditingTrack(t)}>
+            <div className="flex-1 min-w-0 pr-24 relative" onDoubleClick={() => setEditingTrack(t)}>
               <div className="text-[11px] font-bold text-white truncate leading-tight group-hover:text-[#D0BCFF] transition-colors">{t.title}</div>
               <div className="text-[9px] text-gray-500 truncate uppercase font-bold tracking-tighter">{t.author}</div>
+              {hasBeenPlayed && (
+                <span className="absolute top-0 right-0 text-[8px] font-black uppercase tracking-widest text-gray-500 border border-white/10 rounded-full px-2 py-1">
+                  Played
+                </span>
+              )}
             </div>
             <div className="flex items-center justify-end gap-2 min-w-[136px] shrink-0">
               {hasBeenPlayed && (

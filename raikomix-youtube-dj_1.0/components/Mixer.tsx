@@ -180,7 +180,7 @@ const Fader: React.FC<{
     <div className="flex flex-col items-center gap-1.5 w-full group relative">
        <div 
          ref={faderRef}
-            className={`${height} w-6 bg-black/40 rounded-lg relative flex items-end p-0.5 border border-white/5 overflow-hidden cursor-ns-resize shadow-inner touch-none`}
+         className={`${height} w-6 bg-black/40 rounded-lg relative flex items-end p-0.5 border border-white/5 overflow-hidden cursor-ns-resize shadow-inner touch-none`}
        >
           <div 
             className="w-full rounded transition-all duration-75" 
@@ -333,10 +333,11 @@ const Mixer: React.FC<MixerProps> = ({
                 Cue
               </button>
             </div>
+            </div>
           </div>
         </div>
 
-          <div className="mixer-faderbank">
+        <div className="mixer-faderbank">
             <div className="mixer-fadercell mixer-fadercell--a">
             <Fader label="A" value={deckAVolume} onChange={onDeckAVolumeChange} color="#D0BCFF" height="h-28" />
             </div>
@@ -346,7 +347,7 @@ const Mixer: React.FC<MixerProps> = ({
             <div className="mixer-fadercell mixer-fadercell--b">
             <Fader label="B" value={deckBVolume} onChange={onDeckBVolumeChange} color="#F2B8B5" height="h-28" />
             </div>
-          </div>
+        </div>
       </div>
 
       <div className="mixer-footer">
