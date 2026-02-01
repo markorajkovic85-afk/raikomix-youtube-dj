@@ -261,34 +261,58 @@
       height: 100%;
       display: flex;
       justify-content: center;
+      align-items: center;
       min-height: 0;
       overflow: hidden;
+      container-type: size;
+      container-name: central-stage;
     }
 
-    .perform-stage__inner {
-      --mixer-width: 220px;
+    .central-stage {
+      --mixer-width: 224px;
       --deck-min: 360px;
+      --central-gap: 20px;
+      --central-padding-block: 16px;
+      --central-padding-inline: 18px;
+      --mixer-gap: 10px;
+      --mixer-fader-height: 190px;
+      --mixer-meter-height: 110px;
+      --central-stage-scale: 1;
       display: grid;
       grid-template-columns: minmax(var(--deck-min), 1fr) var(--mixer-width) minmax(var(--deck-min), 1fr);
       align-items: stretch;
-      gap: clamp(12px, 2vw, 24px);
+      gap: var(--central-gap);
       height: 100%;
       min-height: 0;
-      padding: clamp(12px, 2vh, 18px) clamp(12px, 1.6vw, 20px);
+      padding: var(--central-padding-block) var(--central-padding-inline);
+      transform: scale(var(--central-stage-scale));
+      transform-origin: center;
     }
 
-    .perform-stage__inner > * {
+    .perform-stage__inner > *,
+    .central-stage > * {
       min-width: 0;
       min-height: 0;
     }
 
     .perform-stage__deck {
       display: flex;
-      align-items: flex-start;
+      align-items: stretch;
       min-width: 0;
       width: 100%;
       max-width: none;
       flex: 1 1 auto;
+    }
+
+    .central-stage__deck > * {
+      height: 100%;
+      min-height: 0;
+      width: 100%;
+    }
+
+    .central-stage__mixer {
+      height: 100%;
+      min-height: 0;
     }
 
     .deck-title-stack {
@@ -303,7 +327,7 @@
     .deck-card,
     .mixer-card {
       max-height: 100%;
-      padding: clamp(12px, 1.6vh, 20px);
+      padding: 14px;
     }
 
     .deck-card {
@@ -324,7 +348,9 @@
       align-self: stretch;
       min-width: 0;
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
+      grid-template-rows: auto auto auto;
+      align-content: center;
+      row-gap: var(--mixer-gap);
       min-height: 0;
     }
 
@@ -335,10 +361,10 @@
     .mixer-content {
       min-height: 0;
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
-      align-content: start;
+      grid-template-rows: auto var(--mixer-fader-height);
+      align-content: center;
       justify-items: stretch;
-      gap: clamp(6px, 0.9vh, 10px);
+      gap: var(--mixer-gap);
     }
 
     .mixer-footer {
@@ -380,15 +406,14 @@
     }
 
     .mixer-meter {
-      height: clamp(92px, 14vh, 120px);
+      height: var(--mixer-meter-height);
       overflow: hidden;
     }
 
     .mixer-faderbank {
       margin-top: 0;
       padding: 0 2px;
-      height: min(100%, clamp(140px, 22vh, 210px));
-      max-height: clamp(140px, 22vh, 210px);
+      height: var(--mixer-fader-height);
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: end;
@@ -419,11 +444,55 @@
     }
 
     .deck-card {
-      gap: clamp(10px, 1.4vh, 16px);
+      gap: 12px;
     }
 
     .waveform-display {
-      height: clamp(4.5rem, 10vh, 6rem);
+      height: 5rem;
+    }
+
+    /* Central Stage density modes:
+       - Comfort (default): generous gaps/padding.
+       - Compact: triggered by height thresholds to tighten spacing.
+       Safe scale: if height is still tight, scale down the central stage wrapper only. */
+    @container central-stage (max-height: 820px) {
+      .central-stage {
+        --central-gap: 14px;
+        --central-padding-block: 12px;
+        --central-padding-inline: 12px;
+        --mixer-gap: 8px;
+        --mixer-fader-height: 170px;
+        --mixer-meter-height: 96px;
+      }
+
+      .central-stage .mixer-card,
+      .central-stage .deck-card {
+        padding: 12px;
+      }
+
+      .central-stage .mixer-topgrid {
+        gap: 4px;
+      }
+
+      .central-stage .mixer-channel {
+        padding: 6px;
+        gap: 6px;
+      }
+
+      .central-stage .mixer-footer .mt-4 {
+        margin-top: 10px;
+        padding-top: 6px;
+      }
+
+      .central-stage .mixer-footer .mt-3 {
+        margin-top: 8px;
+      }
+    }
+
+    @container central-stage (max-height: 720px) {
+      .central-stage {
+        --central-stage-scale: 0.94;
+      }
     }
 
     /* Vertical Text Utility */
@@ -458,7 +527,7 @@
     }
 
     @media (max-width: 1280px) {
-      .perform-stage__inner {
+      .central-stage {
         --mixer-width: 210px;
         --deck-min: 320px;
       }
@@ -469,7 +538,7 @@
         overflow-y: auto;
       }
 
-      .perform-stage__inner {
+      .central-stage {
         grid-template-columns: minmax(0, 1fr);
         grid-auto-rows: auto;
       }
@@ -485,8 +554,50 @@
     }
 
     @media (max-width: 768px) {
-      .perform-stage__inner {
-        padding: clamp(8px, 1.4vh, 14px);
+      .central-stage {
+        --central-padding-block: 10px;
+        --central-padding-inline: 10px;
+        --central-gap: 12px;
+      }
+    }
+
+    @media (max-height: 820px) {
+      .central-stage {
+        --central-gap: 14px;
+        --central-padding-block: 12px;
+        --central-padding-inline: 12px;
+        --mixer-gap: 8px;
+        --mixer-fader-height: 170px;
+        --mixer-meter-height: 96px;
+      }
+
+      .central-stage .mixer-card,
+      .central-stage .deck-card {
+        padding: 12px;
+      }
+
+      .central-stage .mixer-topgrid {
+        gap: 4px;
+      }
+
+      .central-stage .mixer-channel {
+        padding: 6px;
+        gap: 6px;
+      }
+
+      .central-stage .mixer-footer .mt-4 {
+        margin-top: 10px;
+        padding-top: 6px;
+      }
+
+      .central-stage .mixer-footer .mt-3 {
+        margin-top: 8px;
+      }
+    }
+
+    @media (max-height: 720px) {
+      .central-stage {
+        --central-stage-scale: 0.94;
       }
     }
   </style>
