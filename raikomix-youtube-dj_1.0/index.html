@@ -303,7 +303,7 @@
     .deck-card,
     .mixer-card {
       max-height: 100%;
-      padding: clamp(12px, 1.6vh, 20px);
+      padding: clamp(10px, 1.2vh, 16px);
     }
 
     .deck-card {
@@ -323,9 +323,10 @@
       height: 100%;
       align-self: stretch;
       min-width: 0;
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
+      display: flex;
+      flex-direction: column;
       min-height: 0;
+      overflow: hidden;
     }
 
     .mixer-header {
@@ -333,19 +334,22 @@
     }
 
     .mixer-content {
+      position: relative;
+      flex: 1 1 auto;
       min-height: 0;
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
-      align-content: start;
-      justify-items: stretch;
-      gap: clamp(6px, 0.9vh, 10px);
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     .mixer-footer {
+      flex: 0 0 auto;
       min-height: 0;
     }
 
     .mixer-upper {
+      flex: 0 0 auto;
       min-height: 0;
       overflow: visible;
       display: block;
@@ -380,27 +384,35 @@
     }
 
     .mixer-meter {
-      height: clamp(92px, 14vh, 120px);
+      height: 92px;
       overflow: hidden;
     }
 
     .mixer-faderbank {
+      flex: 0 0 auto;
       margin-top: 0;
       padding: 0 2px;
-      height: min(100%, clamp(140px, 22vh, 210px));
-      max-height: clamp(140px, 22vh, 210px);
+      height: auto;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: end;
       justify-items: center;
       gap: 12px;
-      min-height: 0;
     }
 
     .mixer-fadercell {
       width: 100%;
       display: flex;
       justify-content: center;
+    }
+
+    .mixer-scale {
+      transform-origin: top center;
+      width: 100%;
+      max-width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: clamp(4px, 0.6vh, 8px);
     }
 
     .mixer-fadercell--a,
@@ -489,6 +501,25 @@
         padding: clamp(8px, 1.4vh, 14px);
       }
     }
+
+    @media (max-height: 820px) {
+      .mixer-scale {
+        gap: clamp(3px, 0.5vh, 6px);
+      }
+    }
+
+    @media (max-height: 700px) {
+      .mixer-scale {
+        transform: scale(0.96);
+      }
+    }
+
+    @media (max-height: 620px) {
+      .mixer-scale {
+        transform: scale(0.92);
+      }
+    }
+
   </style>
   <script>
     var tag = document.createElement('script');

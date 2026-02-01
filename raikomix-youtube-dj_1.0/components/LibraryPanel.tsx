@@ -499,7 +499,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 <div className="absolute -top-1 -right-1 bg-blue-500 border border-black w-2.5 h-2.5 rounded-full" title="Local File" />
               )}
             </div>
-            <div className="flex-1 min-w-0 pr-24 relative" onDoubleClick={() => setEditingTrack(t)}>
+            <div className="flex-1 min-w-0 relative" onDoubleClick={() => setEditingTrack(t)}>
               <div className="text-[11px] font-bold text-white truncate leading-tight group-hover:text-[#D0BCFF] transition-colors">{t.title}</div>
               <div className="text-[9px] text-gray-500 truncate uppercase font-bold tracking-tighter">{t.author}</div>
               {hasBeenPlayed && (
@@ -508,7 +508,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 </span>
               )}
             </div>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 pointer-events-none transition group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
+            <div className="flex items-center gap-1 shrink-0 opacity-0 pointer-events-none transition group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
               <button 
                 onClick={() => onAddToQueue(t)} 
                 className="w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
