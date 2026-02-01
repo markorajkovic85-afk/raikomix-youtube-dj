@@ -269,91 +269,87 @@ const Mixer: React.FC<MixerProps> = ({
 
   return (
     <div className="m3-card mixer-card mixer-shell central-stage__mixer bg-[#1D1B20] shadow-2xl border-white/5 shrink-0 p-2 select-none" role="region" aria-label="Mixer Controls">
-      <div className="mixer-header flex flex-col items-center gap-0 border-b border-white/5 pb-1 mb-2">
+      <div className="mixer-header flex flex-col items-center gap-0 border-b border-white/5 pb-1">
         <h2 className="text-[8px] font-black uppercase tracking-[0.4em] text-[#D0BCFF]">Mixing Console</h2>
       </div>
 
-      <div className="mixer-content">
-        <div className="mixer-upper">
-          <div className="mixer-top">
-            <div className="mixer-topgrid grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 min-h-0">
-              {/* Channel A Section */}
-              <div className="mixer-channel bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0 flex flex-col items-center gap-2">
-                <div className="flex flex-col items-center gap-1.5 w-full">
-                  <Knob label="Trim" value={deckATrim} onChange={onDeckATrimChange} color="#D0BCFF" size="sm" defaultValue={1} />
-                  <div className="w-full h-px bg-white/5" />
-                  <div className="flex flex-col gap-1.5">
-                    <Knob label="Hi" value={deckAEq.hi} onChange={(v) => onDeckAEqChange('hi', v)} color="#D0BCFF" />
-                    <Knob label="Mid" value={deckAEq.mid} onChange={(v) => onDeckAEqChange('mid', v)} color="#D0BCFF" />
-                    <Knob label="Low" value={deckAEq.low} onChange={(v) => onDeckAEqChange('low', v)} color="#D0BCFF" />
-                    <Knob label="Color" value={deckAEq.filter} onChange={(v) => onDeckAEqChange('filter', v)} color="#D0BCFF" min={-1} max={1} defaultValue={0} />
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => setCueA(!cueA)}
-                  className={`w-10 h-5 rounded-md text-[7px] font-black uppercase tracking-tighter transition-all border ${cueA ? 'bg-orange-500 border-orange-400 text-white shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-black/40 border-white/5 text-gray-500'}`}
-                >
-                  Cue
-                </button>
-              </div>
-
-              {/* Master Section */}
-              <div className="mixer-master-top w-10 bg-black/30 rounded-xl border border-white/5 mx-0.5 justify-self-center p-2">
-                <div className="mixer-meter flex flex-col gap-0.5 items-center py-1">
-                  {[...Array(20)].reverse().map((_, i) => {
-                    const isActive = (deckAPlaying || deckBPlaying) && (Math.random() > (i / 20));
-                    let barColor = 'bg-green-900/10';
-                    if (isActive) {
-                      if (i > 16) barColor = 'bg-red-500 shadow-[0_0_6px_red]';
-                      else if (i > 12) barColor = 'bg-orange-500 shadow-[0_0_4px_orange]';
-                      else barColor = 'bg-green-500 shadow-[0_0_3px_#22c55e]';
-                    }
-                    return <div key={i} className={`w-2 h-0.5 rounded-[0.5px] transition-all duration-75 ${barColor}`} />;
-                  })}
-                </div>
-              </div>
-
-              {/* Channel B Section */}
-              <div className="mixer-channel bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0 flex flex-col items-center gap-2">
-                <div className="flex flex-col items-center gap-1.5 w-full">
-                  <Knob label="Trim" value={deckBTrim} onChange={onDeckBTrimChange} color="#F2B8B5" size="sm" defaultValue={1} />
-                  <div className="w-full h-px bg-white/5" />
-                  <div className="flex flex-col gap-1.5">
-                    <Knob label="Hi" value={deckBEq.hi} onChange={(v) => onDeckBEqChange('hi', v)} color="#F2B8B5" />
-                    <Knob label="Mid" value={deckBEq.mid} onChange={(v) => onDeckBEqChange('mid', v)} color="#F2B8B5" />
-                    <Knob label="Low" value={deckBEq.low} onChange={(v) => onDeckBEqChange('low', v)} color="#F2B8B5" />
-                    <Knob label="Color" value={deckBEq.filter} onChange={(v) => onDeckBEqChange('filter', v)} color="#F2B8B5" min={-1} max={1} defaultValue={0} />
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => setCueB(!cueB)}
-                  className={`w-10 h-5 rounded-md text-[7px] font-black uppercase tracking-tighter transition-all border ${cueB ? 'bg-orange-500 border-orange-400 text-white shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-black/40 border-white/5 text-gray-500'}`}
-                >
-                  Cue
-                </button>
+      <div className="mixer-band mixer-band--eq">
+        <div className="mixer-topgrid grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 min-h-0">
+          {/* Channel A Section */}
+          <div className="mixer-channel bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0 flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-1.5 w-full">
+              <Knob label="Trim" value={deckATrim} onChange={onDeckATrimChange} color="#D0BCFF" size="sm" defaultValue={1} />
+              <div className="w-full h-px bg-white/5" />
+              <div className="flex flex-col gap-1.5">
+                <Knob label="Hi" value={deckAEq.hi} onChange={(v) => onDeckAEqChange('hi', v)} color="#D0BCFF" />
+                <Knob label="Mid" value={deckAEq.mid} onChange={(v) => onDeckAEqChange('mid', v)} color="#D0BCFF" />
+                <Knob label="Low" value={deckAEq.low} onChange={(v) => onDeckAEqChange('low', v)} color="#D0BCFF" />
+                <Knob label="Color" value={deckAEq.filter} onChange={(v) => onDeckAEqChange('filter', v)} color="#D0BCFF" min={-1} max={1} defaultValue={0} />
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="mixer-faderbank">
-          <div className="mixer-fadercell mixer-fadercell--a">
-            <Fader label="A" value={deckAVolume} onChange={onDeckAVolumeChange} color="#D0BCFF" height="h-28" />
+            <button 
+              onClick={() => setCueA(!cueA)}
+              className={`w-10 h-5 rounded-md text-[7px] font-black uppercase tracking-tighter transition-all border ${cueA ? 'bg-orange-500 border-orange-400 text-white shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-black/40 border-white/5 text-gray-500'}`}
+            >
+              Cue
+            </button>
           </div>
-          <div className="mixer-fadercell mixer-fadercell--m">
-            <Fader label="MST" value={masterVolume} onChange={onMasterVolumeChange} color="#FFFFFF" height="h-24" />
-          </div>
-          <div className="mixer-fadercell mixer-fadercell--b">
-            <Fader label="B" value={deckBVolume} onChange={onDeckBVolumeChange} color="#F2B8B5" height="h-28" />
+
+          <div className="mixer-center-spine bg-black/30 rounded-xl border border-white/5 mx-0.5" aria-hidden="true" />
+
+          {/* Channel B Section */}
+          <div className="mixer-channel bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0 flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-1.5 w-full">
+              <Knob label="Trim" value={deckBTrim} onChange={onDeckBTrimChange} color="#F2B8B5" size="sm" defaultValue={1} />
+              <div className="w-full h-px bg-white/5" />
+              <div className="flex flex-col gap-1.5">
+                <Knob label="Hi" value={deckBEq.hi} onChange={(v) => onDeckBEqChange('hi', v)} color="#F2B8B5" />
+                <Knob label="Mid" value={deckBEq.mid} onChange={(v) => onDeckBEqChange('mid', v)} color="#F2B8B5" />
+                <Knob label="Low" value={deckBEq.low} onChange={(v) => onDeckBEqChange('low', v)} color="#F2B8B5" />
+                <Knob label="Color" value={deckBEq.filter} onChange={(v) => onDeckBEqChange('filter', v)} color="#F2B8B5" min={-1} max={1} defaultValue={0} />
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setCueB(!cueB)}
+              className={`w-10 h-5 rounded-md text-[7px] font-black uppercase tracking-tighter transition-all border ${cueB ? 'bg-orange-500 border-orange-400 text-white shadow-[0_0_8px_rgba(249,115,22,0.4)]' : 'bg-black/40 border-white/5 text-gray-500'}`}
+            >
+              Cue
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="mixer-footer">
+      <div className="mixer-band mixer-band--faders">
+        <div className="mixer-fadercell mixer-fadercell--a">
+          <Fader label="A" value={deckAVolume} onChange={onDeckAVolumeChange} color="#D0BCFF" height="h-[var(--mixer-fader-height)]" />
+        </div>
+        <div className="mixer-masterstrip">
+          <div className="mixer-meter flex flex-col gap-0.5 items-center py-1">
+            {[...Array(20)].reverse().map((_, i) => {
+              const isActive = (deckAPlaying || deckBPlaying) && (Math.random() > (i / 20));
+              let barColor = 'bg-green-900/10';
+              if (isActive) {
+                if (i > 16) barColor = 'bg-red-500 shadow-[0_0_6px_red]';
+                else if (i > 12) barColor = 'bg-orange-500 shadow-[0_0_4px_orange]';
+                else barColor = 'bg-green-500 shadow-[0_0_3px_#22c55e]';
+              }
+              return <div key={i} className={`w-2 h-0.5 rounded-[0.5px] transition-all duration-75 ${barColor}`} />;
+            })}
+          </div>
+          <div className="mixer-fadercell mixer-fadercell--m">
+            <Fader label="MST" value={masterVolume} onChange={onMasterVolumeChange} color="#FFFFFF" height="h-[var(--mixer-master-fader-height)]" />
+          </div>
+        </div>
+        <div className="mixer-fadercell mixer-fadercell--b">
+          <Fader label="B" value={deckBVolume} onChange={onDeckBVolumeChange} color="#F2B8B5" height="h-[var(--mixer-fader-height)]" />
+        </div>
+      </div>
+
+      <div className="mixer-footer mixer-band mixer-band--xfade">
         {/* Crossfader Section - Enhanced visual design */}
-        <div className="mt-4 space-y-2 pt-2 border-t border-white/5 relative">
+        <div className="mixer-crossfader space-y-2 pt-2 border-t border-white/5 relative">
           <div className="flex justify-between gap-1 p-0.5 bg-black/30 rounded-lg mb-1">
             {['SMOOTH', 'CUT', 'DIP'].map(curve => (
               <button 
@@ -424,7 +420,7 @@ const Mixer: React.FC<MixerProps> = ({
           </div>
         </div>
 
-        <div className="mt-3 rounded-lg border border-white/5 bg-black/30 p-2">
+        <div className="mixer-autodj rounded-lg border border-white/5 bg-black/30 p-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex flex-col">
               <span className="text-[8px] font-black uppercase tracking-widest text-gray-400">Auto DJ</span>
