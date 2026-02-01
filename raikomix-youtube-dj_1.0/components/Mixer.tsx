@@ -47,8 +47,8 @@ const Knob: React.FC<{
   const startVal = useRef(0);
   const activePointerId = useRef<number | null>(null);
   const knobRef = useRef<HTMLDivElement>(null);
-  const knobSize = size === 'sm' ? 'var(--knob-sm)' : 'var(--knob-md)';
-  const innerSize = size === 'sm' ? 'var(--knob-inner-sm)' : 'var(--knob-inner-md)';
+  const knobSize = size === 'sm' ? 'w-9 h-9' : 'w-11 h-11';
+  const innerSize = size === 'sm' ? 'w-5 h-5' : 'w-6 h-6';
 
  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -97,8 +97,7 @@ const Knob: React.FC<{
     <div className="flex flex-col items-center gap-0 group select-none">
       <div 
         ref={knobRef}
-        className={`relative flex items-center justify-center cursor-ns-resize transition-transform duration-150 touch-none ${isDragging ? 'scale-110' : ''}`}
-        style={{ width: knobSize, height: knobSize }}
+        className={`relative ${knobSize} flex items-center justify-center cursor-ns-resize transition-transform duration-150 touch-none ${isDragging ? 'scale-110' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -119,8 +118,8 @@ const Knob: React.FC<{
           />
         </svg>
         <div 
-          className={`absolute bg-[#1D1B20] rounded-full border border-white/10 shadow-lg flex items-center justify-center transition-transform duration-75 pointer-events-none ${isDragging ? 'border-white/40' : ''}`}
-          style={{ width: innerSize, height: innerSize, transform: `rotate(${rotation}deg)` }}
+          className={`absolute ${innerSize} bg-[#1D1B20] rounded-full border border-white/10 shadow-lg flex items-center justify-center transition-transform duration-75 pointer-events-none ${isDragging ? 'border-white/40' : ''}`}
+          style={{ transform: `rotate(${rotation}deg)` }}
         >
           <div className="w-0.5 h-2.5 bg-white/60 absolute top-0.5 rounded-full" />
         </div>
@@ -135,8 +134,8 @@ const Fader: React.FC<{
   value: number,
   onChange: (val: number) => void,
   color: string,
-  heightVar?: string
-}> = ({ label, value, onChange, color, heightVar = '--fader-h' }) => {
+  height?: string
+}> = ({ label, value, onChange, color, height = 'h-28' }) => {
   const faderRef = useRef<HTMLDivElement>(null);
   const activePointerId = useRef<number | null>(null);
 
@@ -181,8 +180,7 @@ const Fader: React.FC<{
     <div className="flex flex-col items-center gap-1.5 w-full group relative">
        <div 
          ref={faderRef}
-         className="w-6 bg-black/40 rounded-lg relative flex items-end p-0.5 border border-white/5 overflow-hidden cursor-ns-resize shadow-inner touch-none"
-         style={{ height: `var(${heightVar})` }}
+         className={`${height} w-6 bg-black/40 rounded-lg relative flex items-end p-0.5 border border-white/5 overflow-hidden cursor-ns-resize shadow-inner touch-none`}
        >
           <div 
             className="w-full rounded transition-all duration-75" 
@@ -276,8 +274,9 @@ const Mixer: React.FC<MixerProps> = ({
       </div>
 
       <div className="mixer-content">
-        <div className="mixer-top">
-          <div className="mixer-topgrid grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 min-h-0">
+        <div className="mixer-upper">
+          <div className="mixer-top">
+            <div className="mixer-topgrid grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 min-h-0">
             {/* Channel A Section */}
             <div className="mixer-channel bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0 flex flex-col items-center gap-2">
               <div className="flex flex-col items-center gap-1.5 w-full">
@@ -335,20 +334,21 @@ const Mixer: React.FC<MixerProps> = ({
                 Cue
               </button>
             </div>
+            </div>
           </div>
         </div>
 
-          <div className="mixer-faderbank">
+        <div className="mixer-faderbank">
             <div className="mixer-fadercell mixer-fadercell--a">
-            <Fader label="A" value={deckAVolume} onChange={onDeckAVolumeChange} color="#D0BCFF" />
+            <Fader label="A" value={deckAVolume} onChange={onDeckAVolumeChange} color="#D0BCFF" height="h-28" />
             </div>
             <div className="mixer-fadercell mixer-fadercell--m">
-            <Fader label="MST" value={masterVolume} onChange={onMasterVolumeChange} color="#FFFFFF" heightVar="--fader-h-sm" />
+            <Fader label="MST" value={masterVolume} onChange={onMasterVolumeChange} color="#FFFFFF" height="h-24" />
             </div>
             <div className="mixer-fadercell mixer-fadercell--b">
-            <Fader label="B" value={deckBVolume} onChange={onDeckBVolumeChange} color="#F2B8B5" />
+            <Fader label="B" value={deckBVolume} onChange={onDeckBVolumeChange} color="#F2B8B5" height="h-28" />
             </div>
-          </div>
+        </div>
       </div>
 
       <div className="mixer-footer">
