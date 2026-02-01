@@ -481,7 +481,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
             title={tooltipText}
             tabIndex={0}
             onTouchStart={(event) => event.currentTarget.focus()}
-            className={`group flex gap-3 items-center p-3 rounded-xl border transition-all relative ${
+            className={`group grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 p-4 min-h-[72px] rounded-xl border transition-all relative overflow-hidden ${
               isSelected ? 'bg-[#D0BCFF]/10 border-[#D0BCFF]/50' : 'bg-black/20 border-white/5 hover:border-white/20'
             } ${playedOpacity}`}
           >
@@ -503,22 +503,24 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
               <div className="text-[11px] font-bold text-white truncate leading-tight group-hover:text-[#D0BCFF] transition-colors">{t.title}</div>
               <div className="text-[9px] text-gray-500 truncate uppercase font-bold tracking-tighter">{t.author}</div>
             </div>
-             {hasBeenPlayed && (
-              <span className="text-[8px] font-black uppercase tracking-widest text-gray-500 border border-white/10 rounded-full px-2 py-1">
-                Played
-              </span>
-            )}
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-              <button 
-                onClick={() => onAddToQueue(t)} 
-                className="w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
-                title="Add to Queue"
-              >
-                <span className="material-symbols-outlined text-sm">playlist_add</span>
-              </button>
-              <button onClick={() => onLoadToDeck(t, 'A')} className="w-7 h-7 rounded-lg bg-[#D0BCFF] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">A</button>
-              <button onClick={() => onLoadToDeck(t, 'B')} className="w-7 h-7 rounded-lg bg-[#F2B8B5] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">B</button>
-              <button onClick={() => onRemove(t.id)} className="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all" title="Remove"><span className="material-symbols-outlined text-sm">delete</span></button>
+            <div className="flex items-center justify-end gap-2 min-w-[136px] shrink-0">
+              {hasBeenPlayed && (
+                <span className="text-[8px] font-black uppercase tracking-widest text-gray-500 border border-white/10 rounded-full px-2 py-1 shrink-0">
+                  Played
+                </span>
+              )}
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <button 
+                  onClick={() => onAddToQueue(t)} 
+                  className="w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
+                  title="Add to Queue"
+                >
+                  <span className="material-symbols-outlined text-sm">playlist_add</span>
+                </button>
+                <button onClick={() => onLoadToDeck(t, 'A')} className="w-7 h-7 rounded-lg bg-[#D0BCFF] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">A</button>
+                <button onClick={() => onLoadToDeck(t, 'B')} className="w-7 h-7 rounded-lg bg-[#F2B8B5] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">B</button>
+                <button onClick={() => onRemove(t.id)} className="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all" title="Remove"><span className="material-symbols-outlined text-sm">delete</span></button>
+              </div>
             </div>
             <div className="pointer-events-none absolute left-12 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-black/90 p-3 text-[9px] text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               <div className="font-bold text-[#D0BCFF] mb-1">Track Details</div>
