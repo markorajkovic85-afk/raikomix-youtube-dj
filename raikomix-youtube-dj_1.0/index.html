@@ -287,9 +287,9 @@
       --deck-min: 360px;
       --panel-scale: 1;
 
-      --band-eq-height: 120px;
+      --band-eq-height: 210px;
       --band-faders-height: 250px;
-      --band-crossfader-height: 180px;
+      --band-crossfader-height: 230px;
       --mixer-band-gap: 1rem;
       --mixer-fader-height: 200px;
       --mixer-master-fader-height: 176px;
@@ -379,6 +379,11 @@
 
     .mixer-band-eq {
       height: var(--band-eq-height);
+      display: flex;
+    }
+
+    .mixer-band-eq .mixer-topgrid {
+      width: 100%;
     }
 
     .mixer-band-faders {
@@ -392,9 +397,10 @@
 
     .mixer-band-crossfader {
       height: var(--band-crossfader-height);
-      display: grid;
-      grid-template-rows: auto auto;
-      row-gap: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
     }
 
     .mixer-masterstrip {
@@ -461,7 +467,9 @@
       .app-stage {
         --panel-padding: 1.25rem;
         --console-gap: 1.25rem;
+        --band-eq-height: 190px;
         --band-faders-height: 220px;
+        --band-crossfader-height: 210px;
         --mixer-fader-height: 180px;
         --mixer-master-fader-height: 156px;
         --mixer-meter-height: 96px;
