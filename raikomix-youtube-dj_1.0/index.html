@@ -303,7 +303,7 @@
     .deck-card,
     .mixer-card {
       max-height: 100%;
-      padding: clamp(12px, 1.6vh, 20px);
+      padding: clamp(10px, 1.2vh, 16px);
     }
 
     .deck-card {
@@ -336,10 +336,10 @@
     .mixer-content {
       flex: 1 1 auto;
       min-height: 0;
-      overflow: auto;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      gap: clamp(4px, 0.7vh, 8px);
+      gap: clamp(3px, 0.55vh, 7px);
     }
 
     .mixer-footer {
@@ -383,7 +383,7 @@
     }
 
     .mixer-meter {
-      height: clamp(92px, 14vh, 120px);
+      height: clamp(76px, 11vh, 110px);
       overflow: hidden;
     }
 
@@ -393,7 +393,7 @@
       padding: 0 2px;
       height: auto;
       min-height: 0;
-      max-height: clamp(110px, 16vh, 180px);
+      max-height: clamp(100px, 14vh, 170px);
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: end;
@@ -491,6 +491,12 @@
     @media (max-width: 768px) {
       .perform-stage__inner {
         padding: clamp(8px, 1.4vh, 14px);
+      }
+    }
+
+    @media (max-height: 760px) {
+      .mixer-content {
+        overflow: auto;
       }
     }
   </style>
