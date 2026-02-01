@@ -121,7 +121,7 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pr-2 space-y-2 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto pr-2 space-y-2 scrollbar-slim">
         {queue.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-50">
             <span className="material-symbols-outlined text-4xl mb-2">queue_music</span>
