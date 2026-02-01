@@ -268,12 +268,12 @@ const Mixer: React.FC<MixerProps> = ({
   };
 
   return (
-    <div className="m3-card mixer-card mixer-shell central-stage__mixer bg-[#1D1B20] shadow-2xl border-white/5 shrink-0 p-2 select-none" role="region" aria-label="Mixer Controls">
+    <div className="m3-card mixer-card mixer-container bg-[#1D1B20] shadow-2xl border-white/5 shrink-0 p-2 select-none" role="region" aria-label="Mixer Controls">
       <div className="mixer-header flex flex-col items-center gap-0 border-b border-white/5 pb-1">
         <h2 className="text-[8px] font-black uppercase tracking-[0.4em] text-[#D0BCFF]">Mixing Console</h2>
       </div>
 
-      <div className="mixer-band mixer-band--eq">
+      <div className="mixer-band mixer-band-eq">
         <div className="mixer-topgrid grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 min-h-0">
           {/* Channel A Section */}
           <div className="mixer-channel bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0 flex flex-col items-center gap-2">
@@ -321,7 +321,7 @@ const Mixer: React.FC<MixerProps> = ({
         </div>
       </div>
 
-      <div className="mixer-band mixer-band--faders">
+      <div className="mixer-band mixer-band-faders">
         <div className="mixer-fadercell mixer-fadercell--a">
           <Fader label="A" value={deckAVolume} onChange={onDeckAVolumeChange} color="#D0BCFF" height="h-[var(--mixer-fader-height)]" />
         </div>
@@ -347,7 +347,7 @@ const Mixer: React.FC<MixerProps> = ({
         </div>
       </div>
 
-      <div className="mixer-footer mixer-band mixer-band--xfade">
+      <div className="mixer-band mixer-band-crossfader">
         {/* Crossfader Section - Enhanced visual design */}
         <div className="mixer-crossfader space-y-2 pt-2 border-t border-white/5 relative">
           <div className="flex justify-between gap-1 p-0.5 bg-black/30 rounded-lg mb-1">

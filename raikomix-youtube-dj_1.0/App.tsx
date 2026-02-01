@@ -1121,42 +1121,44 @@ useEffect(() => {
             </section>
           )}
 
-          <section className="perform-stage min-h-0 min-w-0">
-            <div className="perform-stage__inner central-stage w-full min-h-0">
-              <div className="central-stage__panel">
-                <div className="perform-stage__deck central-stage__deck">
+          <section className="app-stage min-h-0 min-w-0">
+            <div className="central-console-panel">
+              <div className="console-grid">
+                <div className="console-deck">
                   <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
                 </div>
-                <Mixer
-                  crossfader={crossfader}
-                  onCrossfaderChange={setCrossfader}
-                  crossfaderCurve={xFaderCurve}
-                  onCurveChange={setXFaderCurve}
-                  autoDjEnabled={autoDjEnabled}
-                  onToggleAutoDj={() => setAutoDjEnabled(prev => !prev)}
-                  mixLeadSeconds={mixLeadSeconds}
-                  mixDurationSeconds={mixDurationSeconds}
-                  onMixLeadChange={handleMixLeadChange}
-                  onMixDurationChange={handleMixDurationChange}
-                  queueLength={queue.length}
-                  masterVolume={masterVolume}
-                  onMasterVolumeChange={setMasterVolume}
-                  deckAVolume={deckAVolume}
-                  onDeckAVolumeChange={setDeckAVolume}
-                  deckBVolume={deckBVolume}
-                  onDeckBVolumeChange={setDeckBVolume}
-                  deckAPlaying={deckAState?.playing || false}
-                  deckBPlaying={deckBState?.playing || false}
-                  deckATrim={deckAEffectWet}
-                  deckBTrim={deckBEffectWet}
-                  onDeckATrimChange={setDeckAEffectWet}
-                  onDeckBTrimChange={setDeckBEffectWet}
-                  deckAEq={deckAEq}
-                  deckBEq={deckBEq}
-                  onDeckAEqChange={(k, v) => setDeckAEq(p => ({...p, [k]: v}))}
-                  onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))}
-                />
-                <div className="perform-stage__deck central-stage__deck">
+                <div className="console-mixer">
+                  <Mixer
+                    crossfader={crossfader}
+                    onCrossfaderChange={setCrossfader}
+                    crossfaderCurve={xFaderCurve}
+                    onCurveChange={setXFaderCurve}
+                    autoDjEnabled={autoDjEnabled}
+                    onToggleAutoDj={() => setAutoDjEnabled(prev => !prev)}
+                    mixLeadSeconds={mixLeadSeconds}
+                    mixDurationSeconds={mixDurationSeconds}
+                    onMixLeadChange={handleMixLeadChange}
+                    onMixDurationChange={handleMixDurationChange}
+                    queueLength={queue.length}
+                    masterVolume={masterVolume}
+                    onMasterVolumeChange={setMasterVolume}
+                    deckAVolume={deckAVolume}
+                    onDeckAVolumeChange={setDeckAVolume}
+                    deckBVolume={deckBVolume}
+                    onDeckBVolumeChange={setDeckBVolume}
+                    deckAPlaying={deckAState?.playing || false}
+                    deckBPlaying={deckBState?.playing || false}
+                    deckATrim={deckAEffectWet}
+                    deckBTrim={deckBEffectWet}
+                    onDeckATrimChange={setDeckAEffectWet}
+                    onDeckBTrimChange={setDeckBEffectWet}
+                    deckAEq={deckAEq}
+                    deckBEq={deckBEq}
+                    onDeckAEqChange={(k, v) => setDeckAEq(p => ({...p, [k]: v}))}
+                    onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))}
+                  />
+                </div>
+                <div className="console-deck">
                   <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} onTrackEnd={() => handleTrackEnd('B')} />
                 </div>
               </div>
