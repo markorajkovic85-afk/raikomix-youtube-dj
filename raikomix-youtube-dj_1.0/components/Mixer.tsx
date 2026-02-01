@@ -274,9 +274,8 @@ const Mixer: React.FC<MixerProps> = ({
       </div>
 
       <div className="mixer-content">
-        <div className="mixer-upper">
-          <div className="mixer-top">
-            <div className="mixer-topgrid grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 min-h-0">
+        <div className="mixer-top">
+          <div className="mixer-topgrid grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 min-h-0">
             {/* Channel A Section */}
             <div className="mixer-channel bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0 flex flex-col items-center gap-2">
               <div className="flex flex-col items-center gap-1.5 w-full">

@@ -334,11 +334,10 @@
 
     .mixer-content {
       min-height: 0;
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
-      align-content: start;
-      justify-items: stretch;
-      gap: clamp(6px, 0.9vh, 10px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: clamp(8px, 1vh, 14px);
     }
 
     .mixer-footer {
@@ -385,10 +384,9 @@
     }
 
     .mixer-faderbank {
-      margin-top: 0;
+      margin-top: 6px;
       padding: 0 2px;
-      height: min(100%, clamp(140px, 22vh, 210px));
-      max-height: clamp(140px, 22vh, 210px);
+      height: clamp(140px, 22vh, 210px);
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: end;
