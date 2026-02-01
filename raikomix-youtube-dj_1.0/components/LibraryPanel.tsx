@@ -481,7 +481,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
             title={tooltipText}
             tabIndex={0}
             onTouchStart={(event) => event.currentTarget.focus()}
-            className={`group flex gap-3 items-center p-3 rounded-xl border transition-all relative ${
+            className={`group grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-3 p-4 min-h-[76px] rounded-xl border transition-all relative overflow-hidden ${
               isSelected ? 'bg-[#D0BCFF]/10 border-[#D0BCFF]/50' : 'bg-black/20 border-white/5 hover:border-white/20'
             } ${playedOpacity}`}
           >
@@ -499,16 +499,16 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
                 <div className="absolute -top-1 -right-1 bg-blue-500 border border-black w-2.5 h-2.5 rounded-full" title="Local File" />
               )}
             </div>
-            <div className="flex-1 min-w-0" onDoubleClick={() => setEditingTrack(t)}>
+            <div className="flex-1 min-w-0 relative pr-14" onDoubleClick={() => setEditingTrack(t)}>
               <div className="text-[11px] font-bold text-white truncate leading-tight group-hover:text-[#D0BCFF] transition-colors">{t.title}</div>
               <div className="text-[9px] text-gray-500 truncate uppercase font-bold tracking-tighter">{t.author}</div>
+              {hasBeenPlayed && (
+                <span className="absolute top-0 right-0 text-[8px] font-black uppercase tracking-widest text-gray-500 border border-white/10 rounded-full px-2 py-1">
+                  Played
+                </span>
+              )}
             </div>
-             {hasBeenPlayed && (
-              <span className="text-[8px] font-black uppercase tracking-widest text-gray-500 border border-white/10 rounded-full px-2 py-1">
-                Played
-              </span>
-            )}
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+            <div className="flex items-center justify-end gap-1 min-w-[148px] shrink-0 opacity-0 group-hover:opacity-100 transition-all">
               <button 
                 onClick={() => onAddToQueue(t)} 
                 className="w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
