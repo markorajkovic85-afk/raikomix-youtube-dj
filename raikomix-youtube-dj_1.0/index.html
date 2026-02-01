@@ -323,9 +323,10 @@
       height: 100%;
       align-self: stretch;
       min-width: 0;
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
+      display: flex;
+      flex-direction: column;
       min-height: 0;
+      overflow: hidden;
     }
 
     .mixer-header {
@@ -333,19 +334,21 @@
     }
 
     .mixer-content {
+      flex: 1 1 auto;
       min-height: 0;
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
-      align-content: start;
-      justify-items: stretch;
-      gap: clamp(6px, 0.9vh, 10px);
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: clamp(4px, 0.7vh, 8px);
     }
 
     .mixer-footer {
+      flex: 0 0 auto;
       min-height: 0;
     }
 
     .mixer-upper {
+      flex: 0 0 auto;
       min-height: 0;
       overflow: visible;
       display: block;
@@ -385,16 +388,17 @@
     }
 
     .mixer-faderbank {
+      flex: 0 0 auto;
       margin-top: 0;
       padding: 0 2px;
-      height: min(100%, clamp(140px, 22vh, 210px));
-      max-height: clamp(140px, 22vh, 210px);
+      height: auto;
+      min-height: 0;
+      max-height: clamp(110px, 16vh, 180px);
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: end;
       justify-items: center;
       gap: 12px;
-      min-height: 0;
     }
 
     .mixer-fadercell {

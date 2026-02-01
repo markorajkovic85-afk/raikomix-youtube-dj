@@ -273,7 +273,7 @@ const Mixer: React.FC<MixerProps> = ({
         <h2 className="text-[8px] font-black uppercase tracking-[0.4em] text-[#D0BCFF]">Mixing Console</h2>
       </div>
 
-      <div className="mixer-content">
+      <div className="mixer-content min-h-0">
         <div className="mixer-upper">
           <div className="mixer-top">
             <div className="mixer-topgrid grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-1 min-h-0">
