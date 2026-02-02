@@ -198,19 +198,27 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
     if (recordingStartTimeRef.current) {
       const elapsed = performance.now() - recordingStartTimeRef.current;
-      if (elapsed < 500) {
+      const minRecordingMs = 1200;
+      if (elapsed < minRecordingMs) {
         console.log('[Recording] Too short, waiting...', elapsed);
         window.setTimeout(() => {
           void stopRecording();
-        }, 500 - elapsed);
+        }, minRecordingMs - elapsed);
         return;
       }
-      recordingStartTimeRef.current = null;
     }
 
     if (recorderRef.current?.state === 'recording') {
-      recorderRef.current.requestData();
-      recorderRef.current.stop();
+      try {
+        recorderRef.current.requestData();
+        console.log('[Recording] Requested final data chunk');
+        await new Promise((resolve) => window.setTimeout(resolve, 100));
+        recorderRef.current.stop();
+        console.log('[Recording] Stop called');
+      } catch (error) {
+        console.error('[Recording] Error during stop:', error);
+        setRecordingError('Failed to stop recording properly.');
+      }
       return;
     }
 
@@ -296,7 +304,13 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     };
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100,
+        },
+      });
       console.log('[Recording] Microphone access granted');
 
       recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -314,13 +328,16 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
       console.log('[Recording] Using MIME type:', mimeType || 'default');
 
+      const timesliceMs = 1000;
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       recorderChunksRef.current = [];
+      let dataReceivedCount = 0;
 
       recorder.ondataavailable = (event) => {
         console.log('[Recording] Data available, size:', event.data.size);
         if (event.data.size > 0) {
           recorderChunksRef.current.push(event.data);
+          dataReceivedCount += 1;
         }
       };
 
@@ -329,6 +346,8 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         recordingStartTimeRef.current = null;
         setIsRecording(false);
 
+        await new Promise((resolve) => window.setTimeout(resolve, 50));
+
         const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         const chunks = recorderChunksRef.current.length;
         recorderChunksRef.current = [];
@@ -336,15 +355,15 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
         recorderStreamRef.current = null;
 
-        if (!blob.size || chunks === 0) {
+        if (!blob.size || chunks === 0 || dataReceivedCount === 0) {
           console.error('[Recording] No audio data captured');
           setRecordingError(
-            'No audio captured. Try recording for at least 1 second and speak into your microphone.'
+            'No audio captured. Please record for at least 1 second and ensure your microphone is working.'
           );
           return;
         }
 
-        console.log('[Recording] Creating file, blob size:', blob.size);
+        console.log('[Recording] Creating file, blob size:', blob.size, 'chunks:', chunks);
         const extension = blob.type.includes('mp4') ? 'm4a' : 'webm';
         const file = new File([blob], `mic-recording-${Date.now()}.${extension}`, { type: blob.type });
         await saveRecordingFile(file);
@@ -354,6 +373,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         console.error('[Recording] MediaRecorder error:', event);
         setRecordingError('Recording failed. Please check microphone permissions.');
         setIsRecording(false);
+        recordingStartTimeRef.current = null;
         recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
         recorderStreamRef.current = null;
       };
@@ -363,13 +383,19 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       setIsRecording(true);
       recordingStartTimeRef.current = performance.now();
 
-      recorder.start(100);
-      console.log('[Recording] MediaRecorder started');
+      recorder.start(timesliceMs);
+      console.log('[Recording] MediaRecorder started with', timesliceMs, 'ms timeslice');
     } catch (error) {
       console.error('[Recording] Failed to start:', error);
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            sampleRate: 44100,
+          },
+        });
         await startFallbackRecording(stream);
       } catch (fallbackError) {
         console.error('[Recording] Fallback also failed:', fallbackError);
@@ -932,6 +958,9 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                     {recordingError && <p className="text-[10px] text-[#F2B8B5]">{recordingError}</p>}
                     <p className="text-[10px] text-white/40">
                       Your recording will save to the pad and can be trimmed like any local sample.
+                    </p>
+                    <p className="text-[10px] text-white/40">
+                      Recording requires a minimum of 1.2 seconds. Speak clearly into your microphone.
                     </p>
                   </div>
                 </div>
