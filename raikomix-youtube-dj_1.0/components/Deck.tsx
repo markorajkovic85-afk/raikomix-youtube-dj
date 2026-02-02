@@ -92,6 +92,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
 
   const playerRef = useRef<any>(null);
   const localAudioRef = useRef<HTMLAudioElement>(null);
+  const loadModeRef = useRef<'load' | 'cue'>('load');
+  const localMetadataListenerRef = useRef<(() => void) | null>(null);
   const tempoContainerRef = useRef<HTMLDivElement>(null);
   const tempoPointerIdRef = useRef<number | null>(null);
   const tempoDraggingRef = useRef(false);
@@ -525,8 +527,10 @@ const effectNodesRef = useRef<{
     if (localAudioRef.current) {
       // Clear current source to prevent memory leak / ghost audio
       localAudioRef.current.pause();
-      localAudioRef.current.src = url;
-      localAudioRef.current.load();
+      if (localMetadataListenerRef.current) {
+        localAudioRef.current.removeEventListener('loadedmetadata', localMetadataListenerRef.current);
+      }
+      loadModeRef.current = loadMode;
       
       // Use URL as stable videoId for local files (not timestamp!)
       const stableVideoId = `local_${url}`;
@@ -551,7 +555,7 @@ const effectNodesRef = useRef<{
 
         console.log(`[Deck ${id}] State updated, isReady: true, videoId:`, stableVideoId);
         
-        if (loadMode !== 'cue') {
+        if (loadModeRef.current !== 'cue') {
           analyzeLocalAudio(url);
         }
         
@@ -564,10 +568,13 @@ const effectNodesRef = useRef<{
         });
         
         setIsLoading(false);
-        localAudioRef.current?.removeEventListener('loadedmetadata', onLoaded);
+        localMetadataListenerRef.current = null;
       };
-      
-      localAudioRef.current.addEventListener('loadedmetadata', onLoaded);
+
+      localMetadataListenerRef.current = onLoaded;
+      localAudioRef.current.addEventListener('loadedmetadata', onLoaded, { once: true });
+      localAudioRef.current.src = url;
+      localAudioRef.current.load();
     } else {
       console.error(`[Deck ${id}] localAudioRef.current is null!`);
     }
@@ -675,6 +682,7 @@ const effectNodesRef = useRef<{
       <div id={containerId} className="h-0 w-0 overflow-hidden" />
       <audio
         ref={localAudioRef}
+        preload="auto"
         style={{ display: 'none' }}
         onPlay={() => setState(s => ({ ...s, playing: true }))}
         onPause={() => setState(s => ({ ...s, playing: false }))}

@@ -46,6 +46,10 @@ export interface PlayerState {
   videoId: string;
   sourceType: TrackSourceType;
   isReady: boolean;
+  bpm: number;
+  musicalKey: string;
+  title: string;
+  author: string;
   eqHigh: number;
   eqMid: number;
   eqLow: number;
