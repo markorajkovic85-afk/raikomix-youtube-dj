@@ -193,35 +193,55 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   );
 
   const stopRecording = useCallback(async () => {
+    console.log('[Recording] Stop requested');
+
     if (recorderRef.current?.state === 'recording') {
       recorderRef.current.stop();
       return;
     }
+
     const fallback = fallbackRecorderRef.current;
-    if (!fallback) return;
-    fallback.processor.disconnect();
-    fallback.source.disconnect();
-    fallback.stream.getTracks().forEach((track) => track.stop());
-    fallbackRecorderRef.current = null;
-    recorderStreamRef.current = null;
-    await fallback.ctx.close().catch(() => undefined);
-    setIsRecording(false);
-    if (fallback.buffers.length === 0) {
-      setRecordingError('No audio captured. Try again.');
+    if (!fallback) {
+      console.log('[Recording] No active recorder to stop');
       return;
     }
+
+    try {
+      fallback.processor.disconnect();
+      fallback.source.disconnect();
+      fallback.stream.getTracks().forEach((track) => track.stop());
+      await fallback.ctx.close().catch(() => undefined);
+    } catch (error) {
+      console.error('[Recording] Cleanup error:', error);
+    }
+
+    fallbackRecorderRef.current = null;
+    recorderStreamRef.current = null;
+    setIsRecording(false);
+
+    if (fallback.buffers.length === 0) {
+      setRecordingError('No audio captured. Please speak into your microphone and try again.');
+      return;
+    }
+
     const blob = encodeWav(fallback.buffers, fallback.sampleRate);
     const file = new File([blob], `mic-recording-${Date.now()}.wav`, { type: blob.type });
     await saveRecordingFile(file);
   }, [saveRecordingFile]);
 
   const startRecording = useCallback(async () => {
+    console.log('[Recording] Start requested');
     setRecordingError(null);
+
     if (!navigator.mediaDevices?.getUserMedia) {
       setRecordingError('Microphone access is not supported in this browser.');
       return;
     }
-    if (recorderRef.current?.state === 'recording') return;
+
+    if (recorderRef.current?.state === 'recording') {
+      console.log('[Recording] Already recording');
+      return;
+    }
 
     const startFallbackRecording = async (stream: MediaStream) => {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -229,17 +249,22 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         setRecordingError('Recording is not supported in this browser.');
         return;
       }
+
       recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
       recorderStreamRef.current = stream;
+
       const ctx = new AudioContextClass();
       const source = ctx.createMediaStreamSource(stream);
       const processor = ctx.createScriptProcessor(4096, 1, 1);
       const buffers: Float32Array[] = [];
+
       processor.onaudioprocess = (event) => {
         buffers.push(new Float32Array(event.inputBuffer.getChannelData(0)));
       };
+
       source.connect(processor);
       processor.connect(ctx.destination);
+
       fallbackRecorderRef.current = {
         ctx,
         source,
@@ -248,16 +273,21 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         buffers,
         sampleRate: ctx.sampleRate,
       };
+
       setRecordingMs(0);
       setIsRecording(true);
+      console.log('[Recording] Fallback recorder started');
     };
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('[Recording] Microphone access granted');
+
       recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
       recorderStreamRef.current = stream;
 
       if (typeof MediaRecorder === 'undefined') {
+        console.log('[Recording] MediaRecorder not available, using fallback');
         await startFallbackRecording(stream);
         return;
       }
@@ -265,41 +295,65 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       const preferredTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
       const canCheckMime = typeof MediaRecorder.isTypeSupported === 'function';
       const mimeType = canCheckMime ? preferredTypes.find((type) => MediaRecorder.isTypeSupported(type)) ?? '' : '';
+
+      console.log('[Recording] Using MIME type:', mimeType || 'default');
+
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       recorderChunksRef.current = [];
+
       recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) recorderChunksRef.current.push(event.data);
+        console.log('[Recording] Data available, size:', event.data.size);
+        if (event.data.size > 0) {
+          recorderChunksRef.current.push(event.data);
+        }
       };
+
       recorder.onstop = async () => {
+        console.log('[Recording] Recorder stopped, chunks:', recorderChunksRef.current.length);
         setIsRecording(false);
+
         const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        const chunks = recorderChunksRef.current.length;
         recorderChunksRef.current = [];
+
         recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
         recorderStreamRef.current = null;
-        if (!blob.size) {
-          setRecordingError('No audio captured. Try again.');
+
+        if (!blob.size || chunks === 0) {
+          console.error('[Recording] No audio data captured');
+          setRecordingError('No audio captured. Please speak into your microphone and record for at least 1 second.');
           return;
         }
+
+        console.log('[Recording] Creating file, blob size:', blob.size);
         const extension = blob.type.includes('mp4') ? 'm4a' : 'webm';
         const file = new File([blob], `mic-recording-${Date.now()}.${extension}`, { type: blob.type });
         await saveRecordingFile(file);
       };
-      recorder.onerror = () => {
-        setRecordingError('Recording failed. Please check mic permissions.');
+
+      recorder.onerror = (event) => {
+        console.error('[Recording] MediaRecorder error:', event);
+        setRecordingError('Recording failed. Please check microphone permissions.');
         setIsRecording(false);
         recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
         recorderStreamRef.current = null;
       };
+
       recorderRef.current = recorder;
       setRecordingMs(0);
       setIsRecording(true);
+
       recorder.start(250);
+      console.log('[Recording] MediaRecorder started');
     } catch (error) {
+      console.error('[Recording] Failed to start:', error);
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         await startFallbackRecording(stream);
       } catch (fallbackError) {
-        setRecordingError('Microphone access denied or unavailable.');
+        console.error('[Recording] Fallback also failed:', fallbackError);
+        setRecordingError('Microphone access denied or unavailable. Please check browser permissions.');
         setIsRecording(false);
       }
     }
@@ -396,12 +450,15 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
   useEffect(
     () => () => {
+      // Only cleanup on actual unmount
       onStopPreview();
       onCancelYouTube();
       if (recorderRef.current?.state === 'recording') {
+        console.log('[Recording] Cleanup: stopping recorder');
         recorderRef.current.stop();
       }
       if (fallbackRecorderRef.current) {
+        console.log('[Recording] Cleanup: stopping fallback');
         fallbackRecorderRef.current.processor.disconnect();
         fallbackRecorderRef.current.source.disconnect();
         fallbackRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
