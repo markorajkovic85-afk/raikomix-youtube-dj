@@ -674,11 +674,28 @@ const App: React.FC = () => {
   }, [midiAccess, midiInputs]);
 
   const getActiveDeck = useCallback(() => {
-    if (deckAState?.playing && !deckBState?.playing) return 'A';
-    if (deckBState?.playing && !deckAState?.playing) return 'B';
-    if (deckAState?.playing && deckBState?.playing) return crossfader >= 0 ? 'B' : 'A';
+    const aPlaying = deckAState?.playing;
+    const bPlaying = deckBState?.playing;
+
+    if (aPlaying && !bPlaying) return 'A';
+    if (bPlaying && !aPlaying) return 'B';
+
+    if (aPlaying && bPlaying) {
+      const aRemaining = (deckAState?.duration || 0) - (deckAState?.currentTime || 0);
+      const bRemaining = (deckBState?.duration || 0) - (deckBState?.currentTime || 0);
+
+      return aRemaining <= bRemaining ? 'A' : 'B';
+    }
+
     return null;
-  }, [deckAState?.playing, deckBState?.playing, crossfader]);
+  }, [
+    deckAState?.playing,
+    deckAState?.duration,
+    deckAState?.currentTime,
+    deckBState?.playing,
+    deckBState?.duration,
+    deckBState?.currentTime,
+  ]);
 
   const handleDeckStateUpdate = useCallback((id: DeckId, state: PlayerState) => {
     id === 'A' ? setDeckAState(state) : setDeckBState(state);
