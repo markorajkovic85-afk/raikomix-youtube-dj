@@ -139,6 +139,8 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const recorderStreamRef = React.useRef<MediaStream | null>(null);
   const recorderTimerRef = React.useRef<number | null>(null);
   const recordingStartTimeRef = React.useRef<number | null>(null);
+  const recorderPhaseRef = React.useRef<'idle' | 'starting' | 'recording' | 'stopping'>('idle');
+  const recorderSessionRef = React.useRef(0);
   const fallbackRecorderRef = React.useRef<{
     ctx: AudioContext;
     source: MediaStreamAudioSourceNode;
@@ -193,8 +195,19 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     [onLocalFileSelected]
   );
 
+  const cleanupRecorderStream = useCallback(() => {
+    recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recorderStreamRef.current = null;
+  }, []);
+
   const stopRecording = useCallback(async () => {
     console.log('[Recording] Stop requested');
+
+    if (recorderPhaseRef.current !== 'recording') {
+      console.log('[Recording] Not currently recording');
+      return;
+    }
+    recorderPhaseRef.current = 'stopping';
 
     if (recordingStartTimeRef.current) {
       const elapsed = performance.now() - recordingStartTimeRef.current;
@@ -210,14 +223,37 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
     if (recorderRef.current?.state === 'recording') {
       try {
-        recorderRef.current.requestData();
+        await new Promise<void>((resolve) => {
+          if (!recorderRef.current) {
+            resolve();
+            return;
+          }
+          let resolved = false;
+          const recorder = recorderRef.current;
+          const onData = () => {
+            if (resolved) {
+              return;
+            }
+            resolved = true;
+            recorder.removeEventListener('dataavailable', onData);
+            resolve();
+          };
+          recorder.addEventListener('dataavailable', onData);
+          recorder.requestData();
+          window.setTimeout(() => {
+            if (!resolved) {
+              recorder.removeEventListener('dataavailable', onData);
+              resolve();
+            }
+          }, 250);
+        });
         console.log('[Recording] Requested final data chunk');
-        await new Promise((resolve) => window.setTimeout(resolve, 100));
         recorderRef.current.stop();
         console.log('[Recording] Stop called');
       } catch (error) {
         console.error('[Recording] Error during stop:', error);
         setRecordingError('Failed to stop recording properly.');
+        recorderPhaseRef.current = 'idle';
       }
       return;
     }
@@ -238,9 +274,10 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     }
 
     fallbackRecorderRef.current = null;
-    recorderStreamRef.current = null;
+    cleanupRecorderStream();
     recordingStartTimeRef.current = null;
     setIsRecording(false);
+    recorderPhaseRef.current = 'idle';
 
     if (fallback.buffers.length === 0) {
       setRecordingError('No audio captured. Please speak into your microphone and try again.');
@@ -250,7 +287,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     const blob = encodeWav(fallback.buffers, fallback.sampleRate);
     const file = new File([blob], `mic-recording-${Date.now()}.wav`, { type: blob.type });
     await saveRecordingFile(file);
-  }, [saveRecordingFile]);
+  }, [cleanupRecorderStream, saveRecordingFile]);
 
   const startRecording = useCallback(async () => {
     console.log('[Recording] Start requested');
@@ -261,19 +298,23 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       return;
     }
 
-    if (recorderRef.current?.state === 'recording') {
+    if (recorderPhaseRef.current !== 'idle') {
       console.log('[Recording] Already recording');
       return;
     }
+    recorderPhaseRef.current = 'starting';
+    const sessionId = recorderSessionRef.current + 1;
+    recorderSessionRef.current = sessionId;
 
     const startFallbackRecording = async (stream: MediaStream) => {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContextClass) {
         setRecordingError('Recording is not supported in this browser.');
+        recorderPhaseRef.current = 'idle';
         return;
       }
 
-      recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cleanupRecorderStream();
       recorderStreamRef.current = stream;
 
       const ctx = new AudioContextClass();
@@ -300,6 +341,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       setRecordingMs(0);
       setIsRecording(true);
       recordingStartTimeRef.current = performance.now();
+      recorderPhaseRef.current = 'recording';
       console.log('[Recording] Fallback recorder started');
     };
 
@@ -313,7 +355,12 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       });
       console.log('[Recording] Microphone access granted');
 
-      recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+      if (sessionId !== recorderSessionRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      cleanupRecorderStream();
       recorderStreamRef.current = stream;
 
       if (typeof MediaRecorder === 'undefined') {
@@ -328,7 +375,6 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
       console.log('[Recording] Using MIME type:', mimeType || 'default');
 
-      const timesliceMs = 1000;
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       recorderChunksRef.current = [];
       let dataReceivedCount = 0;
@@ -342,9 +388,13 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       };
 
       recorder.onstop = async () => {
+        if (sessionId !== recorderSessionRef.current) {
+          return;
+        }
         console.log('[Recording] Recorder stopped, chunks:', recorderChunksRef.current.length);
         recordingStartTimeRef.current = null;
         setIsRecording(false);
+        recorderPhaseRef.current = 'idle';
 
         await new Promise((resolve) => window.setTimeout(resolve, 50));
 
@@ -352,8 +402,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         const chunks = recorderChunksRef.current.length;
         recorderChunksRef.current = [];
 
-        recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
-        recorderStreamRef.current = null;
+        cleanupRecorderStream();
 
         if (!blob.size || chunks === 0 || dataReceivedCount === 0) {
           console.error('[Recording] No audio data captured');
@@ -374,19 +423,21 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         setRecordingError('Recording failed. Please check microphone permissions.');
         setIsRecording(false);
         recordingStartTimeRef.current = null;
-        recorderStreamRef.current?.getTracks().forEach((track) => track.stop());
-        recorderStreamRef.current = null;
+        cleanupRecorderStream();
+        recorderPhaseRef.current = 'idle';
       };
 
       recorderRef.current = recorder;
       setRecordingMs(0);
       setIsRecording(true);
       recordingStartTimeRef.current = performance.now();
+      recorderPhaseRef.current = 'recording';
 
-      recorder.start(timesliceMs);
-      console.log('[Recording] MediaRecorder started with', timesliceMs, 'ms timeslice');
+      recorder.start();
+      console.log('[Recording] MediaRecorder started');
     } catch (error) {
       console.error('[Recording] Failed to start:', error);
+      recorderPhaseRef.current = 'idle';
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -401,9 +452,10 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         console.error('[Recording] Fallback also failed:', fallbackError);
         setRecordingError('Microphone access denied or unavailable. Please check browser permissions.');
         setIsRecording(false);
+        recorderPhaseRef.current = 'idle';
       }
     }
-  }, [saveRecordingFile]);
+  }, [cleanupRecorderStream, saveRecordingFile]);
 
   useEffect(() => {
     setDraft(pad);
