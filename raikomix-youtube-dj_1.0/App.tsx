@@ -979,6 +979,14 @@ const App: React.FC = () => {
           // CASE 1: Preloaded track ready - start playing it NOW
           console.log(`[Auto DJ] Starting ${targetDeck} early (preloaded) at ${remaining.toFixed(1)}s remaining`);
 
+          if (queuedItem.sourceType === 'local') {
+            const expectedVideoId = `local_${queuedItem.url}`;
+            if (!targetState?.isReady || targetState.videoId !== expectedVideoId) {
+              console.warn(`[Auto DJ] Local file not ready on ${targetDeck}, skipping early start`);
+              return;
+            }
+          }
+
           // Remove from queue
           setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
 
