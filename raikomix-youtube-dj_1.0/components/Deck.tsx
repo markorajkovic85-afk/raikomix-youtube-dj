@@ -671,7 +671,7 @@ const effectNodesRef = useRef<{
     : undefined;
 
   return (
-    <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none self-start h-auto max-h-full min-h-0">
+    <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-full min-h-0">
       <div id={containerId} className="h-0 w-0 overflow-hidden" />
       <audio
         ref={localAudioRef}
@@ -683,10 +683,11 @@ const effectNodesRef = useRef<{
           onTrackEnd?.();
         }}
       />
-      
-      <div className="flex gap-4 min-w-0">
+
+      {/* ZONE 1: Main (header + bpm + play + waveform + tempo) */}
+      <div className="deck-zone-main flex gap-4 min-w-0 flex-1 min-h-0">
         {/* Main Deck Controls Area */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0">
+        <div className="flex-1 flex flex-col gap-4 min-w-0 min-h-0">
           <div className="flex items-center justify-between gap-4 min-w-0">
             <div className="flex items-center gap-3 shrink-0">
               <div className={`w-3 h-3 rounded-full ${state.playing ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
@@ -725,31 +726,34 @@ const effectNodesRef = useRef<{
             </button>
           </div>
 
-          <Waveform 
-            isPlaying={state.playing} 
-            volume={state.volume * (0.5 + state.eqLow * 0.5)} 
-            color={color} 
-            playbackRate={state.playbackRate}
-            currentTime={state.currentTime}
-            duration={state.duration}
-            peaks={state.waveformPeaks}
-            sourceType={state.sourceType}
-            hotCues={state.hotCues}
-            cueColors={CUE_COLORS}
-            loop={{
-              active: state.loopActive,
-              start: state.loopStart,
-              end: state.loopEnd
-            }}
-            onSeek={(time) => {
-              if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
-              else if (localAudioRef.current) localAudioRef.current.currentTime = time;
-            }}
-            timeLabel={showRemaining
-              ? `-${formatTime(state.duration - state.currentTime)}`
-              : formatTime(state.currentTime)}
-            onTimeToggle={() => setShowRemaining(prev => !prev)}
-          />
+          {/* Waveform zone: flex-1 + min-h-0 prevents overlap when height is constrained */}
+          <div className="flex-1 min-h-0">
+            <Waveform 
+              isPlaying={state.playing} 
+              volume={state.volume * (0.5 + state.eqLow * 0.5)} 
+              color={color} 
+              playbackRate={state.playbackRate}
+              currentTime={state.currentTime}
+              duration={state.duration}
+              peaks={state.waveformPeaks}
+              sourceType={state.sourceType}
+              hotCues={state.hotCues}
+              cueColors={CUE_COLORS}
+              loop={{
+                active: state.loopActive,
+                start: state.loopStart,
+                end: state.loopEnd
+              }}
+              onSeek={(time) => {
+                if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
+                else if (localAudioRef.current) localAudioRef.current.currentTime = time;
+              }}
+              timeLabel={showRemaining
+                ? `-${formatTime(state.duration - state.currentTime)}`
+                : formatTime(state.currentTime)}
+              onTimeToggle={() => setShowRemaining(prev => !prev)}
+            />
+          </div>
         </div>
 
         {/* Improved Pitch / Tempo Fader */}
@@ -757,7 +761,7 @@ const effectNodesRef = useRef<{
           ref={tempoContainerRef}
           className="w-12 shrink-0 bg-black/20 rounded-xl border border-white/5 flex flex-col items-center py-4 gap-2 relative group select-none transition-all hover:border-white/20 active:border-[#D0BCFF]/30"
           onDoubleClick={() => updatePlaybackRate(1.0)}
-      onPointerDown={handleTempoPointerDown}
+          onPointerDown={handleTempoPointerDown}
           onPointerMove={handleTempoPointerMove}
           onPointerUp={handleTempoPointerUp}
           onPointerCancel={handleTempoPointerUp}
@@ -794,7 +798,7 @@ const effectNodesRef = useRef<{
                   max="1.5"
                   step="0.0001"
                   value={state.playbackRate}
-                   onInput={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value))}
+                  onInput={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value))}
                   className="absolute inset-0 cursor-pointer z-20 h-full w-full opacity-0"
                   style={{ WebkitAppearance: 'slider-vertical', appearance: 'slider-vertical' as any }}
                 />
@@ -810,49 +814,52 @@ const effectNodesRef = useRef<{
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mt-2 items-stretch">
-        <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
-          <div className="flex items-center justify-between px-1">
-            <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Hot Cues</div>
-            <button
-              type="button"
-              onClick={handleClearAllHotCues}
-              className="h-5 px-2 rounded-md text-[8px] font-black uppercase tracking-widest border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all"
-            >
-              Clear All
-            </button>
-          </div>
-          <div className="grid grid-cols-4 gap-1">
-            {[0, 1, 2, 3].map((i) => (
-              <button 
-                key={i} 
-                onClick={() => handleHotCue(i)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  handleHotCue(i, true);
-                }}
-                title={`Hot Cue ${i + 1} (Right-click to clear)`}
-                aria-label={`Hot Cue ${i + 1}`}
-                className={`h-8 rounded-lg font-black text-[10px] border transition-all ${state.hotCues[i] !== null ? 'text-black' : 'border-white/5 text-gray-700 hover:border-white/20'}`} 
-                style={state.hotCues[i] !== null ? { backgroundColor: CUE_COLORS[i], borderColor: CUE_COLORS[i], boxShadow: `0 0 10px ${CUE_COLORS[i]}44` } : {}}
-              >
-                <span className="sr-only">{`Hot Cue ${i + 1}`}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
-          <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest px-1">Loops</div>
-          <div className="grid grid-cols-4 gap-1">
-            {[2, 4, 8, 16].map((b) => (
+      {/* ZONE 2: Pads (hot cues + loops) */}
+      <div className="deck-zone-pads shrink-0">
+        <div className="grid grid-cols-2 gap-3 items-stretch">
+          <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
+            <div className="flex items-center justify-between px-1">
+              <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Hot Cues</div>
               <button
-                key={b}
-                onClick={() => handleToggleLoop(b)}
-                className={`h-8 rounded-lg text-[10px] font-black border transition-all ${state.loopActive && Math.abs((state.loopEnd - state.loopStart) - b * (60 / state.bpm)) < 0.1 ? 'bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'border-white/5 text-gray-500 hover:text-white hover:border-white/20'}`}
+                type="button"
+                onClick={handleClearAllHotCues}
+                className="h-5 px-2 rounded-md text-[8px] font-black uppercase tracking-widest border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all"
               >
-                {b}
+                Clear All
               </button>
-            ))}
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              {[0, 1, 2, 3].map((i) => (
+                <button 
+                  key={i} 
+                  onClick={() => handleHotCue(i)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    handleHotCue(i, true);
+                  }}
+                  title={`Hot Cue ${i + 1} (Right-click to clear)`}
+                  aria-label={`Hot Cue ${i + 1}`}
+                  className={`h-8 rounded-lg font-black text-[10px] border transition-all ${state.hotCues[i] !== null ? 'text-black' : 'border-white/5 text-gray-700 hover:border-white/20'}`} 
+                  style={state.hotCues[i] !== null ? { backgroundColor: CUE_COLORS[i], borderColor: CUE_COLORS[i], boxShadow: `0 0 10px ${CUE_COLORS[i]}44` } : {}}
+                >
+                  <span className="sr-only">{`Hot Cue ${i + 1}`}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
+            <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest px-1">Loops</div>
+            <div className="grid grid-cols-4 gap-1">
+              {[2, 4, 8, 16].map((b) => (
+                <button
+                  key={b}
+                  onClick={() => handleToggleLoop(b)}
+                  className={`h-8 rounded-lg text-[10px] font-black border transition-all ${state.loopActive && Math.abs((state.loopEnd - state.loopStart) - b * (60 / state.bpm)) < 0.1 ? 'bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'border-white/5 text-gray-500 hover:text-white hover:border-white/20'}`}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
