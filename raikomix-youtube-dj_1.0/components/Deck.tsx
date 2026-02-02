@@ -810,7 +810,7 @@ const effectNodesRef = useRef<{
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mt-2 items-stretch">
+      <div className="grid grid-cols-2 gap-3 mt-auto items-stretch">
         <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
           <div className="flex items-center justify-between px-1">
             <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Hot Cues</div>
