@@ -671,7 +671,7 @@ const effectNodesRef = useRef<{
     : undefined;
 
   return (
-    <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0">
+    <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none self-start h-auto max-h-full min-h-0">
       <div id={containerId} className="h-0 w-0 overflow-hidden" />
       <audio
         ref={localAudioRef}
@@ -810,7 +810,7 @@ const effectNodesRef = useRef<{
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mt-auto items-stretch">
+      <div className="grid grid-cols-2 gap-3 mt-2 items-stretch">
         <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
           <div className="flex items-center justify-between px-1">
             <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Hot Cues</div>
