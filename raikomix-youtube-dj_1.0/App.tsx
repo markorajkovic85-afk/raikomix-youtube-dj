@@ -944,10 +944,11 @@ const App: React.FC = () => {
 
         // Only start once per track
         if (alreadyStarted?.deck === targetDeck && alreadyStarted?.videoId === activeState.videoId) {
-          // Already started this track
+          // Already started this track - skip
+          console.log(`[Auto DJ] Already started ${targetDeck} for this track`);
         } else if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === targetDeck) {
-          // Preloaded track ready - start playing it NOW
-          console.log(`Auto DJ: Starting ${targetDeck} early at ${remaining.toFixed(1)}s remaining`);
+          // CASE 1: Preloaded track ready - start playing it NOW
+          console.log(`[Auto DJ] Starting ${targetDeck} early (preloaded) at ${remaining.toFixed(1)}s remaining`);
 
           // Remove from queue
           setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
@@ -963,6 +964,36 @@ const App: React.FC = () => {
           setTimeout(() => {
             targetRef.current?.togglePlay();
           }, 150);
+        } else if (queuedItem && !preloaded) {
+          // CASE 2: FAILSAFE - No preload exists, load and play immediately
+          console.log(`[Auto DJ] FAILSAFE: Loading ${targetDeck} directly (no preload) at ${remaining.toFixed(1)}s remaining`);
+
+          // Load track to target deck
+          handleLoadVideo(
+            queuedItem.videoId,
+            queuedItem.url,
+            targetDeck,
+            queuedItem.sourceType || 'youtube',
+            queuedItem.title,
+            queuedItem.author,
+            'load'  // Use 'load' mode, not 'cue'
+          );
+
+          // Remove from queue
+          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
+
+          // Mark as started
+          earlyStartedTrackRef.current = { deck: targetDeck, videoId: activeState.videoId };
+
+          // Clear any stale preload
+          preloadedTrackRef.current = null;
+
+          // Start playing after a short delay for loading
+          const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
+          setTimeout(() => {
+            console.log(`[Auto DJ] Starting ${targetDeck} after failsafe load`);
+            targetRef.current?.togglePlay();
+          }, 500);
         }
       }
       if (remaining <= leadTime) {
