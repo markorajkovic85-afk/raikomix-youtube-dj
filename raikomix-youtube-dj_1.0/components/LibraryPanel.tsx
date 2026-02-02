@@ -249,10 +249,11 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
           }
         }
 
+        const url = URL.createObjectURL(file);
         return {
           id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-          videoId: `local_${file.name}_${Date.now()}`,
-          url: URL.createObjectURL(file),
+          videoId: `local_${url}`,
+          url,
           title,
           author,
           album,
@@ -298,10 +299,11 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
           }
         }
 
+        const url = URL.createObjectURL(file);
         return {
           id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-          videoId: `local_${file.name}_${Date.now()}`,
-          url: URL.createObjectURL(file),
+          videoId: `local_${url}`,
+          url,
           title,
           author,
           album,

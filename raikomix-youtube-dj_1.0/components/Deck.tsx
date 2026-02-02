@@ -547,7 +547,9 @@ const effectNodesRef = useRef<{
         }));
 
         
-        analyzeLocalAudio(url);
+        if (loadMode !== 'cue') {
+          analyzeLocalAudio(url);
+        }
         
         onPlayerReady({
           setVolume: (v: number) => { if(localAudioRef.current) localAudioRef.current.volume = v / 100; },
