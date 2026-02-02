@@ -945,29 +945,29 @@ const App: React.FC = () => {
       const targetDeck = activeDeck === 'A' ? 'B' : 'A';
       const targetState = targetDeck === 'A' ? deckAState : deckBState;
 
-      // 🔍 DEBUG PRELOAD
+      // 🔍 DEBUG PRELOAD - ADD THIS
       if (remaining <= preloadTime + 2 && remaining >= preloadTime - 2) {
-        console.group(`[PRELOAD DEBUG] ${remaining.toFixed(1)}s remaining`);
-        console.log('Active Deck:', activeDeck);
-        console.log('Target Deck:', targetDeck);
-        console.log('Preload Time:', preloadTime);
-        console.log('Condition: remaining <= preloadTime:', remaining <= preloadTime);
-        console.log('Condition: queue.length > 0:', queue.length > 0);
-        console.log('Condition: !targetState?.playing:', !targetState?.playing);
-        console.log('Condition: !pendingMixRef.current:', !pendingMixRef.current);
-        console.log('Queue[0]:', queue[0]?.title, queue[0]?.sourceType);
-        console.log('Target State:', {
+        console.group(`[AUTO DJ PRELOAD CHECK] ${remaining.toFixed(1)}s remaining`);
+        console.log('🎯 Active Deck:', activeDeck, '→ Target Deck:', targetDeck);
+        console.log('📊 Preload Time:', preloadTime);
+        console.log('⏱️ Remaining:', remaining);
+        console.log('✓ remaining <= preloadTime?', remaining <= preloadTime);
+        console.log('✓ queue.length > 0?', queue.length > 0);
+        console.log('✓ !targetState?.playing?', !targetState?.playing);
+        console.log('✓ !pendingMixRef.current?', !pendingMixRef.current);
+        console.log('📦 Queue[0]:', queue[0]?.title);
+        console.log('🎛️ Target Deck State:', {
+          deck: targetDeck,
           isReady: targetState?.isReady,
           playing: targetState?.playing,
-          videoId: targetState?.videoId,
-          sourceType: targetState?.sourceType
+          videoId: targetState?.videoId
         });
-        console.log('Preloaded Ref:', preloadedTrackRef.current);
+        console.log('💾 Current preloadedTrackRef:', preloadedTrackRef.current);
         console.groupEnd();
       }
 
       if (remaining <= preloadTime && queue.length > 0 && !targetState?.playing && !pendingMixRef.current) {
-        console.log(`🎵 [PRELOAD] Calling preloadNextQueueItem(${targetDeck})`);
+        console.log(`🎵 [AUTO DJ] TRIGGERING PRELOAD → ${targetDeck}`);
         preloadNextQueueItem(targetDeck);
       }
 
