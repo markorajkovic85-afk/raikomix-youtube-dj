@@ -928,10 +928,28 @@ const App: React.FC = () => {
       const remaining = activeState.duration - activeState.currentTime;
       const leadTime = Math.min(Math.max(1, mixLeadSeconds), activeState.duration);
       const preloadTime = Math.min(activeState.duration, Math.max(leadTime + 6, leadTime * 2));
+      const playTriggerTime = Math.min(activeState.duration, leadTime + Math.max(2, mixDurationSeconds));
       const targetDeck = activeDeck === 'A' ? 'B' : 'A';
       const targetState = targetDeck === 'A' ? deckAState : deckBState;
       if (remaining <= preloadTime && queue.length > 0 && !targetState?.playing && !pendingMixRef.current) {
         preloadNextQueueItem(targetDeck);
+      }
+      if (remaining <= playTriggerTime && remaining > leadTime && !targetState?.playing && !pendingMixRef.current) {
+        const preloaded = preloadedTrackRef.current;
+        const queuedItem = queue[0];
+
+        if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === targetDeck) {
+          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
+          preloadedTrackRef.current = null;
+          const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
+          setTimeout(() => targetRef.current?.togglePlay(), 100);
+        } else if (queuedItem) {
+          const nextItem = loadNextQueueItem(targetDeck, 'load');
+          if (nextItem) {
+            const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
+            setTimeout(() => targetRef.current?.togglePlay(), 300);
+          }
+        }
       }
       if (remaining <= leadTime) {
         lastMixVideoRef.current[activeDeck] = activeState.videoId;
@@ -939,7 +957,7 @@ const App: React.FC = () => {
       }
     }, 250);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, getActiveDeck, loadNextQueueItem, triggerDeckPlay, queueAutoMix, preloadNextQueueItem]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, triggerDeckPlay, queueAutoMix, preloadNextQueueItem]);
 
   useEffect(() => {
     if (autoDjEnabled) return;
