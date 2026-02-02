@@ -296,7 +296,23 @@ const Mixer: React.FC<MixerProps> = ({
             </button>
           </div>
 
-          <div className="mixer-center-spine bg-black/30 rounded-xl border border-white/5 mx-0.5" aria-hidden="true" />
+          <div
+            className="mixer-center-spine bg-black/30 rounded-xl border border-white/5 mx-0.5 flex flex-col items-center justify-center py-2"
+            aria-hidden="false"
+          >
+            <div className="mixer-meter flex flex-col gap-0.5 items-center">
+              {[...Array(20)].reverse().map((_, i) => {
+                const isActive = (deckAPlaying || deckBPlaying) && (Math.random() > (i / 20));
+                let barColor = 'bg-green-900/10';
+                if (isActive) {
+                  if (i > 16) barColor = 'bg-red-500 shadow-[0_0_6px_red]';
+                  else if (i > 12) barColor = 'bg-orange-500 shadow-[0_0_4px_orange]';
+                  else barColor = 'bg-green-500 shadow-[0_0_3px_#22c55e]';
+                }
+                return <div key={i} className={`w-2 h-0.5 rounded-[0.5px] transition-all duration-75 ${barColor}`} />;
+              })}
+            </div>
+          </div>
 
           {/* Channel B Section */}
           <div className="mixer-channel bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0 flex flex-col items-center gap-2">
@@ -326,18 +342,6 @@ const Mixer: React.FC<MixerProps> = ({
           <Fader label="A" value={deckAVolume} onChange={onDeckAVolumeChange} color="#D0BCFF" height="h-[var(--mixer-fader-height)]" />
         </div>
         <div className="mixer-masterstrip">
-          <div className="mixer-meter flex flex-col gap-0.5 items-center py-1">
-            {[...Array(20)].reverse().map((_, i) => {
-              const isActive = (deckAPlaying || deckBPlaying) && (Math.random() > (i / 20));
-              let barColor = 'bg-green-900/10';
-              if (isActive) {
-                if (i > 16) barColor = 'bg-red-500 shadow-[0_0_6px_red]';
-                else if (i > 12) barColor = 'bg-orange-500 shadow-[0_0_4px_orange]';
-                else barColor = 'bg-green-500 shadow-[0_0_3px_#22c55e]';
-              }
-              return <div key={i} className={`w-2 h-0.5 rounded-[0.5px] transition-all duration-75 ${barColor}`} />;
-            })}
-          </div>
           <div className="mixer-fadercell mixer-fadercell--m">
             <Fader label="MST" value={masterVolume} onChange={onMasterVolumeChange} color="#FFFFFF" height="h-[var(--mixer-master-fader-height)]" />
           </div>

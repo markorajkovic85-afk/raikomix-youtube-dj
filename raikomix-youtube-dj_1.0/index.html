@@ -474,6 +474,7 @@
     .mixer-center-spine {
       min-width: 40px;
       width: 40px;
+      min-height: 200px;
     }
 
     .mixer-crossfader {
@@ -500,7 +501,8 @@
     }
 
     .deck-card {
-      gap: 12px;
+      gap: 10px;
+      padding-bottom: 8px;
     }
 
     .waveform-display {
@@ -521,9 +523,13 @@
         --mixer-meter-height: 96px;
       }
 
-      .central-stage .mixer-card,
-      .central-stage .deck-card {
+      .central-stage .mixer-card {
         padding: 12px;
+      }
+
+      .central-stage .deck-card {
+        padding: 12px 12px 6px;
+        gap: 8px;
       }
 
       .central-stage .mixer-topgrid {
@@ -627,9 +633,13 @@
         --mixer-meter-height: 96px;
       }
 
-      .central-stage .mixer-card,
-      .central-stage .deck-card {
+      .central-stage .mixer-card {
         padding: 12px;
+      }
+
+      .central-stage .deck-card {
+        padding: 12px 12px 6px;
+        gap: 8px;
       }
 
       .central-stage .mixer-topgrid {
