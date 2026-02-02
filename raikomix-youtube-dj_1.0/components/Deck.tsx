@@ -448,10 +448,11 @@ const effectNodesRef = useRef<{
     if (playerRef.current) {
       try {
         // Reset state for existing player to avoid GUI freeze/glitch
+        // IMPORTANT: Keep isReady=true for cue mode so Auto DJ can trigger playback
         setState(s => ({ 
           ...s, 
           videoId, 
-          isReady: false, 
+          isReady: loadMode === 'cue' ? true : false,  // Keep ready for cued tracks
           sourceType: 'youtube',
           playbackRate: 1.0,
           playing: false,
@@ -464,7 +465,7 @@ const effectNodesRef = useRef<{
         } else {
           playerRef.current.loadVideoById(videoId);
         }
-        setIsLoading(true);
+        setIsLoading(loadMode !== 'cue');  // Don't show loader for cue
       } catch (e) { 
         setIsLoading(false); 
       }
