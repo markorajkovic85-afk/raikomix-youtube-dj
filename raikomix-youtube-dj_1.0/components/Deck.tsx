@@ -422,6 +422,10 @@ const effectNodesRef = useRef<{
     }
   }, [state.hotCues, state.currentTime, state.sourceType]);
 
+  const handleClearAllHotCues = useCallback(() => {
+    setState(s => ({ ...s, hotCues: [null, null, null, null] }));
+  }, []);
+
   const togglePlay = useCallback(() => {
     // Resume context if suspended (browser policy)
     if (audioCtxRef.current?.state === 'suspended') {
@@ -790,30 +794,48 @@ const effectNodesRef = useRef<{
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mt-2">
-        <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2">
-          <div className="flex flex-col items-start gap-1 px-1">
-             <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Hot Cues</div>
-             <div className="text-[7px] text-gray-700 font-black uppercase">Shift + Click to Clear</div>
+      <div className="grid grid-cols-2 gap-3 mt-2 items-stretch">
+        <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
+          <div className="flex items-center justify-between px-1">
+            <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Hot Cues</div>
+            <button
+              type="button"
+              onClick={handleClearAllHotCues}
+              className="h-5 px-2 rounded-md text-[8px] font-black uppercase tracking-widest border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all"
+            >
+              Clear All
+            </button>
           </div>
           <div className="grid grid-cols-4 gap-1">
             {[0, 1, 2, 3].map((i) => (
               <button 
                 key={i} 
-                onClick={(e) => handleHotCue(i, e.shiftKey)} 
+                onClick={() => handleHotCue(i)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  handleHotCue(i, true);
+                }}
+                title={`Hot Cue ${i + 1} (Right-click to clear)`}
+                aria-label={`Hot Cue ${i + 1}`}
                 className={`h-8 rounded-lg font-black text-[10px] border transition-all ${state.hotCues[i] !== null ? 'text-black' : 'border-white/5 text-gray-700 hover:border-white/20'}`} 
                 style={state.hotCues[i] !== null ? { backgroundColor: CUE_COLORS[i], borderColor: CUE_COLORS[i], boxShadow: `0 0 10px ${CUE_COLORS[i]}44` } : {}}
               >
-                {i + 1}
+                <span className="sr-only">{`Hot Cue ${i + 1}`}</span>
               </button>
             ))}
           </div>
         </div>
-        <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2">
+        <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
           <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest px-1">Loops</div>
           <div className="grid grid-cols-4 gap-1">
             {[2, 4, 8, 16].map((b) => (
-              <button key={b} onClick={() => handleToggleLoop(b)} className={`h-7 rounded-lg text-[10px] font-black border transition-all ${state.loopActive && Math.abs((state.loopEnd - state.loopStart) - b * (60 / state.bpm)) < 0.1 ? 'bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'border-white/5 text-gray-500 hover:text-white hover:border-white/20'}`}>{b}</button>
+              <button
+                key={b}
+                onClick={() => handleToggleLoop(b)}
+                className={`h-8 rounded-lg text-[10px] font-black border transition-all ${state.loopActive && Math.abs((state.loopEnd - state.loopStart) - b * (60 / state.bpm)) < 0.1 ? 'bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'border-white/5 text-gray-500 hover:text-white hover:border-white/20'}`}
+              >
+                {b}
+              </button>
             ))}
           </div>
         </div>
