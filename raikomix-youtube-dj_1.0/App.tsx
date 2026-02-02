@@ -674,11 +674,28 @@ const App: React.FC = () => {
   }, [midiAccess, midiInputs]);
 
   const getActiveDeck = useCallback(() => {
-    if (deckAState?.playing && !deckBState?.playing) return 'A';
-    if (deckBState?.playing && !deckAState?.playing) return 'B';
-    if (deckAState?.playing && deckBState?.playing) return crossfader >= 0 ? 'B' : 'A';
+    const aPlaying = deckAState?.playing;
+    const bPlaying = deckBState?.playing;
+
+    if (aPlaying && !bPlaying) return 'A';
+    if (bPlaying && !aPlaying) return 'B';
+
+    if (aPlaying && bPlaying) {
+      const aRemaining = (deckAState?.duration || 0) - (deckAState?.currentTime || 0);
+      const bRemaining = (deckBState?.duration || 0) - (deckBState?.currentTime || 0);
+
+      return aRemaining <= bRemaining ? 'A' : 'B';
+    }
+
     return null;
-  }, [deckAState?.playing, deckBState?.playing, crossfader]);
+  }, [
+    deckAState?.playing,
+    deckAState?.duration,
+    deckAState?.currentTime,
+    deckBState?.playing,
+    deckBState?.duration,
+    deckBState?.currentTime,
+  ]);
 
   const handleDeckStateUpdate = useCallback((id: DeckId, state: PlayerState) => {
     id === 'A' ? setDeckAState(state) : setDeckBState(state);
@@ -911,10 +928,28 @@ const App: React.FC = () => {
       const remaining = activeState.duration - activeState.currentTime;
       const leadTime = Math.min(Math.max(1, mixLeadSeconds), activeState.duration);
       const preloadTime = Math.min(activeState.duration, Math.max(leadTime + 6, leadTime * 2));
+      const playTriggerTime = Math.min(activeState.duration, leadTime + Math.max(2, mixDurationSeconds));
       const targetDeck = activeDeck === 'A' ? 'B' : 'A';
       const targetState = targetDeck === 'A' ? deckAState : deckBState;
       if (remaining <= preloadTime && queue.length > 0 && !targetState?.playing && !pendingMixRef.current) {
         preloadNextQueueItem(targetDeck);
+      }
+      if (remaining <= playTriggerTime && remaining > leadTime && !targetState?.playing && !pendingMixRef.current) {
+        const preloaded = preloadedTrackRef.current;
+        const queuedItem = queue[0];
+
+        if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === targetDeck) {
+          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
+          preloadedTrackRef.current = null;
+          const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
+          setTimeout(() => targetRef.current?.togglePlay(), 100);
+        } else if (queuedItem) {
+          const nextItem = loadNextQueueItem(targetDeck, 'load');
+          if (nextItem) {
+            const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
+            setTimeout(() => targetRef.current?.togglePlay(), 300);
+          }
+        }
       }
       if (remaining <= leadTime) {
         lastMixVideoRef.current[activeDeck] = activeState.videoId;
@@ -922,7 +957,7 @@ const App: React.FC = () => {
       }
     }, 250);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, getActiveDeck, loadNextQueueItem, triggerDeckPlay, queueAutoMix, preloadNextQueueItem]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, triggerDeckPlay, queueAutoMix, preloadNextQueueItem]);
 
   useEffect(() => {
     if (autoDjEnabled) return;
