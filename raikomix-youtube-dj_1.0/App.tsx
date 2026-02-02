@@ -106,6 +106,7 @@ const App: React.FC = () => {
   const pendingMixRef = useRef<{ deck: DeckId; fromDeck: DeckId; item: QueueItem } | null>(null);
   const lastAutoDeckRef = useRef<DeckId>('B');
   const autoLoadDeckRef = useRef<DeckId | null>(null);
+  const nextTrackPlayingRef = useRef<{ deck: DeckId; videoId: string } | null>(null);
   const lastMixVideoRef = useRef<{ A?: string | null; B?: string | null }>({});
   const preloadedTrackRef = useRef<{ deck: DeckId; itemId: string; videoId: string } | null>(null);
   const manualPauseRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
@@ -928,32 +929,48 @@ const App: React.FC = () => {
       const remaining = activeState.duration - activeState.currentTime;
       const leadTime = Math.min(Math.max(1, mixLeadSeconds), activeState.duration);
       const preloadTime = Math.min(activeState.duration, Math.max(leadTime + 6, leadTime * 2));
-      const playTriggerTime = Math.min(activeState.duration, leadTime + Math.max(2, mixDurationSeconds));
+      const playStartTime = Math.min(activeState.duration, leadTime + Math.max(2, mixDurationSeconds));
       const targetDeck = activeDeck === 'A' ? 'B' : 'A';
       const targetState = targetDeck === 'A' ? deckAState : deckBState;
       if (remaining <= preloadTime && queue.length > 0 && !targetState?.playing && !pendingMixRef.current) {
         preloadNextQueueItem(targetDeck);
       }
-      if (remaining <= playTriggerTime && remaining > leadTime && !targetState?.playing && !pendingMixRef.current) {
-        const preloaded = preloadedTrackRef.current;
-        const queuedItem = queue[0];
 
-        if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === targetDeck) {
-          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
-          preloadedTrackRef.current = null;
-          const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
-          setTimeout(() => targetRef.current?.togglePlay(), 100);
-        } else if (queuedItem) {
-          const nextItem = loadNextQueueItem(targetDeck, 'load');
-          if (nextItem) {
+      // Start next track playing BEFORE crossfade begins
+      if (remaining <= playStartTime && remaining > leadTime && !targetState?.playing) {
+        const alreadyStarted = nextTrackPlayingRef.current;
+
+        // Only start once per track
+        if (!alreadyStarted || alreadyStarted.deck !== targetDeck) {
+          const preloaded = preloadedTrackRef.current;
+          const queuedItem = queue[0];
+
+          if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === targetDeck) {
+            // Preloaded track ready - start playing it
+            setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
+            preloadedTrackRef.current = null;
+            nextTrackPlayingRef.current = { deck: targetDeck, videoId: queuedItem.videoId };
+
             const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
-            setTimeout(() => targetRef.current?.togglePlay(), 300);
+            setTimeout(() => targetRef.current?.togglePlay(), 100);
           }
         }
       }
       if (remaining <= leadTime) {
         lastMixVideoRef.current[activeDeck] = activeState.videoId;
-        queueAutoMix(activeDeck);
+
+        // If target deck is already playing, just crossfade
+        if (targetState?.playing) {
+          startAutoMix(activeDeck, targetDeck);
+        } else {
+          // Target not playing yet - queue for when ready
+          queueAutoMix(activeDeck);
+        }
+
+        // Clear the playing ref after crossfade starts
+        if (nextTrackPlayingRef.current?.deck === targetDeck) {
+          nextTrackPlayingRef.current = null;
+        }
       }
     }, 250);
     return () => clearInterval(interval);
@@ -969,6 +986,7 @@ const App: React.FC = () => {
     manualPauseRef.current = { A: false, B: false };
     prevPlayingRef.current = { A: false, B: false };
     autoStopRef.current = { A: false, B: false };
+    nextTrackPlayingRef.current = null;
   }, [autoDjEnabled]);
 
   useEffect(() => {
@@ -982,14 +1000,26 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!pendingMix) return;
     const targetState = pendingMix.deck === 'A' ? deckAState : deckBState;
-    const targetRef = pendingMix.deck === 'A' ? deckARef : deckBRef;
+
     if (!targetState?.isReady) return;
-    if (!targetState.playing) {
+
+    // If target deck is playing, start crossfade immediately
+    if (targetState.playing) {
+      startAutoMix(pendingMix.fromDeck, pendingMix.deck);
+      pendingMixRef.current = null;
+      setPendingMix(null);
+    } else {
+      // Target not ready to play yet - wait for it
+      const targetRef = pendingMix.deck === 'A' ? deckARef : deckBRef;
       targetRef.current?.togglePlay();
+
+      // Crossfade will start when track begins playing
+      setTimeout(() => {
+        startAutoMix(pendingMix.fromDeck, pendingMix.deck);
+        pendingMixRef.current = null;
+        setPendingMix(null);
+      }, 500);
     }
-    startAutoMix(pendingMix.fromDeck, pendingMix.deck);
-    pendingMixRef.current = null;
-    setPendingMix(null);
   }, [pendingMix, deckAState, deckBState, startAutoMix]);
 
 useEffect(() => {
