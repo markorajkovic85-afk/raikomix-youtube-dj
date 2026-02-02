@@ -376,7 +376,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
   useEffect(() => {
     if (activeTab !== 'local' && isRecording) {
-      stopRecording();
+      void stopRecording();
     }
   }, [activeTab, isRecording, stopRecording]);
 
@@ -842,6 +842,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                       <button
                         type="button"
                         onClick={isRecording ? stopRecording : startRecording}
+                        disabled={activeTab !== 'local'}
                         className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition ${
                           isRecording
                             ? 'bg-[#F2B8B5] text-black shadow-[0_0_18px_rgba(242,184,181,0.5)]'
