@@ -22,6 +22,8 @@ interface DeckProps {
 export interface DeckHandle {
   loadVideo: (url: string, sourceType?: TrackSourceType, metadata?: { title?: string, author?: string }) => void;
   cueVideo: (url: string, sourceType?: TrackSourceType, metadata?: { title?: string, author?: string }) => void;
+  play: () => void;
+  pause: () => void;
   togglePlay: () => void;
   triggerHotCue: (index: number, clear?: boolean) => void;
   toggleLoop: (beats?: number) => void;
@@ -426,18 +428,38 @@ const effectNodesRef = useRef<{
     setState(s => ({ ...s, hotCues: [null, null, null, null] }));
   }, []);
 
-  const togglePlay = useCallback(() => {
+  const resumeAudioContext = useCallback(() => {
     // Resume context if suspended (browser policy)
     if (audioCtxRef.current?.state === 'suspended') {
       audioCtxRef.current.resume();
     }
-    
+  }, []);
+
+  const play = useCallback(() => {
+    resumeAudioContext();
+    if (state.sourceType === 'youtube') {
+      playerRef.current?.playVideo();
+    } else {
+      localAudioRef.current?.play();
+    }
+  }, [resumeAudioContext, state.sourceType]);
+
+  const pause = useCallback(() => {
+    if (state.sourceType === 'youtube') {
+      playerRef.current?.pauseVideo();
+    } else {
+      localAudioRef.current?.pause();
+    }
+  }, [state.sourceType]);
+
+  const togglePlay = useCallback(() => {
+    resumeAudioContext();
     if (state.sourceType === 'youtube') {
       state.playing ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo();
     } else {
       state.playing ? localAudioRef.current?.pause() : localAudioRef.current?.play();
     }
-  }, [state.playing, state.sourceType]);
+  }, [resumeAudioContext, state.playing, state.sourceType]);
 
   const initPlayer = useCallback((videoId: string, loadMode: 'load' | 'cue' = 'load') => {
     if (!window.YT || !window.YT.Player) {
@@ -526,7 +548,6 @@ const effectNodesRef = useRef<{
       // Clear current source to prevent memory leak / ghost audio
       localAudioRef.current.pause();
       localAudioRef.current.src = url;
-      localAudioRef.current.load();
       
       // Use URL as stable videoId for local files (not timestamp!)
       const stableVideoId = `local_${url}`;
@@ -564,10 +585,10 @@ const effectNodesRef = useRef<{
         });
         
         setIsLoading(false);
-        localAudioRef.current?.removeEventListener('loadedmetadata', onLoaded);
       };
       
-      localAudioRef.current.addEventListener('loadedmetadata', onLoaded);
+      localAudioRef.current.addEventListener('loadedmetadata', onLoaded, { once: true });
+      localAudioRef.current.load();
     } else {
       console.error(`[Deck ${id}] localAudioRef.current is null!`);
     }
@@ -612,12 +633,14 @@ const effectNodesRef = useRef<{
         }
       }
     },
+    play,
+    pause,
     togglePlay,
     triggerHotCue: handleHotCue,
     toggleLoop: handleToggleLoop,
     setPlaybackRate: updatePlaybackRate,
     tapBpm: handleTap
-  }), [handleTap, initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, initAudioEngine]);
+  }), [handleTap, initPlayer, play, pause, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, initAudioEngine]);
 
   useEffect(() => {
     const interval = setInterval(() => {

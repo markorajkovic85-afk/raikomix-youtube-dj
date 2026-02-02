@@ -108,7 +108,8 @@ const App: React.FC = () => {
   const autoLoadDeckRef = useRef<DeckId | null>(null);
   const lastMixVideoRef = useRef<{ A?: string | null; B?: string | null }>({});
   const preloadedTrackRef = useRef<{ deck: DeckId; itemId: string; videoId: string } | null>(null);
-  const earlyStartedTrackRef = useRef<{ deck: DeckId; videoId: string } | null>(null);
+  const earlyStartedTrackRef = useRef<{ deck: DeckId; itemId: string; activeVideoId: string } | null>(null);
+  const pendingEarlyStartRef = useRef<{ deck: DeckId; item: QueueItem; activeVideoId: string } | null>(null);
   const manualPauseRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const prevPlayingRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const autoStopRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
@@ -841,7 +842,7 @@ const App: React.FC = () => {
 
   const triggerDeckPlay = useCallback((deck: DeckId) => {
     const ref = deck === 'A' ? deckARef : deckBRef;
-    setTimeout(() => ref.current?.togglePlay(), 0);
+    setTimeout(() => ref.current?.play(), 0);
   }, []);
 
   const queueAutoMix = useCallback((fromDeck: DeckId) => {
@@ -917,11 +918,11 @@ const App: React.FC = () => {
         const preloaded = preloadedTrackRef.current;
         const queuedItem = queue[0];
         if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === nextDeck) {
-          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
           autoLoadDeckRef.current = nextDeck;
           preloadedTrackRef.current = null;
           setCrossfader(nextDeck === 'A' ? -1 : 1);
           triggerDeckPlay(nextDeck);
+          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
           return;
         }
         const nextItem = loadNextQueueItem(nextDeck, 'load');
@@ -970,20 +971,18 @@ const App: React.FC = () => {
         const alreadyStarted = earlyStartedTrackRef.current;
         const preloaded = preloadedTrackRef.current;
         const queuedItem = queue[0];
+        const targetReady = targetState?.isReady;
 
         // Only start once per track
-        if (alreadyStarted?.deck === targetDeck && alreadyStarted?.videoId === activeState.videoId) {
+        if (alreadyStarted?.deck === targetDeck && alreadyStarted?.itemId === queuedItem?.id) {
           // Already started this track - skip
           console.log(`[Auto DJ] Already started ${targetDeck} for this track`);
-        } else if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === targetDeck) {
+        } else if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === targetDeck && targetReady) {
           // CASE 1: Preloaded track ready - start playing it NOW
           console.log(`[Auto DJ] Starting ${targetDeck} early (preloaded) at ${remaining.toFixed(1)}s remaining`);
 
-          // Remove from queue
-          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
-
           // Mark as started
-          earlyStartedTrackRef.current = { deck: targetDeck, videoId: activeState.videoId };
+          earlyStartedTrackRef.current = { deck: targetDeck, itemId: queuedItem.id, activeVideoId: activeState.videoId };
 
           // Clear preload ref
           preloadedTrackRef.current = null;
@@ -991,45 +990,37 @@ const App: React.FC = () => {
           // Start playing
           const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
           setTimeout(() => {
-            targetRef.current?.togglePlay();
+            targetRef.current?.play();
           }, 150);
+          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
         } else if (queuedItem && !preloaded) {
           // CASE 2: FAILSAFE - No preload exists, load and play immediately
           console.log(`[Auto DJ] FAILSAFE: Loading ${targetDeck} directly (no preload) at ${remaining.toFixed(1)}s remaining`);
 
-          // Load track to target deck
-          handleLoadVideo(
-            queuedItem.videoId,
-            queuedItem.url,
-            targetDeck,
-            queuedItem.sourceType || 'youtube',
-            queuedItem.title,
-            queuedItem.author,
-            'load'  // Use 'load' mode, not 'cue'
-          );
-
-          // Remove from queue
-          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
-
-          // Mark as started
-          earlyStartedTrackRef.current = { deck: targetDeck, videoId: activeState.videoId };
+          if (!pendingEarlyStartRef.current || pendingEarlyStartRef.current.item.id !== queuedItem.id) {
+            pendingEarlyStartRef.current = { deck: targetDeck, item: queuedItem, activeVideoId: activeState.videoId };
+            // Load track to target deck
+            handleLoadVideo(
+              queuedItem.videoId,
+              queuedItem.url,
+              targetDeck,
+              queuedItem.sourceType || 'youtube',
+              queuedItem.title,
+              queuedItem.author,
+              'load'  // Use 'load' mode, not 'cue'
+            );
+          }
 
           // Clear any stale preload
           preloadedTrackRef.current = null;
-
-          // Start playing after a short delay for loading
-          const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
-          setTimeout(() => {
-            console.log(`[Auto DJ] Starting ${targetDeck} after failsafe load`);
-            targetRef.current?.togglePlay();
-          }, 500);
         }
       }
       if (remaining <= leadTime) {
         lastMixVideoRef.current[activeDeck] = activeState.videoId;
 
         // Check if we already started the target deck early
-        const startedEarly = earlyStartedTrackRef.current?.deck === targetDeck;
+        const startedEarly = earlyStartedTrackRef.current?.deck === targetDeck
+          && earlyStartedTrackRef.current?.activeVideoId === activeState.videoId;
 
         if (targetState?.playing || startedEarly) {
           // Target deck is already playing - just start crossfade
@@ -1058,6 +1049,7 @@ const App: React.FC = () => {
     prevPlayingRef.current = { A: false, B: false };
     autoStopRef.current = { A: false, B: false };
     earlyStartedTrackRef.current = null;
+    pendingEarlyStartRef.current = null;
   }, [autoDjEnabled]);
 
   useEffect(() => {
@@ -1079,7 +1071,7 @@ const App: React.FC = () => {
 
     // Start playing if not already
     if (!targetState.playing) {
-      targetRef.current?.togglePlay();
+      targetRef.current?.play();
     }
 
     // Start crossfade immediately (this is emergency fallback or instant mix mode)
@@ -1088,13 +1080,30 @@ const App: React.FC = () => {
     setPendingMix(null);
   }, [pendingMix, deckAState, deckBState, startAutoMix]);
 
-useEffect(() => {
+  useEffect(() => {
+    const pendingEarly = pendingEarlyStartRef.current;
+    if (!pendingEarly) return;
+    const targetState = pendingEarly.deck === 'A' ? deckAState : deckBState;
+    const targetRef = pendingEarly.deck === 'A' ? deckARef : deckBRef;
+    if (!targetState?.isReady || targetState.playing) return;
+    console.log(`[Auto DJ] Early-start ready on ${pendingEarly.deck}, starting playback`);
+    earlyStartedTrackRef.current = {
+      deck: pendingEarly.deck,
+      itemId: pendingEarly.item.id,
+      activeVideoId: pendingEarly.activeVideoId
+    };
+    targetRef.current?.play();
+    setQueue(prev => prev.filter(item => item.id !== pendingEarly.item.id));
+    pendingEarlyStartRef.current = null;
+  }, [deckAState, deckBState]);
+
+  useEffect(() => {
     if (!autoDjEnabled || !autoLoadDeckRef.current) return;
     const autoDeck = autoLoadDeckRef.current;
     const targetState = autoDeck === 'A' ? deckAState : deckBState;
     const targetRef = autoDeck === 'A' ? deckARef : deckBRef;
     if (!targetState?.isReady || targetState.playing) return;
-    targetRef.current?.togglePlay();
+    targetRef.current?.play();
   }, [autoDjEnabled, deckAState, deckBState]);
   
   useEffect(() => {
