@@ -507,10 +507,14 @@ const effectNodesRef = useRef<{
     });
   }, [containerId, onPlayerReady, onTrackEnd, updateMetadata, state.playbackRate]);
 
-  const loadLocalFile = (url: string, metadata?: { title?: string, author?: string }) => {
+  const loadLocalFile = (
+    url: string,
+    metadata?: { title?: string, author?: string },
+    loadMode: 'load' | 'cue' = 'load'
+  ) => {
     // Only init if not already done
     initAudioEngine();
-    setIsLoading(true);
+    setIsLoading(loadMode !== 'cue');
     
     // Pause any existing YT stream
     if (playerRef.current && state.sourceType === 'youtube') {
@@ -523,6 +527,9 @@ const effectNodesRef = useRef<{
       localAudioRef.current.src = url;
       localAudioRef.current.load();
       
+      // Use URL as stable videoId for local files (not timestamp!)
+      const stableVideoId = `local_${url}`;
+
       const onLoaded = () => {
         setState(s => ({
           ...s,
@@ -531,7 +538,7 @@ const effectNodesRef = useRef<{
           duration: localAudioRef.current?.duration || 0,
           title: metadata?.title || url.split('/').pop() || 'Local Track',
           author: metadata?.author || 'Local File',
-          videoId: `local_${Date.now()}`,
+          videoId: stableVideoId,
           playbackRate: 1.0,
           playing: false,
           currentTime: 0,
@@ -573,7 +580,7 @@ const effectNodesRef = useRef<{
   useImperativeHandle(ref, () => ({
     loadVideo: (url: string, sourceType: TrackSourceType = 'youtube', metadata?: { title?: string, author?: string }) => {
       if (sourceType === 'local') {
-        loadLocalFile(url, metadata);
+        loadLocalFile(url, metadata, 'load');
       } else {
         const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
         if (vid) { 
@@ -586,7 +593,7 @@ const effectNodesRef = useRef<{
     },
     cueVideo: (url: string, sourceType: TrackSourceType = 'youtube', metadata?: { title?: string, author?: string }) => {
       if (sourceType === 'local') {
-        loadLocalFile(url, metadata);
+        loadLocalFile(url, metadata, 'cue');
       } else {
         const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
         if (vid) {
