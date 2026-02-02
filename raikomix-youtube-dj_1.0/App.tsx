@@ -897,6 +897,7 @@ const App: React.FC = () => {
       if (mixInProgressRef.current || pendingMixRef.current || queue.length === 0) return;
       const deckAPlaying = deckAState?.playing || false;
       const deckBPlaying = deckBState?.playing || false;
+      console.log(`[AUTO DJ STATE] A.playing=${deckAPlaying} B.playing=${deckBPlaying} queue=${queue.length}`);
       if (!deckAPlaying && !deckBPlaying) {
         if (manualPauseRef.current.A || manualPauseRef.current.B) return;
         if (autoLoadDeckRef.current) return;
@@ -932,8 +933,24 @@ const App: React.FC = () => {
       const playStartTime = leadTime + Math.max(2, mixDurationSeconds);
       const targetDeck = activeDeck === 'A' ? 'B' : 'A';
       const targetState = targetDeck === 'A' ? deckAState : deckBState;
+      if (remaining <= preloadTime + 5) {
+        console.group(`⏰ [AUTO DJ] ${remaining.toFixed(1)}s remaining on ${activeDeck}`);
+        console.log('🎯 Target Deck:', targetDeck);
+        console.log('📊 Preload Time:', preloadTime);
+        console.log('✅ Condition 1: remaining <= preloadTime?', remaining, '<=', preloadTime, '=', remaining <= preloadTime);
+        console.log('✅ Condition 2: queue.length > 0?', queue.length > 0);
+        console.log('✅ Condition 3: !targetState?.playing?', !targetState?.playing, '(targetState.playing=' + targetState?.playing + ')');
+        console.log('✅ Condition 4: !pendingMixRef.current?', !pendingMixRef.current);
+        console.log('📦 Queue[0]:', queue[0]?.title);
+        console.log('🎛️ Target State:', targetState);
+        console.log('💾 Preloaded:', preloadedTrackRef.current);
+        console.groupEnd();
+      }
       if (remaining <= preloadTime && queue.length > 0 && !targetState?.playing && !pendingMixRef.current) {
+        console.log(`🎵🎵🎵 [AUTO DJ] PRELOAD TRIGGERED → ${targetDeck}`);
         preloadNextQueueItem(targetDeck);
+      } else if (remaining <= preloadTime && queue.length > 0) {
+        console.warn(`❌ [AUTO DJ] PRELOAD BLOCKED! targetPlaying=${targetState?.playing} pending=${!!pendingMixRef.current}`);
       }
 
       // Start next track playing BEFORE crossfade begins
