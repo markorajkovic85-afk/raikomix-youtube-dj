@@ -817,13 +817,25 @@ const App: React.FC = () => {
 
   const preloadNextQueueItem = useCallback((targetDeck: DeckId) => {
     const nextItem = queue[0];
-    if (!nextItem) return null;
+    if (!nextItem) {
+      console.warn('[PRELOAD] No queue item to preload');
+      return null;
+    }
     const alreadyPreloaded = preloadedTrackRef.current;
     if (alreadyPreloaded && alreadyPreloaded.itemId === nextItem.id && alreadyPreloaded.deck === targetDeck) {
+      console.log('[PRELOAD] Already preloaded, skipping');
       return nextItem;
     }
+    console.log(`[PRELOAD] Loading ${nextItem.title} to ${targetDeck} in CUE mode`);
+    console.log('[PRELOAD] Item:', {
+      id: nextItem.id,
+      videoId: nextItem.videoId,
+      url: nextItem.url,
+      sourceType: nextItem.sourceType
+    });
     handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author, 'cue');
     preloadedTrackRef.current = { deck: targetDeck, itemId: nextItem.id, videoId: nextItem.videoId };
+    console.log('[PRELOAD] Set preloadedTrackRef:', preloadedTrackRef.current);
     return nextItem;
   }, [queue, handleLoadVideo]);
 
@@ -932,7 +944,30 @@ const App: React.FC = () => {
       const playStartTime = leadTime + Math.max(2, mixDurationSeconds);
       const targetDeck = activeDeck === 'A' ? 'B' : 'A';
       const targetState = targetDeck === 'A' ? deckAState : deckBState;
+
+      // 🔍 DEBUG PRELOAD
+      if (remaining <= preloadTime + 2 && remaining >= preloadTime - 2) {
+        console.group(`[PRELOAD DEBUG] ${remaining.toFixed(1)}s remaining`);
+        console.log('Active Deck:', activeDeck);
+        console.log('Target Deck:', targetDeck);
+        console.log('Preload Time:', preloadTime);
+        console.log('Condition: remaining <= preloadTime:', remaining <= preloadTime);
+        console.log('Condition: queue.length > 0:', queue.length > 0);
+        console.log('Condition: !targetState?.playing:', !targetState?.playing);
+        console.log('Condition: !pendingMixRef.current:', !pendingMixRef.current);
+        console.log('Queue[0]:', queue[0]?.title, queue[0]?.sourceType);
+        console.log('Target State:', {
+          isReady: targetState?.isReady,
+          playing: targetState?.playing,
+          videoId: targetState?.videoId,
+          sourceType: targetState?.sourceType
+        });
+        console.log('Preloaded Ref:', preloadedTrackRef.current);
+        console.groupEnd();
+      }
+
       if (remaining <= preloadTime && queue.length > 0 && !targetState?.playing && !pendingMixRef.current) {
+        console.log(`🎵 [PRELOAD] Calling preloadNextQueueItem(${targetDeck})`);
         preloadNextQueueItem(targetDeck);
       }
 
