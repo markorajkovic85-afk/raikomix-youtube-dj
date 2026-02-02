@@ -257,81 +257,86 @@
       min-height: 0;
     }
 
-    .perform-stage {
-      height: 100%;
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       CENTRAL CONSOLE LAYOUT STRATEGY
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+       PANEL CENTERING:
+       - .app-stage uses flexbox with align-items: center
+       - Panel has fit-content dimensions (intrinsic sizing)
+       - Extra vertical space distributes equally above/below
+
+       GLOBAL SCALING:
+       - Container queries detect short viewports
+       - Single --panel-scale variable applied to entire panel
+       - Prevents individual control stretching
+
+       MIXER FIXED-BAND STRATEGY:
+       - Three horizontal bands: EQ, Faders, Crossfader
+       - Each band has fixed height via CSS custom property
+       - No flex-grow prevents stretching on large displays
+       - No overflow-y prevents internal scrolling
+
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+    :root {
+      --panel-padding: 1.5rem;
+      --panel-max-width: 1400px;
+      --console-gap: 1.5rem;
+      --mixer-width: 240px;
+      --deck-min: 360px;
+      --panel-scale: 1;
+
+      --band-eq-height: 210px;
+      --band-faders-height: 250px;
+      --band-crossfader-height: 230px;
+      --mixer-band-gap: 1rem;
+      --mixer-fader-height: 200px;
+      --mixer-master-fader-height: 176px;
+      --mixer-meter-height: 110px;
+    }
+
+    .app-stage {
       display: flex;
       justify-content: center;
       align-items: center;
+      height: 100%;
       min-height: 0;
       overflow: hidden;
       container-type: size;
-      container-name: central-stage;
+      container-name: stage;
+      padding: 1rem;
     }
 
-    .central-stage {
-      /* Layout philosophy: keep the console as one hardware-like instrument panel.
-         The outer wrapper centers the fixed-proportion panel; the inner grid aligns
-         deck + mixer tops/bottoms so nothing stretches when extra space appears. */
-      --mixer-width: 224px;
-      --deck-min: 360px;
-      --central-gap: 20px;
-      --central-padding-block: 16px;
-      --central-padding-inline: 18px;
-      --mixer-gap: 10px;
-      --mixer-fader-height: 190px;
-      --mixer-master-fader-height: calc(var(--mixer-fader-height) - 24px);
-      --mixer-meter-height: 110px;
-      --central-stage-scale: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      min-height: 0;
+    .central-console-panel {
+      width: fit-content;
+      height: fit-content;
+      max-width: var(--panel-max-width);
+      padding: var(--panel-padding);
+      transform: scale(var(--panel-scale));
+      transform-origin: center center;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     }
 
-    .central-stage__panel {
-      /* Scaling strategy: apply a single scale to the panel at tight heights
-         so controls stay fixed-size and never stretch. */
+    .console-grid {
       display: grid;
       grid-template-columns: minmax(var(--deck-min), 1fr) var(--mixer-width) minmax(var(--deck-min), 1fr);
+      gap: var(--console-gap);
       align-items: stretch;
-      gap: var(--central-gap);
-      height: auto;
-      max-height: 100%;
-      min-height: 0;
-      padding: var(--central-padding-block) var(--central-padding-inline);
-      transform: scale(var(--central-stage-scale));
-      transform-origin: center;
     }
 
-    .perform-stage__inner > *,
-    .central-stage > * {
+    .console-grid > * {
       min-width: 0;
       min-height: 0;
     }
 
-    .central-stage__panel > * {
-      min-width: 0;
-      min-height: 0;
-    }
-
-    .perform-stage__deck {
+    .console-deck,
+    .console-mixer {
       display: flex;
       align-items: stretch;
       min-width: 0;
-      width: 100%;
-      max-width: none;
-      flex: 1 1 auto;
-    }
-
-    .central-stage__deck > * {
-      height: 100%;
-      min-height: 0;
-      width: 100%;
-    }
-
-    .central-stage__mixer {
-      height: 100%;
       min-height: 0;
     }
 
@@ -350,60 +355,52 @@
       padding: 14px;
     }
 
-    .central-stage .deck-card {
-      align-self: stretch;
-      height: 100%;
+    .mixer-card {
+      width: var(--mixer-width);
     }
 
-    .mixer-card {
-      max-height: none;
-      min-height: 0;
+    .mixer-container {
       display: flex;
       flex-direction: column;
-    }
-
-    .mixer-shell {
-      width: var(--mixer-width);
-      height: 100%;
-      align-self: stretch;
-      min-width: 0;
-      display: grid;
-      grid-template-rows: auto auto auto auto;
-      align-content: start;
-      row-gap: var(--mixer-gap);
-      min-height: 0;
+      gap: var(--mixer-band-gap);
+      height: fit-content;
       overflow: visible;
     }
 
     .mixer-header {
       min-height: 0;
-    }
-
-    .mixer-content {
-      min-height: 0;
-    }
-
-    .mixer-footer {
-      min-height: 0;
+      flex-shrink: 0;
     }
 
     .mixer-band {
+      flex-shrink: 0;
       min-height: 0;
-      display: block;
     }
 
-    .mixer-band--eq {
-      display: block;
+    .mixer-band-eq {
+      height: var(--band-eq-height);
+      display: flex;
     }
 
-    .mixer-band--faders {
-      /* Stability note: fixed band heights (meter + fader) stop growth at large sizes,
-         while the grid keeps channel proportions locked across devices/zoom levels. */
+    .mixer-band-eq .mixer-topgrid {
+      width: 100%;
+    }
+
+    .mixer-band-faders {
+      height: var(--band-faders-height);
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       align-items: end;
       justify-items: center;
       gap: 12px;
+    }
+
+    .mixer-band-crossfader {
+      height: var(--band-crossfader-height);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
     }
 
     .mixer-masterstrip {
@@ -414,55 +411,14 @@
       gap: 8px;
     }
 
-    .mixer-upper {
-      min-height: 0;
-      overflow: visible;
-      display: block;
-    }
-
-    .mixer-lower {
-      margin-top: 0;
-    }
-
-    .mixer-main {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(48px, auto) minmax(0, 1fr);
-      gap: clamp(4px, 0.6vw, 8px);
-      align-items: stretch;
-      justify-items: stretch;
-      min-height: 0;
-    }
-
     .mixer-channel {
       min-width: 0;
-      min-height: 0;
-    }
-
-    .mixer-master {
-      min-width: 48px;
-      max-width: 60px;
-      min-height: 0;
-    }
-
-    .mixer-top {
       min-height: 0;
     }
 
     .mixer-meter {
       height: var(--mixer-meter-height);
       overflow: hidden;
-    }
-
-    .mixer-faderbank {
-      margin-top: 0;
-      padding: 0 2px;
-      height: var(--mixer-fader-height);
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      align-items: end;
-      justify-items: center;
-      gap: 12px;
-      min-height: 0;
     }
 
     .mixer-fadercell {
@@ -507,47 +463,22 @@
       height: 5rem;
     }
 
-    /* Central Stage density modes:
-       - Comfort (default): generous gaps/padding.
-       - Compact: triggered by height thresholds to tighten spacing.
-       Safe scale: if height is still tight, scale down the central stage wrapper only. */
-    @container central-stage (max-height: 820px) {
-      .central-stage {
-        --central-gap: 14px;
-        --central-padding-block: 12px;
-        --central-padding-inline: 12px;
-        --mixer-gap: 8px;
-        --mixer-fader-height: 170px;
+    @container stage (max-height: 820px) {
+      .app-stage {
+        --panel-padding: 1.25rem;
+        --console-gap: 1.25rem;
+        --band-eq-height: 190px;
+        --band-faders-height: 220px;
+        --band-crossfader-height: 210px;
+        --mixer-fader-height: 180px;
+        --mixer-master-fader-height: 156px;
         --mixer-meter-height: 96px;
-      }
-
-      .central-stage .mixer-card,
-      .central-stage .deck-card {
-        padding: 12px;
-      }
-
-      .central-stage .mixer-topgrid {
-        gap: 4px;
-      }
-
-      .central-stage .mixer-channel {
-        padding: 6px;
-        gap: 6px;
-      }
-
-      .central-stage .mixer-crossfader {
-        margin-top: 6px;
-        padding-top: 6px;
-      }
-
-      .central-stage .mixer-autodj {
-        margin-top: 8px;
       }
     }
 
-    @container central-stage (max-height: 720px) {
-      .central-stage {
-        --central-stage-scale: 0.94;
+    @container stage (max-height: 700px) {
+      .app-stage {
+        --panel-scale: 0.92;
       }
     }
 
@@ -583,77 +514,32 @@
     }
 
     @media (max-width: 1280px) {
-      .central-stage {
-        --mixer-width: 210px;
+      :root {
+        --mixer-width: 220px;
         --deck-min: 320px;
       }
     }
 
     @media (max-width: 1024px) {
-      .perform-stage {
+      .app-stage {
         overflow-y: auto;
       }
 
-      .central-stage__panel {
+      .console-grid {
         grid-template-columns: minmax(0, 1fr);
         grid-auto-rows: auto;
       }
 
-      .perform-stage__deck {
-        max-width: 100%;
-      }
-
-      .mixer-shell {
+      .mixer-card {
         width: min(280px, 90vw);
         justify-self: center;
       }
     }
 
     @media (max-width: 768px) {
-      .central-stage {
-        --central-padding-block: 10px;
-        --central-padding-inline: 10px;
-        --central-gap: 12px;
-      }
-    }
-
-    @media (max-height: 820px) {
-      .central-stage {
-        --central-gap: 14px;
-        --central-padding-block: 12px;
-        --central-padding-inline: 12px;
-        --mixer-gap: 8px;
-        --mixer-fader-height: 170px;
-        --mixer-meter-height: 96px;
-      }
-
-      .central-stage .mixer-card,
-      .central-stage .deck-card {
-        padding: 12px;
-      }
-
-      .central-stage .mixer-topgrid {
-        gap: 4px;
-      }
-
-      .central-stage .mixer-channel {
-        padding: 6px;
-        gap: 6px;
-      }
-
-      .central-stage .mixer-crossfader {
-        margin-top: 6px;
-        padding-top: 6px;
-      }
-
-      .central-stage .mixer-autodj {
-        margin-top: 8px;
-      }
-    }
-
-    @media (max-height: 720px) {
-      .central-stage {
-        --central-stage-scale: 0.94;
+      :root {
+        --panel-padding: 1.25rem;
+        --console-gap: 1rem;
       }
     }
   </style>
