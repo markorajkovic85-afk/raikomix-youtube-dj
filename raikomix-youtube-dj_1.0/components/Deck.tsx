@@ -512,6 +512,7 @@ const effectNodesRef = useRef<{
     metadata?: { title?: string, author?: string },
     loadMode: 'load' | 'cue' = 'load'
   ) => {
+    console.log(`[Deck ${id}] loadLocalFile called:`, { url, loadMode, metadata });
     // Only init if not already done
     initAudioEngine();
     setIsLoading(loadMode !== 'cue');
@@ -529,8 +530,10 @@ const effectNodesRef = useRef<{
       
       // Use URL as stable videoId for local files (not timestamp!)
       const stableVideoId = `local_${url}`;
+      console.log(`[Deck ${id}] Set audio src, waiting for loadedmetadata. stableVideoId:`, stableVideoId);
 
       const onLoaded = () => {
+        console.log(`[Deck ${id}] loadedmetadata fired! Duration:`, localAudioRef.current?.duration);
         setState(s => ({
           ...s,
           isReady: true,
@@ -546,8 +549,11 @@ const effectNodesRef = useRef<{
           waveformPeaks: undefined
         }));
 
+        console.log(`[Deck ${id}] State updated, isReady: true, videoId:`, stableVideoId);
         
-        analyzeLocalAudio(url);
+        if (loadMode !== 'cue') {
+          analyzeLocalAudio(url);
+        }
         
         onPlayerReady({
           setVolume: (v: number) => { if(localAudioRef.current) localAudioRef.current.volume = v / 100; },
@@ -562,6 +568,8 @@ const effectNodesRef = useRef<{
       };
       
       localAudioRef.current.addEventListener('loadedmetadata', onLoaded);
+    } else {
+      console.error(`[Deck ${id}] localAudioRef.current is null!`);
     }
   };
 

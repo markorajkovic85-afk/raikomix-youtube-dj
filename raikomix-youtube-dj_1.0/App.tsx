@@ -817,13 +817,25 @@ const App: React.FC = () => {
 
   const preloadNextQueueItem = useCallback((targetDeck: DeckId) => {
     const nextItem = queue[0];
-    if (!nextItem) return null;
+    if (!nextItem) {
+      console.warn('[PRELOAD] No queue item to preload');
+      return null;
+    }
     const alreadyPreloaded = preloadedTrackRef.current;
     if (alreadyPreloaded && alreadyPreloaded.itemId === nextItem.id && alreadyPreloaded.deck === targetDeck) {
+      console.log('[PRELOAD] Already preloaded, skipping');
       return nextItem;
     }
+    console.log(`[PRELOAD] Loading ${nextItem.title} to ${targetDeck} in CUE mode`);
+    console.log('[PRELOAD] Item:', {
+      id: nextItem.id,
+      videoId: nextItem.videoId,
+      url: nextItem.url,
+      sourceType: nextItem.sourceType
+    });
     handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author, 'cue');
     preloadedTrackRef.current = { deck: targetDeck, itemId: nextItem.id, videoId: nextItem.videoId };
+    console.log('[PRELOAD] Set preloadedTrackRef:', preloadedTrackRef.current);
     return nextItem;
   }, [queue, handleLoadVideo]);
 
