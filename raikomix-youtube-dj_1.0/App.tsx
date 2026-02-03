@@ -1148,7 +1148,7 @@ useEffect(() => {
           className="app-shell__main min-h-0"
           style={{
             '--left-w': libraryOpen ? 'clamp(320px,26vw,420px)' : '0px',
-            '--right-w': viewMode === 'LIBRARY' && queueOpen ? 'clamp(240px,18vw,300px)' : '0px'
+            '--right-w': queueOpen ? 'clamp(240px,18vw,300px)' : '0px'
           } as React.CSSProperties}
         >
              {viewMode === 'LIBRARY' ? (
@@ -1294,8 +1294,6 @@ useEffect(() => {
             </div>
           </section>
 
-             {viewMode === 'LIBRARY' && (
-            <>
           <aside
             className={`app-shell__panel app-shell__panel--right bg-black/10 flex-none flex flex-col transition-all duration-300 overflow-x-hidden ${
               queueOpen ? 'app-shell__panel--open border-l border-white/5' : 'app-shell__panel--closed'
@@ -1332,8 +1330,6 @@ useEffect(() => {
                   <span className="material-icons rotate-180">chevron_left</span>
                 </button>
               )}
-            </>
-          )}
         </div>
 
         {showHelp && (
