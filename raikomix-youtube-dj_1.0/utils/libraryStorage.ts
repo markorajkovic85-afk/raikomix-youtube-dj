@@ -126,14 +126,6 @@ export const addTrackToLibrary = (
 };
 
 export const removeFromLibrary = (id: string, library: LibraryTrack[]): LibraryTrack[] => {
-  const target = library.find(track => track.id === id);
-  if (target?.sourceType === 'local') {
-    try {
-      URL.revokeObjectURL(target.url);
-    } catch (error) {
-      console.warn('Failed to revoke local track URL', error);
-    }
-  }
   return library.filter(t => t.id !== id);
 };
 

@@ -1,7 +1,5 @@
 
-const isDev =
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV) ||
-  (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production');
+const isDev = import.meta.env?.DEV ?? false;
 
 export const trackEvent = (
   category: string,

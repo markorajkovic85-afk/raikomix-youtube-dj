@@ -8,6 +8,7 @@ import {
   savePerformancePads,
   storePerformancePadSample,
 } from '../utils/performancePadsStorage';
+import { makeId } from '../utils/id';
 import { createEffectChain } from '../utils/effectsChain';
 
 interface PerformancePadsProps {
@@ -753,7 +754,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
   };
 
   const handleLocalFileSelected = async (file: File) => {
-    const record = await storePerformancePadSample(`pad_${Date.now()}`, file);
+    const record = await storePerformancePadSample(makeId(), file);
     if (!record) {
       onNotify('Local storage unavailable for samples', 'warning');
       return null;

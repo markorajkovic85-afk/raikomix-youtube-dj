@@ -907,10 +907,7 @@ const App: React.FC = () => {
   };
 
   const handleRemoveMultiple = useCallback((ids: string[]) => {
-    setLibrary(prev => {
-      revokeLocalTrackUrls(prev.filter(track => ids.includes(track.id)));
-      return prev.filter(track => !ids.includes(track.id));
-    });
+    setLibrary(prev => prev.filter(track => !ids.includes(track.id)));
     showNotification(`Removed ${ids.length} items from Library`);
   }, []);
 
