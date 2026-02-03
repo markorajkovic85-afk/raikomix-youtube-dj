@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 interface WaveformProps {
@@ -111,6 +110,7 @@ const Waveform: React.FC<WaveformProps> = ({
     const endIndex = Math.min(totalPeaks, Math.ceil(((visibleStart + visibleDuration) / duration) * totalPeaks));
     const visiblePeaks = peaks.slice(startIndex, endIndex);
     if (visiblePeaks.length === 0) return;
+
     const centerY = height / 2;
     const barWidth = width / visiblePeaks.length;
     const baseLineWidth = Math.max(1, barWidth * 0.7);
@@ -256,7 +256,7 @@ const Waveform: React.FC<WaveformProps> = ({
   return (
     <div
       ref={containerRef}
-      className="waveform-display w-full h-24 bg-black/70 rounded-xl overflow-hidden border border-white/5 shadow-inner relative"
+      className="waveform-display w-full h-full min-h-[56px] bg-black/70 rounded-xl overflow-hidden border border-white/5 shadow-inner relative min-w-0"
       onClick={(event) => {
         if (!onSeek || duration <= 0) return;
         const rect = event.currentTarget.getBoundingClientRect();
@@ -276,9 +276,9 @@ const Waveform: React.FC<WaveformProps> = ({
       }}
     >
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/4 to-transparent pointer-events-none" />
-           <button
+      <button
         type="button"
-        className="absolute top-2 right-3 text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors"
+        className="absolute top-2 right-3 text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors z-10"
         onClick={(event) => {
           event.stopPropagation();
           onTimeToggle?.();
@@ -287,8 +287,8 @@ const Waveform: React.FC<WaveformProps> = ({
       >
         {timeLabel ?? '--:--'}
       </button>
-      <canvas 
-        ref={canvasRef} 
+      <canvas
+        ref={canvasRef}
         className="w-full h-full"
       />
     </div>
