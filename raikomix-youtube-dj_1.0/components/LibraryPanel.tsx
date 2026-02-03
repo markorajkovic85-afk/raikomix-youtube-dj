@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LibraryTrack, Playlist, DeckId } from '../types';
 import { exportLibrary, loadPlaylists, savePlaylists } from '../utils/libraryStorage';
+import { makeId } from '../utils/id';
 import { extractPlaylistId, fetchPlaylistItems } from '../utils/youtubeApi';
 
 interface LibraryPanelProps {
@@ -59,7 +60,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         }
 
         const fetchedTracks: LibraryTrack[] = items.map(t => ({
-          id: `yt_${Date.now()}_${t.videoId}_${Math.random().toString(36).substr(2, 4)}`,
+          id: makeId(),
           videoId: t.videoId!,
           url: `https://www.youtube.com/watch?v=${t.videoId}`,
           title: t.title || 'Unknown Title',
@@ -250,7 +251,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         }
 
         return {
-          id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          id: makeId(),
           videoId: `local_${file.name}_${Date.now()}`,
           url: URL.createObjectURL(file),
           title,
@@ -299,7 +300,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         }
 
         return {
-          id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          id: makeId(),
           videoId: `local_${file.name}_${Date.now()}`,
           url: URL.createObjectURL(file),
           title,

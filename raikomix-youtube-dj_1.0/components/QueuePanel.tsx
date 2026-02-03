@@ -50,6 +50,19 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
     handleDragEnd();
   };
 
+  const handleMove = (from: number, to: number) => {
+    if (to < 0 || to >= queue.length || to === from) return;
+    onReorder(from, to);
+  };
+
+  const parseNumberOrIgnore = (value: string, onValid: (n: number) => void) => {
+    if (value.trim() === '') return;
+    const nextValue = Number(value);
+    if (Number.isFinite(nextValue)) {
+      onValid(nextValue);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full gap-4 elevation-2">
       <div className="flex items-center justify-between px-2">
@@ -103,7 +116,7 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
               min={4}
               max={30}
               value={mixLeadSeconds}
-              onChange={(e) => onMixLeadChange(Number(e.target.value))}
+              onChange={(e) => parseNumberOrIgnore(e.target.value, onMixLeadChange)}
               className="mix-number-input w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[10px] text-white"
             />
           </label>
@@ -114,7 +127,7 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
               min={2}
               max={20}
               value={mixDurationSeconds}
-              onChange={(e) => onMixDurationChange(Number(e.target.value))}
+              onChange={(e) => parseNumberOrIgnore(e.target.value, onMixDurationChange)}
               className="mix-number-input w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-[10px] text-white"
             />
           </label>

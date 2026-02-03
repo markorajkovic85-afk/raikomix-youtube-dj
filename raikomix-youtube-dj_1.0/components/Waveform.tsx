@@ -47,7 +47,8 @@ const Waveform: React.FC<WaveformProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const requestRef = useRef<number>(null);
+  const requestRef = useRef<number | null>(null);
+  const runningRef = useRef(false);
   const offsetRef = useRef(0);
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
   const [zoomLevel, setZoomLevel] = useState(MIN_ZOOM);
@@ -218,6 +219,7 @@ const Waveform: React.FC<WaveformProps> = ({
   }, [currentTime, duration, zoomLevel]);
 
   const draw = () => {
+    if (!runningRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -234,6 +236,7 @@ const Waveform: React.FC<WaveformProps> = ({
 
     if (peaks && peaks.length > 0) {
       drawPeaks(ctx, width, height, visibleProgress, visibleWindow.start, visibleWindow.length);
+      if (!runningRef.current) return;
       requestRef.current = requestAnimationFrame(draw);
       return;
     }
@@ -291,14 +294,20 @@ const Waveform: React.FC<WaveformProps> = ({
     const p = duration > 0 ? currentTime / duration : 0;
     drawPlayhead(ctx, width, height, p, 'soft');
 
+    if (!runningRef.current) return;
     requestRef.current = requestAnimationFrame(draw);
   };
 
   useEffect(() => {
+    runningRef.current = true;
     resizeCanvas();
     requestRef.current = requestAnimationFrame(draw);
     return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      runningRef.current = false;
+      if (requestRef.current !== null) {
+        cancelAnimationFrame(requestRef.current);
+      }
+      requestRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, volume, playbackRate, color, peaks, currentTime, duration, sourceType, hotCues, cueColors, loop, visibleWindow]);

@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { safeSetStorageItem } from '../utils/storage';
 
 export const useTheme = () => {
   const [theme, setTheme] = useState<'dark' | 'light'>(
@@ -8,7 +9,7 @@ export const useTheme = () => {
   
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
+    safeSetStorageItem('theme', theme);
     // Also update body color for overall consistency
     document.body.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--md-sys-color-background');
   }, [theme]);

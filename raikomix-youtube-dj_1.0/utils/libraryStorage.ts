@@ -1,4 +1,5 @@
 import { LibraryTrack, Playlist } from '../types';
+import { safeSetStorageItem } from './storage';
 
 const STORAGE_KEY = 'raikomix_library';
 const PLAYLISTS_KEY = 'raikomix_playlists';
@@ -45,8 +46,11 @@ export const saveLibrary = (tracks: LibraryTrack[]): boolean => {
   try {
     // Only save tracks that are not local (since ObjectURLs are temporary)
     // Or save them, but know URLs might break
-     localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION, tracks }));
-    return true;
+    const persistedTracks = tracks.filter(track => track.sourceType !== 'local');
+    return safeSetStorageItem(
+      STORAGE_KEY,
+      JSON.stringify({ version: STORAGE_VERSION, tracks: persistedTracks })
+    );
   } catch (e) {
     console.error('Failed to save library:', e);
     return false;
@@ -74,8 +78,8 @@ export const loadPlaylists = (): Playlist[] => {
   }
 };
 
-export const savePlaylists = (playlists: Playlist[]): void => {
-  localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists));
+export const savePlaylists = (playlists: Playlist[]): boolean => {
+  return safeSetStorageItem(PLAYLISTS_KEY, JSON.stringify(playlists));
 };
 
 export const exportLibrary = (library: LibraryTrack[]): void => {
@@ -122,7 +126,26 @@ export const addTrackToLibrary = (
 };
 
 export const removeFromLibrary = (id: string, library: LibraryTrack[]): LibraryTrack[] => {
+  const target = library.find(track => track.id === id);
+  if (target?.sourceType === 'local') {
+    try {
+      URL.revokeObjectURL(target.url);
+    } catch (error) {
+      console.warn('Failed to revoke local track URL', error);
+    }
+  }
   return library.filter(t => t.id !== id);
+};
+
+export const revokeLocalTrackUrls = (tracks: LibraryTrack[]) => {
+  tracks.forEach(track => {
+    if (track.sourceType !== 'local') return;
+    try {
+      URL.revokeObjectURL(track.url);
+    } catch (error) {
+      console.warn('Failed to revoke local track URL', error);
+    }
+  });
 };
 
 export const updateTrackMetadata = (

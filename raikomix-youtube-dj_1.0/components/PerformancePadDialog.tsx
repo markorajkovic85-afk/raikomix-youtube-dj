@@ -14,7 +14,7 @@ interface PerformancePadDialogProps {
   onClose: () => void;
   onSave: (pad: PerformancePadConfig) => void;
   onClear: () => void;
-  onLocalFileSelected: (file: File) => Promise<LocalSampleMeta>;
+  onLocalFileSelected: (file: File) => Promise<LocalSampleMeta | null>;
   onPreview: (pad: PerformancePadConfig) => Promise<{ ok: boolean; error?: string }>;
   onStopPreview: () => void;
   onPreflightYouTube: (pad: PerformancePadConfig) => void;
@@ -176,6 +176,10 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     async (file: File) => {
       try {
         const meta = await onLocalFileSelected(file);
+        if (!meta) {
+          setRecordingError('Local storage unavailable for samples.');
+          return;
+        }
         setDraft((prev) => ({
           ...prev,
           sourceType: 'local',
@@ -963,6 +967,10 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                         const file = event.target.files?.[0];
                         if (!file) return;
                         const meta = await onLocalFileSelected(file);
+                        if (!meta) {
+                          setRecordingError('Local storage unavailable for samples.');
+                          return;
+                        }
                         setDraft((prev) => ({
                           ...prev,
                           sourceType: 'local',

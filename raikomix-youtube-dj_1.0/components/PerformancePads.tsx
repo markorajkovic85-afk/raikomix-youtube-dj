@@ -754,6 +754,10 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
 
   const handleLocalFileSelected = async (file: File) => {
     const record = await storePerformancePadSample(`pad_${Date.now()}`, file);
+    if (!record) {
+      onNotify('Local storage unavailable for samples', 'warning');
+      return null;
+    }
     const ctx = ensureAudioContext();
     const buffer = await ctx.decodeAudioData(record.arrayBuffer.slice(0));
     if (activePadId !== null) {
