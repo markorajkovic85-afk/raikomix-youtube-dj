@@ -696,7 +696,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     };
 
     return (
-      <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-2 flex flex-col gap-1.5">
+      <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-2 flex flex-col gap-2">
         <div id={containerId} className="h-0 w-0 overflow-hidden" />
 
         <audio
@@ -741,7 +741,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         </div>
 
         {/* Row 1: Title + Play */}
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5 items-stretch min-w-0">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-stretch min-w-0">
           <div className="bg-black/30 rounded-lg border border-white/5 px-2 py-1.5 min-w-0 overflow-hidden flex items-center">
             <div className="flex items-start justify-between gap-2 min-w-0 w-full">
               <div className="min-w-0">
@@ -772,22 +772,24 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             </div>
           </div>
 
-          <button
-            onClick={togglePlay}
-            disabled={!state.isReady}
-            className="w-10 h-10 rounded-lg bg-gradient-to-b from-[#2A2733] to-[#16151C] border-2 flex items-center justify-center transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
-            style={playRingStyle}
-            aria-label={state.playing ? 'Pause' : 'Play'}
-            title="Play / Pause"
-          >
-            <span className="material-icons text-[22px] text-white leading-none">
-              {state.playing ? 'pause' : 'play_arrow'}
-            </span>
-          </button>
+          <div className="flex items-center justify-center">
+            <button
+              onClick={togglePlay}
+              disabled={!state.isReady}
+              className="w-10 h-10 rounded-lg bg-gradient-to-b from-[#2A2733] to-[#16151C] border-2 flex items-center justify-center transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
+              style={playRingStyle}
+              aria-label={state.playing ? 'Pause' : 'Play'}
+              title="Play / Pause"
+            >
+              <span className="material-icons text-[22px] text-white leading-none">
+                {state.playing ? 'pause' : 'play_arrow'}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Row 2: BPM + Tempo */}
-        <div className="grid grid-cols-[minmax(0,148px)_minmax(0,1fr)] gap-1.5 items-stretch min-w-0">
+        <div className="grid grid-cols-[minmax(0,148px)_minmax(0,1fr)] gap-2 items-stretch min-w-0">
           {/* BPM block */}
           <div className="bg-black/30 rounded-lg border border-white/5 px-2 py-1.5 min-w-0 flex flex-col justify-between">
             <div className="flex items-center justify-between gap-2 min-w-0">
@@ -885,10 +887,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         </div>
 
         {/* Row 3: Hot Cues + Loops */}
-        <div className="grid grid-cols-2 gap-1.5 items-stretch min-w-0">
+        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0">
           {/* Hot Cues */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden">
-            <div className="flex items-center justify-between gap-2 min-w-0 mb-1">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col h-full">
+            <div className="flex items-center justify-between gap-2 min-w-0 h-6">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Hot Cues
               </div>
@@ -902,7 +904,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </button>
             </div>
 
-            <div className="grid grid-cols-4 gap-1 min-w-0">
+            <div className="grid grid-cols-4 gap-1 min-w-0 flex-1 content-center min-h-[36px]">
               {[0, 1, 2, 3].map((i) => {
                 const isSet = state.hotCues[i] !== null;
                 return (
@@ -932,8 +934,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
 
           {/* Loops */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden">
-            <div className="flex items-center justify-between gap-2 min-w-0 mb-1">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col h-full">
+            <div className="flex items-center justify-between gap-2 min-w-0 h-6">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Loops
               </div>
@@ -942,7 +944,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-1 min-w-0">
+            <div className="grid grid-cols-4 gap-1 min-w-0 flex-1 content-center min-h-[36px]">
               {[2, 4, 8, 16].map((b) => (
                 <button
                   key={b}
