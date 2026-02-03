@@ -13,6 +13,7 @@ import { detectBpmFromAudioBuffer, extractBPMFromTitle } from '../utils/bpmDetec
 import { parseYouTubeTitle } from '../utils/youtubeApi';
 import { createEffectChain } from '../utils/effectsChain';
 import { buildWaveformPeaks } from '../utils/waveform';
+import { getBpmCacheEntry, setBpmCacheEntry } from '../utils/bpmCache';
 
 interface DeckProps {
   id: DeckId;
@@ -27,8 +28,16 @@ interface DeckProps {
 }
 
 export interface DeckHandle {
-  loadVideo: (url: string, sourceType?: TrackSourceType, metadata?: { title?: string, author?: string }) => void;
-  cueVideo: (url: string, sourceType?: TrackSourceType, metadata?: { title?: string, author?: string }) => void;
+  loadVideo: (
+    url: string,
+    sourceType?: TrackSourceType,
+    metadata?: { title?: string; author?: string; fileName?: string; fileSize?: number; fileLastModified?: number }
+  ) => void;
+  cueVideo: (
+    url: string,
+    sourceType?: TrackSourceType,
+    metadata?: { title?: string; author?: string; fileName?: string; fileSize?: number; fileLastModified?: number }
+  ) => void;
   togglePlay: () => void;
   triggerHotCue: (index: number, clear?: boolean) => void;
   toggleLoop: (beats?: number) => void;
@@ -78,6 +87,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const [bpmConfidence, setBpmConfidence] = useState(1);
     const [keyConfidence, setKeyConfidence] = useState(0);
     const analysisTokenRef = useRef(0);
+    const analysisRequestedRef = useRef<string | null>(null);
+    const localFingerprintRef = useRef<string | null>(null);
+    const localUrlRef = useRef<string | null>(null);
 
     const [state, setState] = useState<PlayerState>({
       playing: false,
@@ -112,6 +124,13 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const tempoDraggingRef = useRef(false);
 
     const containerId = `yt-player-${id}`;
+    const bpmConfidenceThreshold = 0.25;
+    const keyConfidenceThreshold = 0.15;
+
+    const buildLocalFingerprint = (meta?: { fileName?: string; fileSize?: number; fileLastModified?: number }) => {
+      if (!meta?.fileName || !meta.fileSize || !meta.fileLastModified) return null;
+      return `local:${meta.fileName}:${meta.fileSize}:${meta.fileLastModified}`;
+    };
 
     const formatTime = useCallback((timeSeconds: number) => {
       const safeSeconds = Math.max(0, Math.floor(timeSeconds));
@@ -362,7 +381,12 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       }
     };
 
-    const analyzeLocalAudio = async (url: string, analysisToken: number, expectedVideoId: string) => {
+    const analyzeLocalAudio = async (
+      url: string,
+      analysisToken: number,
+      expectedVideoId: string,
+      fingerprint: string | null
+    ) => {
       try {
         setIsScanning(true);
         const response = await fetch(url);
@@ -378,16 +402,30 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           skipEdgeSeconds: 10,
           analyzeSeconds: 60
         });
-        if (analysisTokenRef.current !== analysisToken) return;
+        if (analysisTokenRef.current !== analysisToken) {
+          if (!existingContext) {
+            await tempContext.close();
+          }
+          return;
+        }
         const peaks = buildWaveformPeaks(audioBuffer, 900);
-        const nextBpm = (analysis.bpm !== null && analysis.confidence >= 0.25)
+        const nextBpm = (analysis.bpm !== null && analysis.confidence >= bpmConfidenceThreshold)
           ? analysis.bpm
           : null;
-        const nextKey = (analysis.musicalKey && (analysis.keyConfidence ?? 0) >= 0.15)
+        const nextKey = (analysis.musicalKey && (analysis.keyConfidence ?? 0) >= keyConfidenceThreshold)
           ? analysis.musicalKey
           : '-';
         setBpmConfidence(analysis.confidence ?? 0);
         setKeyConfidence(analysis.keyConfidence ?? 0);
+        if (fingerprint && analysis.bpm !== null) {
+          setBpmCacheEntry(fingerprint, {
+            bpm: analysis.bpm,
+            bpmConfidence: analysis.confidence ?? 0,
+            musicalKey: analysis.musicalKey,
+            keyConfidence: analysis.keyConfidence ?? 0,
+            analyzedAt: Date.now()
+          });
+        }
         setState(s => {
           if (s.videoId !== expectedVideoId) return s;
           return {
@@ -406,6 +444,23 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         setIsScanning(false);
       }
     };
+
+    const requestLocalAnalysisIfNeeded = useCallback(() => {
+      if (state.sourceType !== 'local' || !state.isReady) return;
+      const expectedVideoId = state.videoId;
+      if (!expectedVideoId) return;
+      if (analysisRequestedRef.current === expectedVideoId) return;
+      const needsAnalysis = bpmConfidence < bpmConfidenceThreshold || state.bpm === 120;
+      if (!needsAnalysis) {
+        analysisRequestedRef.current = expectedVideoId;
+        return;
+      }
+      const url = localUrlRef.current;
+      if (!url) return;
+      const analysisToken = ++analysisTokenRef.current;
+      analysisRequestedRef.current = expectedVideoId;
+      analyzeLocalAudio(url, analysisToken, expectedVideoId, localFingerprintRef.current);
+    }, [bpmConfidence, bpmConfidenceThreshold, state.bpm, state.isReady, state.sourceType, state.videoId]);
 
     const updateMetadata = useCallback((player: any) => {
       if (!player) return;
@@ -426,7 +481,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     }, []);
 
     const handleToggleLoop = useCallback((beats: number = 4) => {
-      const beatDuration = 60 / state.bpm;
+      const effectiveBpm = Math.max(1, state.bpm * state.playbackRate);
+      const beatDuration = 60 / effectiveBpm;
       const loopDuration = beats * beatDuration;
       const isThisLoopActive = state.loopActive && Math.abs((state.loopEnd - state.loopStart) - loopDuration) < 0.1;
       setState(s => ({
@@ -435,7 +491,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         loopStart: !isThisLoopActive ? state.currentTime : 0,
         loopEnd: !isThisLoopActive ? state.currentTime + loopDuration : 0
       }));
-    }, [state.bpm, state.loopActive, state.loopStart, state.loopEnd, state.currentTime]);
+    }, [state.bpm, state.playbackRate, state.loopActive, state.loopStart, state.loopEnd, state.currentTime]);
 
     const handleHotCue = useCallback((index: number, clear: boolean = false) => {
       if (clear) {
@@ -549,7 +605,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
     const loadLocalFile = (
       url: string,
-      metadata?: { title?: string, author?: string },
+      metadata?: { title?: string; author?: string; fileName?: string; fileSize?: number; fileLastModified?: number },
       loadMode: 'load' | 'cue' = 'load'
     ) => {
       console.log(`[Deck ${id}] loadLocalFile called:`, { url, loadMode, metadata });
@@ -565,6 +621,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       if (localAudioRef.current) {
         // Clear current source to prevent memory leak / ghost audio
         localAudioRef.current.pause();
+        localUrlRef.current = url;
         localAudioRef.current.src = url;
         localAudioRef.current.load();
 
@@ -574,6 +631,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
         const onLoaded = () => {
           console.log(`[Deck ${id}] loadedmetadata fired! Duration:`, localAudioRef.current?.duration);
+          const fingerprint = buildLocalFingerprint(metadata);
+          localFingerprintRef.current = fingerprint;
+          const cached = fingerprint ? getBpmCacheEntry(fingerprint) : null;
+          const cachedBpmOk = !!cached && cached.bpmConfidence >= bpmConfidenceThreshold;
+          const cachedKeyOk = !!cached && (cached.keyConfidence ?? 0) >= keyConfidenceThreshold;
           setState(s => ({
             ...s,
             isReady: true,
@@ -587,17 +649,14 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             currentTime: 0,
             loopActive: false,
             waveformPeaks: undefined,
-            musicalKey: '-'
+            musicalKey: cachedKeyOk ? cached?.musicalKey || '-' : '-',
+            bpm: cachedBpmOk ? cached?.bpm || 120 : 120
           }));
-          setBpmConfidence(0);
-          setKeyConfidence(0);
+          setBpmConfidence(cached?.bpmConfidence ?? 0);
+          setKeyConfidence(cached?.keyConfidence ?? 0);
+          analysisRequestedRef.current = cachedBpmOk ? stableVideoId : null;
 
           console.log(`[Deck ${id}] State updated, isReady: true, videoId:`, stableVideoId);
-
-          if (loadMode !== 'cue') {
-            const analysisToken = ++analysisTokenRef.current;
-            analyzeLocalAudio(url, analysisToken, stableVideoId);
-          }
 
           onPlayerReady({
             setVolume: (v: number) => { if (localAudioRef.current) localAudioRef.current.volume = v / 100; },
@@ -630,7 +689,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     }, [tapHistory]);
 
     useImperativeHandle(ref, () => ({
-      loadVideo: (url: string, sourceType: TrackSourceType = 'youtube', metadata?: { title?: string, author?: string }) => {
+      loadVideo: (
+        url: string,
+        sourceType: TrackSourceType = 'youtube',
+        metadata?: { title?: string; author?: string; fileName?: string; fileSize?: number; fileLastModified?: number }
+      ) => {
         if (sourceType === 'local') {
           loadLocalFile(url, metadata, 'load');
         } else {
@@ -643,7 +706,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           }
         }
       },
-      cueVideo: (url: string, sourceType: TrackSourceType = 'youtube', metadata?: { title?: string, author?: string }) => {
+      cueVideo: (
+        url: string,
+        sourceType: TrackSourceType = 'youtube',
+        metadata?: { title?: string; author?: string; fileName?: string; fileSize?: number; fileLastModified?: number }
+      ) => {
         if (sourceType === 'local') {
           loadLocalFile(url, metadata, 'cue');
         } else {
@@ -719,7 +786,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const tempoPercentText = ((state.playbackRate - 1.0) * 100).toFixed(2);
 
     const loopIsActiveForBeats = (beats: number) => {
-      const beatDuration = 60 / state.bpm;
+      const effectiveBpm = Math.max(1, state.bpm * state.playbackRate);
+      const beatDuration = 60 / effectiveBpm;
       return state.loopActive && Math.abs((state.loopEnd - state.loopStart) - beats * beatDuration) < 0.1;
     };
 
@@ -730,7 +798,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         <audio
           ref={localAudioRef}
           style={{ display: 'none' }}
-          onPlay={() => setState(s => ({ ...s, playing: true }))}
+          onPlay={() => {
+            setState(s => ({ ...s, playing: true }));
+            requestLocalAnalysisIfNeeded();
+          }}
           onPause={() => setState(s => ({ ...s, playing: false }))}
           onEnded={() => {
             setState(s => ({ ...s, playing: false }));

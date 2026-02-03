@@ -731,14 +731,27 @@ const App: React.FC = () => {
     sourceType: TrackSourceType = 'youtube',
     title?: string,
     author?: string,
+    fileInfo?: { name?: string; size?: number; lastModified?: number },
     mode: 'load' | 'cue' = 'load'
   ) => {
     const ref = deck === 'A' ? deckARef : deckBRef;
     if (ref.current) {
       if (mode === 'cue') {
-        ref.current.cueVideo(url, sourceType, { title, author });
+        ref.current.cueVideo(url, sourceType, {
+          title,
+          author,
+          fileName: fileInfo?.name,
+          fileSize: fileInfo?.size,
+          fileLastModified: fileInfo?.lastModified
+        });
       } else {
-        ref.current.loadVideo(url, sourceType, { title, author });
+        ref.current.loadVideo(url, sourceType, {
+          title,
+          author,
+          fileName: fileInfo?.name,
+          fileSize: fileInfo?.size,
+          fileLastModified: fileInfo?.lastModified
+        });
       }
       setLibrary(prev => incrementPlayCount(videoId, prev));
       showNotification(`${sourceType === 'local' ? 'File' : 'Stream'} ${mode === 'cue' ? 'Queued' : 'Loaded'} to Deck ${deck}`, 'success');
@@ -756,6 +769,8 @@ const App: React.FC = () => {
       author: 'addedAt' in track ? track.author : (track as YouTubeSearchResult).channelTitle,
       album: 'addedAt' in track ? track.album : undefined,
       fileName: 'addedAt' in track ? track.fileName : undefined,
+      fileSize: 'addedAt' in track ? track.fileSize : undefined,
+      fileLastModified: 'addedAt' in track ? track.fileLastModified : undefined,
       sourceType: 'sourceType' in track ? track.sourceType : 'youtube'
     };
     setQueue(prev => [...prev, item]);
@@ -809,7 +824,16 @@ const App: React.FC = () => {
   const loadNextQueueItem = useCallback((targetDeck: DeckId, mode: 'load' | 'cue' = 'load') => {
     const nextItem = queue[0];
     if (!nextItem) return null;
-    handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author, mode);
+    handleLoadVideo(
+      nextItem.videoId,
+      nextItem.url,
+      targetDeck,
+      nextItem.sourceType || 'youtube',
+      nextItem.title,
+      nextItem.author,
+      { name: nextItem.fileName, size: nextItem.fileSize, lastModified: nextItem.fileLastModified },
+      mode
+    );
     setQueue(prev => prev.filter(item => item.id !== nextItem.id));
     lastAutoDeckRef.current = targetDeck;
     return nextItem;
@@ -833,7 +857,16 @@ const App: React.FC = () => {
       url: nextItem.url,
       sourceType: nextItem.sourceType
     });
-    handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author, 'cue');
+    handleLoadVideo(
+      nextItem.videoId,
+      nextItem.url,
+      targetDeck,
+      nextItem.sourceType || 'youtube',
+      nextItem.title,
+      nextItem.author,
+      { name: nextItem.fileName, size: nextItem.fileSize, lastModified: nextItem.fileLastModified },
+      'cue'
+    );
     preloadedTrackRef.current = { deck: targetDeck, itemId: nextItem.id, videoId: nextItem.videoId };
     console.log('[PRELOAD] Set preloadedTrackRef:', preloadedTrackRef.current);
     return nextItem;
@@ -1005,6 +1038,7 @@ const App: React.FC = () => {
             queuedItem.sourceType || 'youtube',
             queuedItem.title,
             queuedItem.author,
+            { name: queuedItem.fileName, size: queuedItem.fileSize, lastModified: queuedItem.fileLastModified },
             'load'  // Use 'load' mode, not 'cue'
           );
 
@@ -1159,7 +1193,9 @@ useEffect(() => {
             >
               <div className={`flex flex-col gap-4 h-full min-h-0 ${libraryOpen ? 'p-4 opacity-100 transition-opacity' : 'p-0 opacity-0'}`}>
                 <SearchPanel 
-                  onLoadToDeck={(vid, url, deck, title, author) => handleLoadVideo(vid, url, deck, 'youtube', title, author)} 
+                  onLoadToDeck={(vid, url, deck, title, author) =>
+                    handleLoadVideo(vid, url, deck, 'youtube', title, author)
+                  } 
                   onAddToQueue={handleAddToQueue} 
                   onAddToLibrary={(result) => {
                     setLibrary(prev => {
@@ -1190,7 +1226,17 @@ useEffect(() => {
                     }} 
                     onRemove={id => setLibrary(p => removeFromLibrary(id, p))} 
                     onRemoveMultiple={handleRemoveMultiple}
-                    onLoadToDeck={(track, deck) => handleLoadVideo(track.videoId, track.url, deck, track.sourceType, track.title, track.author)} 
+                    onLoadToDeck={(track, deck) =>
+                      handleLoadVideo(
+                        track.videoId,
+                        track.url,
+                        deck,
+                        track.sourceType,
+                        track.title,
+                        track.author,
+                        { name: track.fileName, size: track.fileSize, lastModified: track.fileLastModified }
+                      )
+                    } 
                     onAddToQueue={handleAddToQueue} 
                     onUpdateMetadata={(v, m) => { setLibrary(updateTrackMetadata(v, m, library)); showNotification('Metadata Saved'); }} 
                     onImportLibrary={setLibrary} 
@@ -1314,7 +1360,18 @@ useEffect(() => {
                     onToggleAutoDj={() => setAutoDjEnabled(prev => !prev)}
                     onMixLeadChange={handleMixLeadChange}
                     onMixDurationChange={handleMixDurationChange}
-                    onLoadToDeck={(i, d) => { handleLoadVideo(i.videoId, i.url, d, i.sourceType || 'youtube', i.title, i.author); setQueue(p => p.filter(q => q.id !== i.id)); }} 
+                    onLoadToDeck={(i, d) => {
+                      handleLoadVideo(
+                        i.videoId,
+                        i.url,
+                        d,
+                        i.sourceType || 'youtube',
+                        i.title,
+                        i.author,
+                        { name: i.fileName, size: i.fileSize, lastModified: i.fileLastModified }
+                      );
+                      setQueue(p => p.filter(q => q.id !== i.id));
+                    }} 
                     onRemove={id => setQueue(p => p.filter(i => i.id !== id))} 
                     onClear={() => setQueue([])} 
                     onReorder={handleQueueReorder} 

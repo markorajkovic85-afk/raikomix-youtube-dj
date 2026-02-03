@@ -67,6 +67,8 @@ export interface QueueItem {
   author?: string;
   album?: string;
   fileName?: string;
+  fileSize?: number;
+  fileLastModified?: number;
   sourceType?: TrackSourceType;
 }
 
@@ -83,6 +85,8 @@ export interface LibraryTrack {
   playCount: number;
   sourceType: TrackSourceType;
   fileName?: string;
+  fileSize?: number;
+  fileLastModified?: number;
 }
 
 export interface PerformancePadConfig {
