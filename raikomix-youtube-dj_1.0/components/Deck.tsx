@@ -921,9 +921,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                       aria-label={`Hot Cue ${i + 1}`}
                       className={[
                         "w-full h-full rounded-md font-black text-[clamp(11px,1.4vw,14px)] border transition-all select-none min-w-0 flex items-center justify-center leading-none",
-                        "bg-gradient-to-b from-[#2A2733] to-[#16151C]",
+                        "bg-transparent",
                         isSet
-                          ? "text-white border-2"
+                          ? "border-2"
                           : "border-white/5 text-gray-600 hover:text-white hover:border-white/20"
                       ].join(" ")}
                       style={isSet
@@ -958,7 +958,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                     onClick={() => handleToggleLoop(b)}
                     className={[
                       "w-full h-full rounded-md text-[clamp(11px,1.4vw,14px)] font-black border transition-all select-none min-w-0 flex items-center justify-center leading-none",
-                      "bg-gradient-to-b from-[#2A2733] to-[#16151C]",
+                      "bg-transparent",
                       loopIsActiveForBeats(b)
                         ? "border-2 text-green-400"
                         : "border-white/5 text-gray-500 hover:text-white hover:border-white/20"
