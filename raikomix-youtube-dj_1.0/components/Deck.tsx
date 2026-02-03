@@ -75,6 +75,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const [isScanning, setIsScanning] = useState(false);
     const [tapHistory, setTapHistory] = useState<number[]>([]);
     const [showRemaining, setShowRemaining] = useState(false);
+    const [bpmConfidence, setBpmConfidence] = useState(1);
+    const [keyConfidence, setKeyConfidence] = useState(0);
 
     const [state, setState] = useState<PlayerState>({
       playing: false,
@@ -367,11 +369,27 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         const existingContext = audioCtxRef.current;
         const tempContext = existingContext ?? new (window.AudioContext || (window as any).webkitAudioContext)();
         const audioBuffer = await tempContext.decodeAudioData(arrayBuffer.slice(0));
-        const bpm = detectBpmFromAudioBuffer(audioBuffer);
+        const analysis = await detectBpmFromAudioBuffer(audioBuffer, {
+          detectKey: true,
+          bpmMin: 70,
+          bpmMax: 180,
+          bpmStep: 0.5,
+          skipEdgeSeconds: 10,
+          analyzeSeconds: 60
+        });
         const peaks = buildWaveformPeaks(audioBuffer, 900);
+        const nextBpm = (analysis.bpm !== null && analysis.confidence >= 0.25)
+          ? analysis.bpm
+          : null;
+        const nextKey = (analysis.musicalKey && (analysis.keyConfidence ?? 0) >= 0.15)
+          ? analysis.musicalKey
+          : '-';
+        setBpmConfidence(analysis.confidence ?? 0);
+        setKeyConfidence(analysis.keyConfidence ?? 0);
         setState(s => ({
           ...s,
-          bpm: bpm ?? s.bpm,
+          bpm: nextBpm ?? s.bpm,
+          musicalKey: nextKey ?? s.musicalKey,
           waveformPeaks: peaks.length ? peaks : undefined
         }));
         if (!existingContext) {
@@ -474,7 +492,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             playing: false,
             currentTime: 0,
             loopActive: false,
-            waveformPeaks: undefined
+            waveformPeaks: undefined,
+            musicalKey: '-'
           }));
           if (loadMode === 'cue') {
             playerRef.current.cueVideoById(videoId);
@@ -562,8 +581,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             playing: false,
             currentTime: 0,
             loopActive: false,
-            waveformPeaks: undefined
+            waveformPeaks: undefined,
+            musicalKey: '-'
           }));
+          setBpmConfidence(0);
+          setKeyConfidence(0);
 
           console.log(`[Deck ${id}] State updated, isReady: true, videoId:`, stableVideoId);
 
@@ -814,7 +836,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             </div>
 
             <div className="text-[8px] text-gray-600 font-black uppercase tracking-widest whitespace-nowrap">
-              Base <span className="text-white/70">{state.bpm}</span> • Rate <span className="text-white/70">{state.playbackRate.toFixed(3)}x</span>
+              Base <span className="text-white/70">{state.bpm}</span>
+              {" "}• Conf <span className="text-white/70">{Math.round(bpmConfidence * 100)}%</span>
+              {" "}• Rate <span className="text-white/70">{state.playbackRate.toFixed(3)}x</span>
             </div>
           </div>
 
