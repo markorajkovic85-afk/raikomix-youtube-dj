@@ -8,7 +8,9 @@ import {
   savePerformancePads,
   storePerformancePadSample,
 } from '../utils/performancePadsStorage';
+import { makeId } from '../utils/id';
 import { createEffectChain } from '../utils/effectsChain';
+import { ToastType } from './Toast';
 
 interface PerformancePadsProps {
   masterVolume: number;
@@ -16,7 +18,7 @@ interface PerformancePadsProps {
   effect: EffectType | null;
   effectWet: number;
   effectIntensity: number;
-  onNotify: (message: string, type?: 'info' | 'success' | 'error') => void;
+  onNotify: (message: string, type?: ToastType) => void;
 }
 
 const DEFAULT_KEYS = ['1', '2', '3', '4', '5', 'q', 'w', 'e', 'r', 't', 'a', 's'];
@@ -753,7 +755,11 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
   };
 
   const handleLocalFileSelected = async (file: File) => {
-    const record = await storePerformancePadSample(`pad_${Date.now()}`, file);
+    const record = await storePerformancePadSample(makeId(), file);
+    if (!record) {
+      onNotify('Local storage unavailable for samples', 'warning');
+      return null;
+    }
     const ctx = ensureAudioContext();
     const buffer = await ctx.decodeAudioData(record.arrayBuffer.slice(0));
     if (activePadId !== null) {

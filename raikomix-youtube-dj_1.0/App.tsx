@@ -12,8 +12,10 @@ import {
   addTrackToLibrary,
   removeFromLibrary,
   incrementPlayCount,
-  updateTrackMetadata
+  updateTrackMetadata,
+  revokeLocalTrackUrls
 } from './utils/libraryStorage';
+import { makeId } from './utils/id';
 import EffectsPanel from './components/EffectsPanel';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTheme } from './hooks/useTheme';
@@ -104,6 +106,7 @@ const App: React.FC = () => {
   const mixAnimationRef = useRef<number | null>(null);
   const mixInProgressRef = useRef(false);
   const pendingMixRef = useRef<{ deck: DeckId; fromDeck: DeckId; item: QueueItem } | null>(null);
+  const libraryRef = useRef(library);
   const lastAutoDeckRef = useRef<DeckId>('B');
   const autoLoadDeckRef = useRef<DeckId | null>(null);
   const lastMixVideoRef = useRef<{ A?: string | null; B?: string | null }>({});
@@ -214,6 +217,9 @@ const App: React.FC = () => {
 
   useEffect(() => { saveLibrary(library); }, [library]);
   useEffect(() => {
+    libraryRef.current = library;
+  }, [library]);
+  useEffect(() => {
     midiLearnIndexRef.current = midiLearnIndex;
   }, [midiLearnIndex]);
   useEffect(() => {
@@ -228,6 +234,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (padEffect) lastEffectRef.current.PADS = padEffect;
   }, [padEffect]);
+
+  useEffect(() => {
+    return () => {
+      revokeLocalTrackUrls(libraryRef.current);
+    };
+  }, []);
 
   const showNotification = (msg: string, type: ToastType = 'info') => setToast({ msg, type });
   const effectCycle: EffectType[] = [
@@ -747,7 +759,7 @@ const App: React.FC = () => {
 
   const handleAddToQueue = useCallback((track: LibraryTrack | YouTubeSearchResult) => {
     const item: QueueItem = {
-      id: `${Date.now()}_${track.videoId}`,
+      id: makeId(),
       videoId: track.videoId,
       url: 'addedAt' in track ? track.url : `https://www.youtube.com/watch?v=${track.videoId}`,
       title: track.title,

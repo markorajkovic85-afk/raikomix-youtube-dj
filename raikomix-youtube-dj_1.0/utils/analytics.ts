@@ -1,4 +1,6 @@
 
+const isDev = import.meta.env?.DEV ?? false;
+
 export const trackEvent = (
   category: string,
   action: string,
@@ -15,7 +17,11 @@ export const trackEvent = (
   }
   
   // Also log to console in development
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`[Analytics] ${category} > ${action}${label ? ` (${label})` : ''}${value ? ` : ${value}` : ''}`);
+  if (isDev) {
+    console.log(
+      `[Analytics] ${category} > ${action}` +
+        (label ? ` (${label})` : '') +
+        (value !== undefined ? ` : ${value}` : '')
+    );
   }
 };

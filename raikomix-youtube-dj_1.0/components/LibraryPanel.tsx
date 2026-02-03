@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LibraryTrack, Playlist, DeckId } from '../types';
-import { exportLibrary, loadPlaylists, savePlaylists } from '../utils/libraryStorage';
+import { exportLibrary, loadPlaylists, savePlaylists, revokeLocalTrackUrls } from '../utils/libraryStorage';
+import { makeId } from '../utils/id';
 import { extractPlaylistId, fetchPlaylistItems } from '../utils/youtubeApi';
 
 interface LibraryPanelProps {
@@ -59,7 +60,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         }
 
         const fetchedTracks: LibraryTrack[] = items.map(t => ({
-          id: `yt_${Date.now()}_${t.videoId}_${Math.random().toString(36).substr(2, 4)}`,
+          id: makeId(),
           videoId: t.videoId!,
           url: `https://www.youtube.com/watch?v=${t.videoId}`,
           title: t.title || 'Unknown Title',
@@ -250,7 +251,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         }
 
         return {
-          id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          id: makeId(),
           videoId: `local_${file.name}_${Date.now()}`,
           url: URL.createObjectURL(file),
           title,
@@ -299,7 +300,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         }
 
         return {
-          id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          id: makeId(),
           videoId: `local_${file.name}_${Date.now()}`,
           url: URL.createObjectURL(file),
           title,
@@ -331,6 +332,8 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
   };
 
   const handleBulkRemove = () => {
+    const tracksToRemove = library.filter(t => selectedTracks.has(t.id));
+    revokeLocalTrackUrls(tracksToRemove);
     onRemoveMultiple(Array.from(selectedTracks));
     setSelectedTracks(new Set());
   };
@@ -518,7 +521,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
               </button>
               <button onClick={() => onLoadToDeck(t, 'A')} className="w-7 h-7 rounded-lg bg-[#D0BCFF] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">A</button>
               <button onClick={() => onLoadToDeck(t, 'B')} className="w-7 h-7 rounded-lg bg-[#F2B8B5] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">B</button>
-              <button onClick={() => onRemove(t.id)} className="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all" title="Remove"><span className="material-symbols-outlined text-sm">delete</span></button>
+              <button onClick={() => { revokeLocalTrackUrls([t]); onRemove(t.id); }} className="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all" title="Remove"><span className="material-symbols-outlined text-sm">delete</span></button>
             </div>
             <div className="pointer-events-none absolute left-12 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-black/90 p-3 text-[9px] text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               <div className="font-bold text-[#D0BCFF] mb-1">Track Details</div>
