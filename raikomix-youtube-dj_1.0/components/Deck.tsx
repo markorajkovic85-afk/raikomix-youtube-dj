@@ -14,7 +14,7 @@ interface DeckProps {
   onPlayerReady: (player: any) => void;
   onTrackEnd?: () => void;
   eq: { hi: number, mid: number, low: number, filter: number };
-   effect: EffectType | null;
+  effect: EffectType | null;
   effectWet: number;
   effectIntensity: number;
 }
@@ -49,8 +49,8 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
 
   return (
     <div ref={containerRef} className="marquee-container w-full min-w-0">
-      <div 
-        ref={textRef} 
+      <div
+        ref={textRef}
         className={`${className} marquee-text ${shouldAnimate ? 'animate-marquee' : 'truncate'}`}
       >
         {text}
@@ -65,7 +65,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
   const [isScanning, setIsScanning] = useState(false);
   const [tapHistory, setTapHistory] = useState<number[]>([]);
   const [showRemaining, setShowRemaining] = useState(false);
-  
+
   const [state, setState] = useState<PlayerState>({
     playing: false,
     currentTime: 0,
@@ -96,8 +96,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPl
   const tempoPointerIdRef = useRef<number | null>(null);
   const tempoDraggingRef = useRef(false);
   const containerId = `yt-player-${id}`;
-  
-const formatTime = useCallback((timeSeconds: number) => {
+
+  const formatTime = useCallback((timeSeconds: number) => {
     const safeSeconds = Math.max(0, Math.floor(timeSeconds));
     const minutes = Math.floor(safeSeconds / 60);
     const seconds = safeSeconds % 60;
@@ -117,20 +117,20 @@ const formatTime = useCallback((timeSeconds: number) => {
     wetGain: GainNode;
     mixGain: GainNode;
     effectInput: GainNode;
-    effectOutput: GainNode;  
+    effectOutput: GainNode;
   } | null>(null);
-const effectNodesRef = useRef<{
+  const effectNodesRef = useRef<{
     nodes: AudioNode[];
     dispose?: () => void;
   } | null>(null);
-  
+
   // Initialize Audio Engine - Safe version that doesn't re-create source node
   const initAudioEngine = useCallback(() => {
     if (sourceNodeRef.current || !localAudioRef.current) return;
 
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const source = ctx.createMediaElementSource(localAudioRef.current);
-    
+
     const low = ctx.createBiquadFilter();
     low.type = 'lowshelf';
     low.frequency.value = 200;
@@ -174,7 +174,7 @@ const effectNodesRef = useRef<{
 
   const clearEffectChain = useCallback(() => {
     if (!nodesRef.current) return;
-    const { effectInput, effectOutput } = nodesRef.current;
+    const { effectInput } = nodesRef.current;
     try {
       effectInput.disconnect();
     } catch (e) {}
@@ -207,10 +207,10 @@ const effectNodesRef = useRef<{
     effectNodesRef.current = { nodes: chain.nodes, dispose: chain.dispose };
     effectInput.connect(chain.input);
     chain.output.connect(effectOutput);
-  }, [clearEffectChain, createEffectChain, effectIntensity]);
+  }, [clearEffectChain, effectIntensity]);
 
   // Sync EQ nodes with props
-   useEffect(() => {
+  useEffect(() => {
     if (nodesRef.current && audioCtxRef.current) {
       const { low, mid, hi, filter } = nodesRef.current;
       const now = audioCtxRef.current.currentTime;
@@ -247,8 +247,8 @@ const effectNodesRef = useRef<{
   useEffect(() => {
     if (!nodesRef.current || !audioCtxRef.current) return;
     applyEffectChain(effect);
-  }, [applyEffectChain, effect, effectIntensity]);
-  
+  }, [applyEffectChain, effect]);
+
   useEffect(() => {
     setState(s => ({
       ...s,
@@ -261,7 +261,7 @@ const effectNodesRef = useRef<{
 
   const updatePlaybackRate = useCallback((rate: number) => {
     const newRate = Math.min(1.5, Math.max(0.5, rate));
-    
+
     if (playerRef.current && typeof playerRef.current.setPlaybackRate === 'function') {
       try {
         playerRef.current.setPlaybackRate(newRate);
@@ -269,7 +269,7 @@ const effectNodesRef = useRef<{
         console.warn("YouTube player setPlaybackRate failed", e);
       }
     }
-    
+
     if (localAudioRef.current) {
       localAudioRef.current.playbackRate = newRate;
     }
@@ -277,12 +277,13 @@ const effectNodesRef = useRef<{
     setState(s => ({ ...s, playbackRate: newRate }));
   }, []);
 
-  const getPlaybackRateFromPointer = useCallback((clientY: number) => {
+  const getPlaybackRateFromPointer = useCallback((clientX: number) => {
     if (!tempoContainerRef.current) return null;
     const rect = tempoContainerRef.current.getBoundingClientRect();
-    const ratio = (clientY - rect.top) / rect.height;
-    const rate = 1.5 - ratio;
-    return Math.min(1.5, Math.max(0.5, rate));
+    const ratio = (clientX - rect.left) / rect.width; // 0..1
+    const rate = 0.5 + ratio * 1.0; // 0.5..1.5
+    const clamped = Math.min(1.5, Math.max(0.5, rate));
+    return Math.abs(clamped - 1.0) < 0.002 ? 1.0 : clamped;
   }, []);
 
   const handleTempoPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -292,7 +293,7 @@ const effectNodesRef = useRef<{
     tempoContainerRef.current.setPointerCapture(event.pointerId);
     tempoPointerIdRef.current = event.pointerId;
     tempoDraggingRef.current = true;
-    const rate = getPlaybackRateFromPointer(event.clientY);
+    const rate = getPlaybackRateFromPointer(event.clientX);
     if (rate !== null) updatePlaybackRate(rate);
   }, [getPlaybackRateFromPointer, updatePlaybackRate]);
 
@@ -300,7 +301,7 @@ const effectNodesRef = useRef<{
     if (!tempoDraggingRef.current) return;
     if (tempoPointerIdRef.current !== event.pointerId) return;
     event.preventDefault();
-    const rate = getPlaybackRateFromPointer(event.clientY);
+    const rate = getPlaybackRateFromPointer(event.clientX);
     if (rate !== null) updatePlaybackRate(rate);
   }, [getPlaybackRateFromPointer, updatePlaybackRate]);
 
@@ -314,7 +315,7 @@ const effectNodesRef = useRef<{
   }, []);
 
   const analyzeTrackMetadata = async (title: string, author: string) => {
-     const apiKey = (import.meta as any)?.env?.VITE_API_KEY || process.env.API_KEY;
+    const apiKey = (import.meta as any)?.env?.VITE_API_KEY || process.env.API_KEY;
     if (!title || title === 'Unknown Track' || !apiKey) return;
     setIsScanning(true);
     try {
@@ -344,7 +345,7 @@ const effectNodesRef = useRef<{
     }
   };
 
-    const analyzeLocalAudio = async (url: string) => {
+  const analyzeLocalAudio = async (url: string) => {
     try {
       setIsScanning(true);
       const response = await fetch(url);
@@ -368,21 +369,22 @@ const effectNodesRef = useRef<{
       setIsScanning(false);
     }
   };
+
   const updateMetadata = useCallback((player: any) => {
     if (!player) return;
     const data = player.getVideoData ? player.getVideoData() : {};
     const { title, author } = parseYouTubeTitle(data.title || 'Unknown Track', data.author || 'YouTube Stream');
     const initialBpm = extractBPMFromTitle(data.title || '') || 120;
-    
-    setState(s => ({ 
-      ...s, 
-      isReady: true, 
-      duration: player.getDuration() || 0, 
-      title, 
-      author, 
-      bpm: initialBpm 
+
+    setState(s => ({
+      ...s,
+      isReady: true,
+      duration: player.getDuration() || 0,
+      title,
+      author,
+      bpm: initialBpm
     }));
-    
+
     analyzeTrackMetadata(title, author);
   }, []);
 
@@ -431,7 +433,7 @@ const effectNodesRef = useRef<{
     if (audioCtxRef.current?.state === 'suspended') {
       audioCtxRef.current.resume();
     }
-    
+
     if (state.sourceType === 'youtube') {
       state.playing ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo();
     } else {
@@ -449,9 +451,9 @@ const effectNodesRef = useRef<{
       try {
         // Reset state for existing player to avoid GUI freeze/glitch
         // IMPORTANT: Keep isReady=true for cue mode so Auto DJ can trigger playback
-        setState(s => ({ 
-          ...s, 
-          videoId, 
+        setState(s => ({
+          ...s,
+          videoId,
           isReady: loadMode === 'cue' ? true : false,  // Keep ready for cued tracks
           sourceType: 'youtube',
           playbackRate: 1.0,
@@ -465,9 +467,9 @@ const effectNodesRef = useRef<{
         } else {
           playerRef.current.loadVideoById(videoId);
         }
-        setIsLoading(loadMode !== 'cue');  // Don't show loader for cue
-      } catch (e) { 
-        setIsLoading(false); 
+        setIsLoading(loadMode !== 'cue');
+      } catch (e) {
+        setIsLoading(false);
       }
       return;
     }
@@ -491,11 +493,11 @@ const effectNodesRef = useRef<{
         onStateChange: (event: any) => {
           const playerState = event.data;
           setState(s => ({ ...s, playing: playerState === window.YT.PlayerState.PLAYING }));
-          
+
           if (playerState === window.YT.PlayerState.CUED || playerState === window.YT.PlayerState.PLAYING) {
             updateMetadata(event.target);
             event.target.setPlaybackRate(state.playbackRate);
-            setIsLoading(false); // Ensure loader clears
+            setIsLoading(false);
           }
 
           if (playerState === window.YT.PlayerState.ENDED) {
@@ -513,21 +515,19 @@ const effectNodesRef = useRef<{
     loadMode: 'load' | 'cue' = 'load'
   ) => {
     console.log(`[Deck ${id}] loadLocalFile called:`, { url, loadMode, metadata });
-    // Only init if not already done
     initAudioEngine();
     setIsLoading(loadMode !== 'cue');
-    
+
     // Pause any existing YT stream
     if (playerRef.current && state.sourceType === 'youtube') {
-      try { playerRef.current.pauseVideo(); } catch(e) {}
+      try { playerRef.current.pauseVideo(); } catch (e) {}
     }
-    
+
     if (localAudioRef.current) {
-      // Clear current source to prevent memory leak / ghost audio
       localAudioRef.current.pause();
       localAudioRef.current.src = url;
       localAudioRef.current.load();
-      
+
       // Use URL as stable videoId for local files (not timestamp!)
       const stableVideoId = `local_${url}`;
       console.log(`[Deck ${id}] Set audio src, waiting for loadedmetadata. stableVideoId:`, stableVideoId);
@@ -550,23 +550,23 @@ const effectNodesRef = useRef<{
         }));
 
         console.log(`[Deck ${id}] State updated, isReady: true, videoId:`, stableVideoId);
-        
+
         if (loadMode !== 'cue') {
           analyzeLocalAudio(url);
         }
-        
+
         onPlayerReady({
-          setVolume: (v: number) => { if(localAudioRef.current) localAudioRef.current.volume = v / 100; },
+          setVolume: (v: number) => { if (localAudioRef.current) localAudioRef.current.volume = v / 100; },
           playVideo: () => localAudioRef.current?.play(),
           pauseVideo: () => localAudioRef.current?.pause(),
-          seekTo: (t: number) => { if(localAudioRef.current) localAudioRef.current.currentTime = t; },
-          setPlaybackRate: (r: number) => { if(localAudioRef.current) localAudioRef.current.playbackRate = r; }
+          seekTo: (t: number) => { if (localAudioRef.current) localAudioRef.current.currentTime = t; },
+          setPlaybackRate: (r: number) => { if (localAudioRef.current) localAudioRef.current.playbackRate = r; }
         });
-        
+
         setIsLoading(false);
         localAudioRef.current?.removeEventListener('loadedmetadata', onLoaded);
       };
-      
+
       localAudioRef.current.addEventListener('loadedmetadata', onLoaded);
     } else {
       console.error(`[Deck ${id}] localAudioRef.current is null!`);
@@ -591,8 +591,8 @@ const effectNodesRef = useRef<{
         loadLocalFile(url, metadata, 'load');
       } else {
         const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
-        if (vid) { 
-          initPlayer(vid, 'load'); 
+        if (vid) {
+          initPlayer(vid, 'load');
           if (metadata) {
             setState(s => ({ ...s, title: metadata.title, author: metadata.author }));
           }
@@ -670,8 +670,11 @@ const effectNodesRef = useRef<{
     ? { borderColor: color, boxShadow: `0 0 24px ${color}55` }
     : undefined;
 
+  const tempoPct = (state.playbackRate - 1.0) * 100;
+  const tempoNearZero = Math.abs(tempoPct) < 0.01;
+
   return (
-    <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 p-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none self-start h-auto max-h-full min-h-0">
+    <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-3 p-3 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none self-start h-auto max-h-full min-h-0">
       <div id={containerId} className="h-0 w-0 overflow-hidden" />
       <audio
         ref={localAudioRef}
@@ -684,10 +687,10 @@ const effectNodesRef = useRef<{
         }}
       />
 
-      {/* ZONE 1: Main (header + bpm + play + waveform + tempo) */}
-      <div className="deck-zone-main flex gap-4 min-w-0 min-h-0">
-        {/* Main Deck Controls Area */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0 min-h-0">
+      {/* ZONE 1: Main */}
+      <div className="deck-zone-main flex min-w-0 min-h-0 flex-1">
+        <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">
+          {/* Header */}
           <div className="flex items-center justify-between gap-4 min-w-0">
             <div className="flex items-center gap-3 shrink-0">
               <div className={`w-3 h-3 rounded-full ${state.playing ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
@@ -695,43 +698,91 @@ const effectNodesRef = useRef<{
             </div>
             <div className="deck-title-stack text-right min-w-0 flex-1 overflow-hidden">
               <MarqueeText text={state.title || 'Deck Ready'} className="text-sm font-bold text-white uppercase tracking-tight" />
-              <MarqueeText 
-                text={state.author || (state.sourceType === 'local' ? 'Local Media' : 'Insert Media')} 
-                className="text-[10px] text-gray-500 font-bold uppercase tracking-widest opacity-80" 
+              <MarqueeText
+                text={state.author || (state.sourceType === 'local' ? 'Local Media' : 'Insert Media')}
+                className="text-[10px] text-gray-500 font-bold uppercase tracking-widest opacity-80"
               />
             </div>
           </div>
 
-          <div className="flex justify-between items-center px-3 py-1.5 bg-black/30 rounded-2xl border border-white/5">
-            <div className="flex flex-col">
-              <div className="flex items-baseline gap-1">
-                <div className={`text-2xl font-black mono ${isScanning ? 'animate-pulse text-gray-400' : ''}`} style={!isScanning ? { color } : {}}>
-                  {(state.bpm * state.playbackRate).toFixed(1)}
+          {/* Compact row: BPM + Tempo */}
+          <div className="grid grid-cols-2 gap-3 items-stretch">
+            {/* BPM panel */}
+            <div className="bg-black/20 p-2 rounded-xl border border-white/5 flex items-center justify-between gap-2 min-w-0">
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-1">
+                  <div className={`text-xl font-black mono ${isScanning ? 'animate-pulse text-gray-400' : ''}`} style={!isScanning ? { color } : {}}>
+                    {(state.bpm * state.playbackRate).toFixed(1)}
+                  </div>
+                  <div className="text-[9px] text-gray-500 font-black uppercase">BPM</div>
                 </div>
-                <div className="text-[9px] text-gray-500 font-black uppercase">BPM</div>
+                <div className="text-[9px] text-gray-600 font-black uppercase tracking-widest truncate">Key: <span className="text-white/80">{state.musicalKey}</span></div>
               </div>
-              <div className="text-[9px] text-gray-600 font-black uppercase tracking-widest">Key: <span className="text-white/80">{state.musicalKey}</span></div>
+              <button onClick={handleTap} className="h-8 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-white shrink-0">TAP</button>
             </div>
-            <button onClick={handleTap} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-white">TAP</button>
+
+            {/* Tempo panel */}
+            <div className="bg-black/20 p-2 rounded-xl border border-white/5 flex items-center gap-3 min-w-0">
+              <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest shrink-0">Tempo</div>
+
+              <div
+                ref={tempoContainerRef}
+                className="relative flex-1 h-8 rounded-lg bg-black/20 border border-white/5 overflow-hidden select-none"
+                onDoubleClick={() => updatePlaybackRate(1.0)}
+                onPointerDown={handleTempoPointerDown}
+                onPointerMove={handleTempoPointerMove}
+                onPointerUp={handleTempoPointerUp}
+                onPointerCancel={handleTempoPointerUp}
+                onWheel={(e) => {
+                  e.preventDefault();
+                  const delta = -e.deltaY * 0.001;
+                  updatePlaybackRate(state.playbackRate + delta);
+                }}
+                title="Drag to Pitch • Scroll for Fine-Tune • Double-click to Reset"
+              >
+                {/* Center detent */}
+                <div className="absolute inset-y-0 left-1/2 w-px bg-white/20 pointer-events-none" />
+
+                {/* Fill */}
+                <div
+                  className="absolute inset-y-0 left-0 bg-[#D0BCFF]/15 pointer-events-none"
+                  style={{ width: `${((state.playbackRate - 0.5) / 1.0) * 100}%` }}
+                />
+
+                {/* Thumb */}
+                <div
+                  className="absolute top-1/2 w-5 h-5 rounded-full bg-[#D0BCFF] shadow-[0_0_10px_rgba(208,188,255,0.45)] border border-white/20 pointer-events-none"
+                  style={{
+                    left: `${((state.playbackRate - 0.5) / 1.0) * 100}%`,
+                    transform: 'translate(-50%, -50%)'
+                  }}
+                />
+
+                {/* Invisible input for keyboard + a11y */}
+                <input
+                  type="range"
+                  min="0.5"
+                  max="1.5"
+                  step="0.0001"
+                  value={state.playbackRate}
+                  onInput={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value))}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize"
+                  aria-label="Tempo"
+                />
+              </div>
+
+              <div className={`text-[9px] font-black mono transition-all shrink-0 ${tempoNearZero ? 'text-[#D0BCFF]' : 'text-gray-500'}`}>
+                {tempoPct >= 0 ? '+' : ''}{tempoPct.toFixed(2)}%
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center justify-center py-1">
-            <button
-              onClick={togglePlay}
-              disabled={!state.isReady}
-              className="w-16 h-16 rounded-full bg-gradient-to-b from-[#2A2733] to-[#16151C] border-2 flex items-center justify-center transition-all hover:scale-[1.02] active:scale-95"
-              style={playRingStyle}
-            >
-              <span className="material-icons text-3xl text-white">{state.playing ? 'pause' : 'play_arrow'}</span>
-            </button>
-          </div>
-
-          {/* Waveform zone: min-h-0 keeps it from forcing overflow when constrained */}
-          <div className="min-h-0">
-            <Waveform 
-              isPlaying={state.playing} 
-              volume={state.volume * (0.5 + state.eqLow * 0.5)} 
-              color={color} 
+          {/* Waveform fills space; play button centered overlay */}
+          <div className="relative flex-1 min-h-0">
+            <Waveform
+              isPlaying={state.playing}
+              volume={state.volume * (0.5 + state.eqLow * 0.5)}
+              color={color}
               playbackRate={state.playbackRate}
               currentTime={state.currentTime}
               duration={state.duration}
@@ -753,69 +804,24 @@ const effectNodesRef = useRef<{
                 : formatTime(state.currentTime)}
               onTimeToggle={() => setShowRemaining(prev => !prev)}
             />
+
+            <div className="absolute inset-0 grid place-items-center pointer-events-none">
+              <button
+                onClick={togglePlay}
+                disabled={!state.isReady}
+                className="pointer-events-auto w-16 h-16 rounded-full bg-gradient-to-b from-[#2A2733] to-[#16151C] border-2 flex items-center justify-center transition-all hover:scale-[1.02] active:scale-95"
+                style={playRingStyle}
+                aria-label={state.playing ? 'Pause' : 'Play'}
+              >
+                <span className="material-icons text-3xl text-white">{state.playing ? 'pause' : 'play_arrow'}</span>
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* Improved Pitch / Tempo Fader */}
-        <div 
-          ref={tempoContainerRef}
-          className="w-12 shrink-0 bg-black/20 rounded-xl border border-white/5 flex flex-col items-center py-4 gap-2 relative group select-none transition-all hover:border-white/20 active:border-[#D0BCFF]/30"
-          onDoubleClick={() => updatePlaybackRate(1.0)}
-          onPointerDown={handleTempoPointerDown}
-          onPointerMove={handleTempoPointerMove}
-          onPointerUp={handleTempoPointerUp}
-          onPointerCancel={handleTempoPointerUp}
-          onWheel={(e) => {
-            e.preventDefault();
-            const delta = -e.deltaY * 0.001; // Fine control with mouse wheel
-            updatePlaybackRate(state.playbackRate + delta);
-          }}
-          title="Click/Drag to Pitch • Scroll for Fine-Tune • Double-click to Reset"
-        >
-           <div className="text-[8px] font-black text-gray-500 uppercase tracking-tighter vertical-text h-10 mb-2">Tempo</div>
-           
-           <div className="flex-1 w-full flex justify-center relative py-2">
-              <div className="absolute inset-y-2 left-2 flex flex-col justify-between items-center pointer-events-none opacity-20">
-                {[...Array(11)].map((_, i) => (
-                  <div key={i} className={`h-px bg-white ${i % 5 === 0 ? 'w-3' : 'w-1.5'}`} />
-                ))}
-              </div>
-
-              <div className="h-full w-8 relative flex items-center justify-center cursor-ns-resize">
-                <div
-                  className="absolute w-10 h-10 bg-[#323038] rounded-md border-2 border-white/20 shadow-[0_8px_16px_rgba(0,0,0,0.6)] flex items-center justify-center transition-all duration-75 pointer-events-none z-10"
-                  style={{
-                    top: `${(1.5 - state.playbackRate) * 100}%`,
-                    transform: 'translateY(-50%)'
-                  }}
-                >
-                  <div className="w-6 h-[2px] bg-[#D0BCFF] shadow-[0_0_8px_#D0BCFF]" />
-                </div>
-
-                <input
-                  type="range"
-                  min="0.5"
-                  max="1.5"
-                  step="0.0001"
-                  value={state.playbackRate}
-                  onInput={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value))}
-                  className="absolute inset-0 cursor-pointer z-20 h-full w-full opacity-0"
-                  style={{ WebkitAppearance: 'slider-vertical', appearance: 'slider-vertical' as any }}
-                />
-              </div>
-           </div>
-
-           <div className="flex flex-col items-center gap-0.5 pb-2">
-             <div className={`text-[9px] font-black mono transition-all ${Math.abs(state.playbackRate - 1.0) < 0.001 ? 'text-[#D0BCFF] scale-110' : 'text-gray-500'}`}>
-                {((state.playbackRate - 1.0) * 100).toFixed(2)}%
-             </div>
-             <div className={`w-1.5 h-1.5 rounded-full transition-all ${Math.abs(state.playbackRate - 1.0) < 0.001 ? 'bg-[#D0BCFF] shadow-[0_0_8px_#D0BCFF]' : 'bg-transparent'}`} />
-           </div>
         </div>
       </div>
 
       {/* ZONE 2: Pads (hot cues + loops) */}
-      <div className="deck-zone-pads mt-2">
+      <div className="deck-zone-pads mt-1">
         <div className="grid grid-cols-2 gap-3 items-stretch">
           <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
             <div className="flex items-center justify-between px-1">
@@ -830,8 +836,8 @@ const effectNodesRef = useRef<{
             </div>
             <div className="grid grid-cols-4 gap-1">
               {[0, 1, 2, 3].map((i) => (
-                <button 
-                  key={i} 
+                <button
+                  key={i}
                   onClick={() => handleHotCue(i)}
                   onContextMenu={(e) => {
                     e.preventDefault();
@@ -839,7 +845,7 @@ const effectNodesRef = useRef<{
                   }}
                   title={`Hot Cue ${i + 1} (Right-click to clear)`}
                   aria-label={`Hot Cue ${i + 1}`}
-                  className={`h-8 rounded-lg font-black text-[10px] border transition-all ${state.hotCues[i] !== null ? 'text-black' : 'border-white/5 text-gray-700 hover:border-white/20'}`} 
+                  className={`h-8 rounded-lg font-black text-[10px] border transition-all ${state.hotCues[i] !== null ? 'text-black' : 'border-white/5 text-gray-700 hover:border-white/20'}`}
                   style={state.hotCues[i] !== null ? { backgroundColor: CUE_COLORS[i], borderColor: CUE_COLORS[i], boxShadow: `0 0 10px ${CUE_COLORS[i]}44` } : {}}
                 >
                   <span className="sr-only">{`Hot Cue ${i + 1}`}</span>
