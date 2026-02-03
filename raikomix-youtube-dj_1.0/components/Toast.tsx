@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 interface ToastProps {
   message: string;
@@ -19,6 +19,7 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
     success: 'bg-green-500 border-green-400 text-black',
     error: 'bg-red-500 border-red-400 text-white',
     info: 'bg-[#D0BCFF] border-[#D0BCFF] text-black',
+    warning: 'bg-amber-400 border-amber-300 text-black',
   };
 
   return (

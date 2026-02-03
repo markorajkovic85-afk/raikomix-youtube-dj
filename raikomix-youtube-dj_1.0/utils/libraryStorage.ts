@@ -1,5 +1,6 @@
 import { LibraryTrack, Playlist } from '../types';
 import { safeSetStorageItem } from './storage';
+import { makeId } from './id';
 
 const STORAGE_KEY = 'raikomix_library';
 const PLAYLISTS_KEY = 'raikomix_playlists';
@@ -66,7 +67,7 @@ export const loadPlaylists = (): Playlist[] => {
     return data
       .filter((playlist) => playlist && typeof playlist === 'object')
       .map((playlist) => ({
-        id: playlist.id || `pl_${Date.now()}`,
+        id: playlist.id || makeId(),
         name: playlist.name || 'Untitled Playlist',
         trackIds: Array.isArray(playlist.trackIds) ? playlist.trackIds : [],
         createdAt: playlist.createdAt || Date.now(),
@@ -112,7 +113,7 @@ export const addTrackToLibrary = (
   if (library.some(t => t.videoId === videoId)) return { success: false, error: 'Track already in library' };
   
   const track: LibraryTrack = {
-    id: `${Date.now()}_${videoId}`,
+    id: makeId(),
     videoId,
     url: `https://www.youtube.com/watch?v=${videoId}`,
     title: `Track ${videoId}`,

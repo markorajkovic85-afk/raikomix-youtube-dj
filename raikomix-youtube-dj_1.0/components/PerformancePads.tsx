@@ -10,6 +10,7 @@ import {
 } from '../utils/performancePadsStorage';
 import { makeId } from '../utils/id';
 import { createEffectChain } from '../utils/effectsChain';
+import { ToastType } from './Toast';
 
 interface PerformancePadsProps {
   masterVolume: number;
@@ -17,7 +18,7 @@ interface PerformancePadsProps {
   effect: EffectType | null;
   effectWet: number;
   effectIntensity: number;
-  onNotify: (message: string, type?: 'info' | 'success' | 'error') => void;
+  onNotify: (message: string, type?: ToastType) => void;
 }
 
 const DEFAULT_KEYS = ['1', '2', '3', '4', '5', 'q', 'w', 'e', 'r', 't', 'a', 's'];
