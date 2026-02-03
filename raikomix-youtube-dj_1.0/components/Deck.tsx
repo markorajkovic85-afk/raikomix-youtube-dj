@@ -710,8 +710,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           }}
         />
 
-        {/* Waveform: compact (reduce height) */}
-        <div className="w-full min-w-0 h-[clamp(40px,6vh,64px)]">
+        {/* Waveform: primary + flexible (fills spare deck height) */}
+        <div className="w-full min-w-0 flex-1 min-h-[clamp(56px,10vh,120px)]">
           <Waveform
             isPlaying={state.playing}
             volume={state.volume * (0.5 + state.eqLow * 0.5)}
@@ -736,7 +736,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               ? `-${formatTime(state.duration - state.currentTime)}`
               : formatTime(state.currentTime)}
             onTimeToggle={() => setShowRemaining(prev => !prev)}
-            minHeightPx={40}
+            minHeightPx={56}
           />
         </div>
 
@@ -886,10 +886,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
         </div>
 
-        {/* Row 3: Hot Cues + Loops */}
-        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0">
+        {/* Row 3: Hot Cues + Loops (flexes to fill spare height) */}
+        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 flex-1 min-h-[120px]">
           {/* Hot Cues */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col h-full">
             <div className="flex items-center justify-between gap-2 min-w-0 h-6">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Hot Cues
@@ -904,7 +904,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </button>
             </div>
 
-            <div className="grid grid-cols-4 gap-1 min-w-0 place-items-center">
+            <div className="grid grid-cols-2 grid-rows-2 gap-1 min-w-0 flex-1 place-content-center place-items-center min-h-[44px]">
               {[0, 1, 2, 3].map((i) => {
                 const isSet = state.hotCues[i] !== null;
                 return (
@@ -934,7 +934,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
 
           {/* Loops */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col h-full">
             <div className="flex items-center justify-between gap-2 min-w-0 h-6">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Loops
@@ -944,7 +944,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-1 min-w-0 place-items-center">
+            <div className="grid grid-cols-2 grid-rows-2 gap-1 min-w-0 flex-1 place-content-center place-items-center min-h-[44px]">
               {[2, 4, 8, 16].map((b) => (
                 <button
                   key={b}
