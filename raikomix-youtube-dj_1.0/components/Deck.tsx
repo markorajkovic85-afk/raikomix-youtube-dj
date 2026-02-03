@@ -908,6 +908,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full aspect-square min-w-0">
                 {[0, 1, 2, 3].map((i) => {
                   const isSet = state.hotCues[i] !== null;
+                  const cueColor = CUE_COLORS[i];
                   return (
                     <button
                       key={i}
@@ -920,10 +921,13 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                       aria-label={`Hot Cue ${i + 1}`}
                       className={[
                         "w-full h-full rounded-md font-black text-[clamp(11px,1.4vw,14px)] border transition-all select-none min-w-0 flex items-center justify-center leading-none",
-                        isSet ? "text-black" : "border-white/5 text-gray-600 hover:text-white hover:border-white/20"
+                        "bg-gradient-to-b from-[#2A2733] to-[#16151C]",
+                        isSet
+                          ? "text-white border-2"
+                          : "border-white/5 text-gray-600 hover:text-white hover:border-white/20"
                       ].join(" ")}
                       style={isSet
-                        ? { backgroundColor: CUE_COLORS[i], borderColor: CUE_COLORS[i], boxShadow: `0 0 10px ${CUE_COLORS[i]}44` }
+                        ? { borderColor: cueColor, boxShadow: `0 0 10px ${cueColor}22`, color: cueColor }
                         : {}
                       }
                     >
@@ -954,10 +958,15 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                     onClick={() => handleToggleLoop(b)}
                     className={[
                       "w-full h-full rounded-md text-[clamp(11px,1.4vw,14px)] font-black border transition-all select-none min-w-0 flex items-center justify-center leading-none",
+                      "bg-gradient-to-b from-[#2A2733] to-[#16151C]",
                       loopIsActiveForBeats(b)
-                        ? "bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]"
+                        ? "border-2 text-green-400"
                         : "border-white/5 text-gray-500 hover:text-white hover:border-white/20"
                     ].join(" ")}
+                    style={loopIsActiveForBeats(b)
+                      ? { borderColor: 'rgba(34,197,94,0.9)', boxShadow: '0 0 10px rgba(34,197,94,0.18)' }
+                      : {}
+                    }
                     title={`Loop ${b} beats`}
                   >
                     {b}
