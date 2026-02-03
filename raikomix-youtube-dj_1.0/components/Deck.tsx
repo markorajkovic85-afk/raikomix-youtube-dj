@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useImperativeHandle,
+  forwardRef
+} from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { DeckId, EffectType, PlayerState, TrackSourceType } from '../types';
 import Waveform from './Waveform';
@@ -14,7 +21,7 @@ interface DeckProps {
   onPlayerReady: (player: any) => void;
   onTrackEnd?: () => void;
   eq: { hi: number, mid: number, low: number, filter: number };
-   effect: EffectType | null;
+  effect: EffectType | null;
   effectWet: number;
   effectIntensity: number;
 }
@@ -49,8 +56,8 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
 
   return (
     <div ref={containerRef} className="marquee-container w-full min-w-0">
-      <div 
-        ref={textRef} 
+      <div
+        ref={textRef}
         className={`${className} marquee-text ${shouldAnimate ? 'animate-marquee' : 'truncate'}`}
       >
         {text}
@@ -60,675 +67,743 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
   );
 };
 
-const Deck = forwardRef<DeckHandle, DeckProps>(({ id, color, onStateUpdate, onPlayerReady, onTrackEnd, eq, effect, effectWet, effectIntensity }, ref) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [tapHistory, setTapHistory] = useState<number[]>([]);
-  const [showRemaining, setShowRemaining] = useState(false);
-  
-  const [state, setState] = useState<PlayerState>({
-    playing: false,
-    currentTime: 0,
-    duration: 0,
-    volume: 80,
-    playbackRate: 1.0,
-    videoId: '',
-    sourceType: 'youtube',
-    isReady: false,
-    bpm: 120,
-    musicalKey: '-',
-    title: '',
-    author: '',
-    hotCues: [null, null, null, null],
-    loopActive: false,
-    loopStart: 0,
-    loopEnd: 0,
-    eqHigh: eq.hi,
-    eqMid: eq.mid,
-    eqLow: eq.low,
-    filter: eq.filter,
-    waveformPeaks: undefined
-  });
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
-  const playerRef = useRef<any>(null);
-  const localAudioRef = useRef<HTMLAudioElement>(null);
-  const tempoContainerRef = useRef<HTMLDivElement>(null);
-  const tempoPointerIdRef = useRef<number | null>(null);
-  const tempoDraggingRef = useRef(false);
-  const containerId = `yt-player-${id}`;
-  
-const formatTime = useCallback((timeSeconds: number) => {
-    const safeSeconds = Math.max(0, Math.floor(timeSeconds));
-    const minutes = Math.floor(safeSeconds / 60);
-    const seconds = safeSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }, []);
+const Deck = forwardRef<DeckHandle, DeckProps>(
+  ({ id, color, onStateUpdate, onPlayerReady, onTrackEnd, eq, effect, effectWet, effectIntensity }, ref) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+    const [tapHistory, setTapHistory] = useState<number[]>([]);
+    const [showRemaining, setShowRemaining] = useState(false);
 
-  // Web Audio API Refs
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const nodesRef = useRef<{
-    low: BiquadFilterNode;
-    mid: BiquadFilterNode;
-    hi: BiquadFilterNode;
-    filter: BiquadFilterNode;
-    gain: GainNode;
-    dryGain: GainNode;
-    wetGain: GainNode;
-    mixGain: GainNode;
-    effectInput: GainNode;
-    effectOutput: GainNode;  
-  } | null>(null);
-const effectNodesRef = useRef<{
-    nodes: AudioNode[];
-    dispose?: () => void;
-  } | null>(null);
-  
-  // Initialize Audio Engine - Safe version that doesn't re-create source node
-  const initAudioEngine = useCallback(() => {
-    if (sourceNodeRef.current || !localAudioRef.current) return;
-
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const source = ctx.createMediaElementSource(localAudioRef.current);
-    
-    const low = ctx.createBiquadFilter();
-    low.type = 'lowshelf';
-    low.frequency.value = 200;
-
-    const mid = ctx.createBiquadFilter();
-    mid.type = 'peaking';
-    mid.frequency.value = 1000;
-    mid.Q.value = 1;
-
-    const hi = ctx.createBiquadFilter();
-    hi.type = 'highshelf';
-    hi.frequency.value = 10000;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'allpass';
-
-    const gainNode = ctx.createGain();
-    const dryGain = ctx.createGain();
-    const wetGain = ctx.createGain();
-    const mixGain = ctx.createGain();
-    const effectInput = ctx.createGain();
-    const effectOutput = ctx.createGain();
-
-    // Connection chain: source -> low -> mid -> hi -> filter -> dry/wet -> mix -> destination
-    source.connect(low);
-    low.connect(mid);
-    mid.connect(hi);
-    hi.connect(filter);
-    filter.connect(dryGain);
-    filter.connect(effectInput);
-    dryGain.connect(mixGain);
-    effectOutput.connect(wetGain);
-    wetGain.connect(mixGain);
-    mixGain.connect(gainNode);
-    gainNode.connect(ctx.destination);
-
-    audioCtxRef.current = ctx;
-    sourceNodeRef.current = source;
-    nodesRef.current = { low, mid, hi, filter, gain: gainNode, dryGain, wetGain, mixGain, effectInput, effectOutput };
-  }, []);
-
-  const clearEffectChain = useCallback(() => {
-    if (!nodesRef.current) return;
-    const { effectInput, effectOutput } = nodesRef.current;
-    try {
-      effectInput.disconnect();
-    } catch (e) {}
-    if (effectNodesRef.current) {
-      effectNodesRef.current.nodes.forEach(node => {
-        try {
-          node.disconnect();
-        } catch (e) {}
-      });
-      effectNodesRef.current.dispose?.();
-    }
-    effectNodesRef.current = null;
-  }, []);
-
-  const applyEffectChain = useCallback((effectType: EffectType | null) => {
-    if (!nodesRef.current || !audioCtxRef.current) return;
-    const { effectInput, effectOutput } = nodesRef.current;
-    clearEffectChain();
-
-    if (!effectType) {
-      effectInput.connect(effectOutput);
-      return;
-    }
-
-    const chain = createEffectChain(audioCtxRef.current, effectType, effectIntensity);
-    if (!chain) {
-      effectInput.connect(effectOutput);
-      return;
-    }
-    effectNodesRef.current = { nodes: chain.nodes, dispose: chain.dispose };
-    effectInput.connect(chain.input);
-    chain.output.connect(effectOutput);
-  }, [clearEffectChain, createEffectChain, effectIntensity]);
-
-  // Sync EQ nodes with props
-   useEffect(() => {
-    if (nodesRef.current && audioCtxRef.current) {
-      const { low, mid, hi, filter } = nodesRef.current;
-      const now = audioCtxRef.current.currentTime;
-      const ramp = 0.05;
-
-      // Map 0-2 to -12dB to +12dB
-      low.gain.setTargetAtTime((eq.low - 1.0) * 12, now, ramp);
-      mid.gain.setTargetAtTime((eq.mid - 1.0) * 12, now, ramp);
-      hi.gain.setTargetAtTime((eq.hi - 1.0) * 12, now, ramp);
-
-      // Bi-polar filter knob
-      if (eq.filter < -0.05) {
-        filter.type = 'highpass';
-        filter.frequency.setTargetAtTime(Math.pow(10, Math.abs(eq.filter) * 2) * 20, now, ramp);
-      } else if (eq.filter > 0.05) {
-        filter.type = 'lowpass';
-        filter.frequency.setTargetAtTime(20000 - (eq.filter * 19800), now, ramp);
-      } else {
-        filter.type = 'allpass';
-      }
-    }
-  }, [eq]);
-
-  useEffect(() => {
-    if (!nodesRef.current || !audioCtxRef.current) return;
-    const { dryGain, wetGain } = nodesRef.current;
-    const wet = Math.min(1, Math.max(0, effectWet));
-    const now = audioCtxRef.current.currentTime;
-    const ramp = 0.05;
-    dryGain.gain.setTargetAtTime(Math.cos(wet * Math.PI * 0.5), now, ramp);
-    wetGain.gain.setTargetAtTime(Math.sin(wet * Math.PI * 0.5), now, ramp);
-  }, [effectWet]);
-
-  useEffect(() => {
-    if (!nodesRef.current || !audioCtxRef.current) return;
-    applyEffectChain(effect);
-  }, [applyEffectChain, effect, effectIntensity]);
-  
-  useEffect(() => {
-    setState(s => ({
-      ...s,
+    const [state, setState] = useState<PlayerState>({
+      playing: false,
+      currentTime: 0,
+      duration: 0,
+      volume: 80,
+      playbackRate: 1.0,
+      videoId: '',
+      sourceType: 'youtube',
+      isReady: false,
+      bpm: 120,
+      musicalKey: '-',
+      title: '',
+      author: '',
+      hotCues: [null, null, null, null],
+      loopActive: false,
+      loopStart: 0,
+      loopEnd: 0,
       eqHigh: eq.hi,
       eqMid: eq.mid,
       eqLow: eq.low,
-      filter: eq.filter
-    }));
-  }, [eq]);
+      filter: eq.filter,
+      waveformPeaks: undefined
+    });
 
-  const updatePlaybackRate = useCallback((rate: number) => {
-    const newRate = Math.min(1.5, Math.max(0.5, rate));
-    
-    if (playerRef.current && typeof playerRef.current.setPlaybackRate === 'function') {
+    const playerRef = useRef<any>(null);
+    const localAudioRef = useRef<HTMLAudioElement>(null);
+
+    // Tempo (horizontal) pointer handling
+    const tempoContainerRef = useRef<HTMLDivElement>(null);
+    const tempoPointerIdRef = useRef<number | null>(null);
+    const tempoDraggingRef = useRef(false);
+
+    const containerId = `yt-player-${id}`;
+    const isDeckA = id === ('A' as DeckId);
+
+    const formatTime = useCallback((timeSeconds: number) => {
+      const safeSeconds = Math.max(0, Math.floor(timeSeconds));
+      const minutes = Math.floor(safeSeconds / 60);
+      const seconds = safeSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }, []);
+
+    // Web Audio API Refs
+    const audioCtxRef = useRef<AudioContext | null>(null);
+    const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+    const nodesRef = useRef<{
+      low: BiquadFilterNode;
+      mid: BiquadFilterNode;
+      hi: BiquadFilterNode;
+      filter: BiquadFilterNode;
+      gain: GainNode;
+      dryGain: GainNode;
+      wetGain: GainNode;
+      mixGain: GainNode;
+      effectInput: GainNode;
+      effectOutput: GainNode;
+    } | null>(null);
+
+    const effectNodesRef = useRef<{
+      nodes: AudioNode[];
+      dispose?: () => void;
+    } | null>(null);
+
+    // Initialize Audio Engine - Safe version that doesn't re-create source node
+    const initAudioEngine = useCallback(() => {
+      if (sourceNodeRef.current || !localAudioRef.current) return;
+
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const source = ctx.createMediaElementSource(localAudioRef.current);
+
+      const low = ctx.createBiquadFilter();
+      low.type = 'lowshelf';
+      low.frequency.value = 200;
+
+      const mid = ctx.createBiquadFilter();
+      mid.type = 'peaking';
+      mid.frequency.value = 1000;
+      mid.Q.value = 1;
+
+      const hi = ctx.createBiquadFilter();
+      hi.type = 'highshelf';
+      hi.frequency.value = 10000;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'allpass';
+
+      const gainNode = ctx.createGain();
+      const dryGain = ctx.createGain();
+      const wetGain = ctx.createGain();
+      const mixGain = ctx.createGain();
+      const effectInput = ctx.createGain();
+      const effectOutput = ctx.createGain();
+
+      // Connection chain: source -> low -> mid -> hi -> filter -> dry/wet -> mix -> destination
+      source.connect(low);
+      low.connect(mid);
+      mid.connect(hi);
+      hi.connect(filter);
+      filter.connect(dryGain);
+      filter.connect(effectInput);
+      dryGain.connect(mixGain);
+      effectOutput.connect(wetGain);
+      wetGain.connect(mixGain);
+      mixGain.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      audioCtxRef.current = ctx;
+      sourceNodeRef.current = source;
+      nodesRef.current = { low, mid, hi, filter, gain: gainNode, dryGain, wetGain, mixGain, effectInput, effectOutput };
+    }, []);
+
+    const clearEffectChain = useCallback(() => {
+      if (!nodesRef.current) return;
+      const { effectInput } = nodesRef.current;
       try {
-        playerRef.current.setPlaybackRate(newRate);
-      } catch (e) {
-        console.warn("YouTube player setPlaybackRate failed", e);
+        effectInput.disconnect();
+      } catch (e) { }
+      if (effectNodesRef.current) {
+        effectNodesRef.current.nodes.forEach(node => {
+          try {
+            node.disconnect();
+          } catch (e) { }
+        });
+        effectNodesRef.current.dispose?.();
       }
-    }
-    
-    if (localAudioRef.current) {
-      localAudioRef.current.playbackRate = newRate;
-    }
+      effectNodesRef.current = null;
+    }, []);
 
-    setState(s => ({ ...s, playbackRate: newRate }));
-  }, []);
+    const applyEffectChain = useCallback((effectType: EffectType | null) => {
+      if (!nodesRef.current || !audioCtxRef.current) return;
+      const { effectInput, effectOutput } = nodesRef.current;
+      clearEffectChain();
 
-  const getPlaybackRateFromPointer = useCallback((clientY: number) => {
-    if (!tempoContainerRef.current) return null;
-    const rect = tempoContainerRef.current.getBoundingClientRect();
-    const ratio = (clientY - rect.top) / rect.height;
-    const rate = 1.5 - ratio;
-    return Math.min(1.5, Math.max(0.5, rate));
-  }, []);
+      if (!effectType) {
+        effectInput.connect(effectOutput);
+        return;
+      }
 
-  const handleTempoPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!tempoContainerRef.current) return;
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    event.preventDefault();
-    tempoContainerRef.current.setPointerCapture(event.pointerId);
-    tempoPointerIdRef.current = event.pointerId;
-    tempoDraggingRef.current = true;
-    const rate = getPlaybackRateFromPointer(event.clientY);
-    if (rate !== null) updatePlaybackRate(rate);
-  }, [getPlaybackRateFromPointer, updatePlaybackRate]);
+      const chain = createEffectChain(audioCtxRef.current, effectType, effectIntensity);
+      if (!chain) {
+        effectInput.connect(effectOutput);
+        return;
+      }
+      effectNodesRef.current = { nodes: chain.nodes, dispose: chain.dispose };
+      effectInput.connect(chain.input);
+      chain.output.connect(effectOutput);
+    }, [clearEffectChain, effectIntensity]);
 
-  const handleTempoPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!tempoDraggingRef.current) return;
-    if (tempoPointerIdRef.current !== event.pointerId) return;
-    event.preventDefault();
-    const rate = getPlaybackRateFromPointer(event.clientY);
-    if (rate !== null) updatePlaybackRate(rate);
-  }, [getPlaybackRateFromPointer, updatePlaybackRate]);
+    // Sync EQ nodes with props
+    useEffect(() => {
+      if (nodesRef.current && audioCtxRef.current) {
+        const { low, mid, hi, filter } = nodesRef.current;
+        const now = audioCtxRef.current.currentTime;
+        const ramp = 0.05;
 
-  const handleTempoPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (tempoPointerIdRef.current !== event.pointerId) return;
-    tempoDraggingRef.current = false;
-    tempoPointerIdRef.current = null;
-    if (tempoContainerRef.current?.hasPointerCapture(event.pointerId)) {
-      tempoContainerRef.current.releasePointerCapture(event.pointerId);
-    }
-  }, []);
+        // Map 0-2 to -12dB to +12dB
+        low.gain.setTargetAtTime((eq.low - 1.0) * 12, now, ramp);
+        mid.gain.setTargetAtTime((eq.mid - 1.0) * 12, now, ramp);
+        hi.gain.setTargetAtTime((eq.hi - 1.0) * 12, now, ramp);
 
-  const analyzeTrackMetadata = async (title: string, author: string) => {
-     const apiKey = (import.meta as any)?.env?.VITE_API_KEY || process.env.API_KEY;
-    if (!title || title === 'Unknown Track' || !apiKey) return;
-    setIsScanning(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Identify the BPM and Musical Key (Camelot scale) for: "${title}" by "${author}". Return valid JSON.`,
-        config: {
-          thinkingConfig: { thinkingBudget: 0 },
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              bpm: { type: Type.NUMBER },
-              key: { type: Type.STRING }
-            },
-            required: ["bpm", "key"]
-          }
+        // Bi-polar filter knob
+        if (eq.filter < -0.05) {
+          filter.type = 'highpass';
+          filter.frequency.setTargetAtTime(Math.pow(10, Math.abs(eq.filter) * 2) * 20, now, ramp);
+        } else if (eq.filter > 0.05) {
+          filter.type = 'lowpass';
+          filter.frequency.setTargetAtTime(20000 - (eq.filter * 19800), now, ramp);
+        } else {
+          filter.type = 'allpass';
         }
-      });
-      const data = JSON.parse(response.text || '{}');
-      if (data.bpm) setState(s => ({ ...s, bpm: data.bpm, musicalKey: data.key || '-' }));
-    } catch (e) {
-      console.error("AI Analysis failed:", e);
-    } finally {
-      setIsScanning(false);
-    }
-  };
+      }
+    }, [eq]);
 
-    const analyzeLocalAudio = async (url: string) => {
-    try {
-      setIsScanning(true);
-      const response = await fetch(url);
-      const arrayBuffer = await response.arrayBuffer();
-      const existingContext = audioCtxRef.current;
-      const tempContext = existingContext ?? new (window.AudioContext || (window as any).webkitAudioContext)();
-      const audioBuffer = await tempContext.decodeAudioData(arrayBuffer.slice(0));
-      const bpm = detectBpmFromAudioBuffer(audioBuffer);
-      const peaks = buildWaveformPeaks(audioBuffer, 900);
+    useEffect(() => {
+      if (!nodesRef.current || !audioCtxRef.current) return;
+      const { dryGain, wetGain } = nodesRef.current;
+      const wet = Math.min(1, Math.max(0, effectWet));
+      const now = audioCtxRef.current.currentTime;
+      const ramp = 0.05;
+      dryGain.gain.setTargetAtTime(Math.cos(wet * Math.PI * 0.5), now, ramp);
+      wetGain.gain.setTargetAtTime(Math.sin(wet * Math.PI * 0.5), now, ramp);
+    }, [effectWet]);
+
+    useEffect(() => {
+      if (!nodesRef.current || !audioCtxRef.current) return;
+      applyEffectChain(effect);
+    }, [applyEffectChain, effect]);
+
+    useEffect(() => {
       setState(s => ({
         ...s,
-        bpm: bpm ?? s.bpm,
-        waveformPeaks: peaks.length ? peaks : undefined
+        eqHigh: eq.hi,
+        eqMid: eq.mid,
+        eqLow: eq.low,
+        filter: eq.filter
       }));
-      if (!existingContext) {
-        await tempContext.close();
+    }, [eq]);
+
+    const updatePlaybackRate = useCallback((rate: number) => {
+      const newRate = clamp(rate, 0.5, 1.5);
+
+      if (playerRef.current && typeof playerRef.current.setPlaybackRate === 'function') {
+        try {
+          playerRef.current.setPlaybackRate(newRate);
+        } catch (e) {
+          console.warn("YouTube player setPlaybackRate failed", e);
+        }
       }
-    } catch (e) {
-      console.warn('Local audio analysis failed:', e);
-    } finally {
-      setIsScanning(false);
-    }
-  };
-  const updateMetadata = useCallback((player: any) => {
-    if (!player) return;
-    const data = player.getVideoData ? player.getVideoData() : {};
-    const { title, author } = parseYouTubeTitle(data.title || 'Unknown Track', data.author || 'YouTube Stream');
-    const initialBpm = extractBPMFromTitle(data.title || '') || 120;
-    
-    setState(s => ({ 
-      ...s, 
-      isReady: true, 
-      duration: player.getDuration() || 0, 
-      title, 
-      author, 
-      bpm: initialBpm 
-    }));
-    
-    analyzeTrackMetadata(title, author);
-  }, []);
 
-  const handleToggleLoop = useCallback((beats: number = 4) => {
-    const beatDuration = 60 / state.bpm;
-    const loopDuration = beats * beatDuration;
-    const isThisLoopActive = state.loopActive && Math.abs((state.loopEnd - state.loopStart) - loopDuration) < 0.1;
-    setState(s => ({
-      ...s,
-      loopActive: !isThisLoopActive,
-      loopStart: !isThisLoopActive ? state.currentTime : 0,
-      loopEnd: !isThisLoopActive ? state.currentTime + loopDuration : 0
-    }));
-  }, [state.bpm, state.loopActive, state.loopStart, state.loopEnd, state.currentTime]);
-
-  const handleHotCue = useCallback((index: number, clear: boolean = false) => {
-    if (clear) {
-      const newCues = [...state.hotCues];
-      newCues[index] = null;
-      setState(s => ({ ...s, hotCues: newCues }));
-      return;
-    }
-
-    const cue = state.hotCues[index];
-    if (cue === null) {
-      const newCues = [...state.hotCues];
-      newCues[index] = state.currentTime;
-      setState(s => ({ ...s, hotCues: newCues }));
-    } else {
-      if (state.sourceType === 'youtube') {
-        playerRef.current?.seekTo(cue, true);
-        playerRef.current?.playVideo();
-      } else if (localAudioRef.current) {
-        localAudioRef.current.currentTime = cue;
-        localAudioRef.current.play();
+      if (localAudioRef.current) {
+        localAudioRef.current.playbackRate = newRate;
       }
-    }
-  }, [state.hotCues, state.currentTime, state.sourceType]);
 
-  const handleClearAllHotCues = useCallback(() => {
-    setState(s => ({ ...s, hotCues: [null, null, null, null] }));
-  }, []);
+      setState(s => ({ ...s, playbackRate: newRate }));
+    }, []);
 
-  const togglePlay = useCallback(() => {
-    // Resume context if suspended (browser policy)
-    if (audioCtxRef.current?.state === 'suspended') {
-      audioCtxRef.current.resume();
-    }
-    
-    if (state.sourceType === 'youtube') {
-      state.playing ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo();
-    } else {
-      state.playing ? localAudioRef.current?.pause() : localAudioRef.current?.play();
-    }
-  }, [state.playing, state.sourceType]);
+    const getPlaybackRateFromPointer = useCallback((clientX: number) => {
+      if (!tempoContainerRef.current) return null;
+      const rect = tempoContainerRef.current.getBoundingClientRect();
+      const ratio = (clientX - rect.left) / rect.width;
+      const rate = 0.5 + ratio * 1.0; // 0.5..1.5
+      return clamp(rate, 0.5, 1.5);
+    }, []);
 
-  const initPlayer = useCallback((videoId: string, loadMode: 'load' | 'cue' = 'load') => {
-    if (!window.YT || !window.YT.Player) {
-      setTimeout(() => initPlayer(videoId, loadMode), 500);
-      return;
-    }
+    const handleTempoPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      if (!tempoContainerRef.current) return;
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+      tempoContainerRef.current.setPointerCapture(event.pointerId);
+      tempoPointerIdRef.current = event.pointerId;
+      tempoDraggingRef.current = true;
 
-    if (playerRef.current) {
+      const rate = getPlaybackRateFromPointer(event.clientX);
+      if (rate !== null) updatePlaybackRate(rate);
+    }, [getPlaybackRateFromPointer, updatePlaybackRate]);
+
+    const handleTempoPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      if (!tempoDraggingRef.current) return;
+      if (tempoPointerIdRef.current !== event.pointerId) return;
+      event.preventDefault();
+      const rate = getPlaybackRateFromPointer(event.clientX);
+      if (rate !== null) updatePlaybackRate(rate);
+    }, [getPlaybackRateFromPointer, updatePlaybackRate]);
+
+    const handleTempoPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      if (tempoPointerIdRef.current !== event.pointerId) return;
+      tempoDraggingRef.current = false;
+      tempoPointerIdRef.current = null;
+      if (tempoContainerRef.current?.hasPointerCapture(event.pointerId)) {
+        tempoContainerRef.current.releasePointerCapture(event.pointerId);
+      }
+    }, []);
+
+    const analyzeTrackMetadata = async (title: string, author: string) => {
+      const apiKey = (import.meta as any)?.env?.VITE_API_KEY || process.env.API_KEY;
+      if (!title || title === 'Unknown Track' || !apiKey) return;
+      setIsScanning(true);
       try {
-        // Reset state for existing player to avoid GUI freeze/glitch
-        // IMPORTANT: Keep isReady=true for cue mode so Auto DJ can trigger playback
-        setState(s => ({ 
-          ...s, 
-          videoId, 
-          isReady: loadMode === 'cue' ? true : false,  // Keep ready for cued tracks
-          sourceType: 'youtube',
-          playbackRate: 1.0,
-          playing: false,
-          currentTime: 0,
-          loopActive: false,
-          waveformPeaks: undefined
-        }));
-        if (loadMode === 'cue') {
-          playerRef.current.cueVideoById(videoId);
-        } else {
-          playerRef.current.loadVideoById(videoId);
-        }
-        setIsLoading(loadMode !== 'cue');  // Don't show loader for cue
-      } catch (e) { 
-        setIsLoading(false); 
-      }
-      return;
-    }
-
-    playerRef.current = new window.YT.Player(containerId, {
-      height: '1', width: '1', videoId,
-      playerVars: { autoplay: 0, controls: 0, disablekb: 1, origin: window.location.origin, enablejsapi: 1, rel: 0, modestbranding: 1 },
-      events: {
-        onReady: (event: any) => {
-          const p = event.target;
-          updateMetadata(p);
-          onPlayerReady({
-            setVolume: (v: number) => p.setVolume(v),
-            playVideo: () => p.playVideo(),
-            pauseVideo: () => p.pauseVideo(),
-            seekTo: (t: number) => p.seekTo(t, true),
-            setPlaybackRate: (r: number) => p.setPlaybackRate(r)
-          });
-          setIsLoading(false);
-        },
-        onStateChange: (event: any) => {
-          const playerState = event.data;
-          setState(s => ({ ...s, playing: playerState === window.YT.PlayerState.PLAYING }));
-          
-          if (playerState === window.YT.PlayerState.CUED || playerState === window.YT.PlayerState.PLAYING) {
-            updateMetadata(event.target);
-            event.target.setPlaybackRate(state.playbackRate);
-            setIsLoading(false); // Ensure loader clears
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: `Identify the BPM and Musical Key (Camelot scale) for: "${title}" by "${author}". Return valid JSON.`,
+          config: {
+            thinkingConfig: { thinkingBudget: 0 },
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                bpm: { type: Type.NUMBER },
+                key: { type: Type.STRING }
+              },
+              required: ["bpm", "key"]
+            }
           }
-
-          if (playerState === window.YT.PlayerState.ENDED) {
-            setState(s => ({ ...s, playing: false }));
-            onTrackEnd?.();
-          }
-        },
-      }
-    });
-  }, [containerId, onPlayerReady, onTrackEnd, updateMetadata, state.playbackRate]);
-
-  const loadLocalFile = (
-    url: string,
-    metadata?: { title?: string, author?: string },
-    loadMode: 'load' | 'cue' = 'load'
-  ) => {
-    console.log(`[Deck ${id}] loadLocalFile called:`, { url, loadMode, metadata });
-    // Only init if not already done
-    initAudioEngine();
-    setIsLoading(loadMode !== 'cue');
-    
-    // Pause any existing YT stream
-    if (playerRef.current && state.sourceType === 'youtube') {
-      try { playerRef.current.pauseVideo(); } catch(e) {}
-    }
-    
-    if (localAudioRef.current) {
-      // Clear current source to prevent memory leak / ghost audio
-      localAudioRef.current.pause();
-      localAudioRef.current.src = url;
-      localAudioRef.current.load();
-      
-      // Use URL as stable videoId for local files (not timestamp!)
-      const stableVideoId = `local_${url}`;
-      console.log(`[Deck ${id}] Set audio src, waiting for loadedmetadata. stableVideoId:`, stableVideoId);
-
-      const onLoaded = () => {
-        console.log(`[Deck ${id}] loadedmetadata fired! Duration:`, localAudioRef.current?.duration);
-        setState(s => ({
-          ...s,
-          isReady: true,
-          sourceType: 'local',
-          duration: localAudioRef.current?.duration || 0,
-          title: metadata?.title || url.split('/').pop() || 'Local Track',
-          author: metadata?.author || 'Local File',
-          videoId: stableVideoId,
-          playbackRate: 1.0,
-          playing: false,
-          currentTime: 0,
-          loopActive: false,
-          waveformPeaks: undefined
-        }));
-
-        console.log(`[Deck ${id}] State updated, isReady: true, videoId:`, stableVideoId);
-        
-        if (loadMode !== 'cue') {
-          analyzeLocalAudio(url);
-        }
-        
-        onPlayerReady({
-          setVolume: (v: number) => { if(localAudioRef.current) localAudioRef.current.volume = v / 100; },
-          playVideo: () => localAudioRef.current?.play(),
-          pauseVideo: () => localAudioRef.current?.pause(),
-          seekTo: (t: number) => { if(localAudioRef.current) localAudioRef.current.currentTime = t; },
-          setPlaybackRate: (r: number) => { if(localAudioRef.current) localAudioRef.current.playbackRate = r; }
         });
-        
-        setIsLoading(false);
-        localAudioRef.current?.removeEventListener('loadedmetadata', onLoaded);
-      };
-      
-      localAudioRef.current.addEventListener('loadedmetadata', onLoaded);
-    } else {
-      console.error(`[Deck ${id}] localAudioRef.current is null!`);
-    }
-  };
-
-  const handleTap = useCallback(() => {
-    const now = Date.now();
-    const newHistory = [...tapHistory, now].slice(-4);
-    setTapHistory(newHistory);
-    if (newHistory.length >= 2) {
-      const intervals = [];
-      for (let i = 1; i < newHistory.length; i++) intervals.push(newHistory[i] - newHistory[i - 1]);
-      const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
-      setState(s => ({ ...s, bpm: Math.round(60000 / avgInterval) }));
-    }
-  }, [tapHistory]);
-
-  useImperativeHandle(ref, () => ({
-    loadVideo: (url: string, sourceType: TrackSourceType = 'youtube', metadata?: { title?: string, author?: string }) => {
-      if (sourceType === 'local') {
-        loadLocalFile(url, metadata, 'load');
-      } else {
-        const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
-        if (vid) { 
-          initPlayer(vid, 'load'); 
-          if (metadata) {
-            setState(s => ({ ...s, title: metadata.title, author: metadata.author }));
-          }
-        }
-      }
-    },
-    cueVideo: (url: string, sourceType: TrackSourceType = 'youtube', metadata?: { title?: string, author?: string }) => {
-      if (sourceType === 'local') {
-        loadLocalFile(url, metadata, 'cue');
-      } else {
-        const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
-        if (vid) {
-          initPlayer(vid, 'cue');
-          if (metadata) {
-            setState(s => ({ ...s, title: metadata.title, author: metadata.author }));
-          }
-        }
-      }
-    },
-    togglePlay,
-    triggerHotCue: handleHotCue,
-    toggleLoop: handleToggleLoop,
-    setPlaybackRate: updatePlaybackRate,
-    tapBpm: handleTap
-  }), [handleTap, initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, initAudioEngine]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (state.isReady) {
-        let t = 0;
-        let nextDuration: number | null = null;
-        if (state.sourceType === 'youtube' && playerRef.current) {
-          try {
-            t = playerRef.current.getCurrentTime();
-            nextDuration = playerRef.current.getDuration?.() || null;
-          } catch (e) {}
-        } else if (state.sourceType === 'local' && localAudioRef.current) {
-          t = localAudioRef.current.currentTime;
-          nextDuration = localAudioRef.current.duration || null;
-        }
-
-        if (state.loopActive && t >= state.loopEnd) {
-          if (state.sourceType === 'youtube') playerRef.current?.seekTo(state.loopStart, true);
-          else if (localAudioRef.current) localAudioRef.current.currentTime = state.loopStart;
-        }
-        setState(s => {
-          const duration = nextDuration && Math.abs(nextDuration - s.duration) > 0.5
-            ? nextDuration
-            : s.duration;
-          const timeChanged = Math.abs(t - s.currentTime) > 0.05;
-          if (!timeChanged && duration === s.duration) return s;
-          return { ...s, currentTime: t, duration };
-        });
-      }
-    }, 100);
-    return () => clearInterval(interval);
-  }, [state.isReady, state.loopActive, state.loopStart, state.loopEnd, state.sourceType]);
-
-  useEffect(() => { onStateUpdate(state); }, [state, onStateUpdate]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden || !state.playing) return;
-      if (state.sourceType === 'youtube') {
-        playerRef.current?.playVideo?.();
-      } else {
-        localAudioRef.current?.play?.().catch(() => {});
+        const data = JSON.parse(response.text || '{}');
+        if (data.bpm) setState(s => ({ ...s, bpm: data.bpm, musicalKey: data.key || '-' }));
+      } catch (e) {
+        console.error("AI Analysis failed:", e);
+      } finally {
+        setIsScanning(false);
       }
     };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [state.playing, state.sourceType]);
 
-  const playRingStyle = state.playing
-    ? { borderColor: color, boxShadow: `0 0 24px ${color}55` }
-    : undefined;
+    const analyzeLocalAudio = async (url: string) => {
+      try {
+        setIsScanning(true);
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+        const existingContext = audioCtxRef.current;
+        const tempContext = existingContext ?? new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioBuffer = await tempContext.decodeAudioData(arrayBuffer.slice(0));
+        const bpm = detectBpmFromAudioBuffer(audioBuffer);
+        const peaks = buildWaveformPeaks(audioBuffer, 900);
+        setState(s => ({
+          ...s,
+          bpm: bpm ?? s.bpm,
+          waveformPeaks: peaks.length ? peaks : undefined
+        }));
+        if (!existingContext) {
+          await tempContext.close();
+        }
+      } catch (e) {
+        console.warn('Local audio analysis failed:', e);
+      } finally {
+        setIsScanning(false);
+      }
+    };
 
-  return (
-    <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0">
-      <div id={containerId} className="h-0 w-0 overflow-hidden" />
-      <audio
-        ref={localAudioRef}
-        style={{ display: 'none' }}
-        onPlay={() => setState(s => ({ ...s, playing: true }))}
-        onPause={() => setState(s => ({ ...s, playing: false }))}
-        onEnded={() => {
-          setState(s => ({ ...s, playing: false }));
-          onTrackEnd?.();
-        }}
-      />
-      
-      <div className="flex gap-4 min-w-0">
-        {/* Main Deck Controls Area */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0">
-          <div className="flex items-center justify-between gap-4 min-w-0">
-            <div className="flex items-center gap-3 shrink-0">
-              <div className={`w-3 h-3 rounded-full ${state.playing ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
-              <div className="text-4xl font-black" style={{ color }}>{id}</div>
+    const updateMetadata = useCallback((player: any) => {
+      if (!player) return;
+      const data = player.getVideoData ? player.getVideoData() : {};
+      const { title, author } = parseYouTubeTitle(data.title || 'Unknown Track', data.author || 'YouTube Stream');
+      const initialBpm = extractBPMFromTitle(data.title || '') || 120;
+
+      setState(s => ({
+        ...s,
+        isReady: true,
+        duration: player.getDuration() || 0,
+        title,
+        author,
+        bpm: initialBpm
+      }));
+
+      analyzeTrackMetadata(title, author);
+    }, []);
+
+    const handleToggleLoop = useCallback((beats: number = 4) => {
+      const beatDuration = 60 / state.bpm;
+      const loopDuration = beats * beatDuration;
+      const isThisLoopActive = state.loopActive && Math.abs((state.loopEnd - state.loopStart) - loopDuration) < 0.1;
+      setState(s => ({
+        ...s,
+        loopActive: !isThisLoopActive,
+        loopStart: !isThisLoopActive ? state.currentTime : 0,
+        loopEnd: !isThisLoopActive ? state.currentTime + loopDuration : 0
+      }));
+    }, [state.bpm, state.loopActive, state.loopStart, state.loopEnd, state.currentTime]);
+
+    const handleHotCue = useCallback((index: number, clear: boolean = false) => {
+      if (clear) {
+        const newCues = [...state.hotCues];
+        newCues[index] = null;
+        setState(s => ({ ...s, hotCues: newCues }));
+        return;
+      }
+
+      const cue = state.hotCues[index];
+      if (cue === null) {
+        const newCues = [...state.hotCues];
+        newCues[index] = state.currentTime;
+        setState(s => ({ ...s, hotCues: newCues }));
+      } else {
+        if (state.sourceType === 'youtube') {
+          playerRef.current?.seekTo(cue, true);
+          playerRef.current?.playVideo();
+        } else if (localAudioRef.current) {
+          localAudioRef.current.currentTime = cue;
+          localAudioRef.current.play();
+        }
+      }
+    }, [state.hotCues, state.currentTime, state.sourceType]);
+
+    const handleClearAllHotCues = useCallback(() => {
+      setState(s => ({ ...s, hotCues: [null, null, null, null] }));
+    }, []);
+
+    const togglePlay = useCallback(() => {
+      // Resume context if suspended (browser policy)
+      if (audioCtxRef.current?.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+
+      if (state.sourceType === 'youtube') {
+        state.playing ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo();
+      } else {
+        state.playing ? localAudioRef.current?.pause() : localAudioRef.current?.play();
+      }
+    }, [state.playing, state.sourceType]);
+
+    const initPlayer = useCallback((videoId: string, loadMode: 'load' | 'cue' = 'load') => {
+      if (!window.YT || !window.YT.Player) {
+        setTimeout(() => initPlayer(videoId, loadMode), 500);
+        return;
+      }
+
+      if (playerRef.current) {
+        try {
+          // Reset state for existing player to avoid GUI freeze/glitch
+          // IMPORTANT: Keep isReady=true for cue mode so Auto DJ can trigger playback
+          setState(s => ({
+            ...s,
+            videoId,
+            isReady: loadMode === 'cue' ? true : false,
+            sourceType: 'youtube',
+            playbackRate: 1.0,
+            playing: false,
+            currentTime: 0,
+            loopActive: false,
+            waveformPeaks: undefined
+          }));
+          if (loadMode === 'cue') {
+            playerRef.current.cueVideoById(videoId);
+          } else {
+            playerRef.current.loadVideoById(videoId);
+          }
+          setIsLoading(loadMode !== 'cue');
+        } catch (e) {
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      playerRef.current = new window.YT.Player(containerId, {
+        height: '1', width: '1', videoId,
+        playerVars: { autoplay: 0, controls: 0, disablekb: 1, origin: window.location.origin, enablejsapi: 1, rel: 0, modestbranding: 1 },
+        events: {
+          onReady: (event: any) => {
+            const p = event.target;
+            updateMetadata(p);
+            onPlayerReady({
+              setVolume: (v: number) => p.setVolume(v),
+              playVideo: () => p.playVideo(),
+              pauseVideo: () => p.pauseVideo(),
+              seekTo: (t: number) => p.seekTo(t, true),
+              setPlaybackRate: (r: number) => p.setPlaybackRate(r)
+            });
+            setIsLoading(false);
+          },
+          onStateChange: (event: any) => {
+            const playerState = event.data;
+            setState(s => ({ ...s, playing: playerState === window.YT.PlayerState.PLAYING }));
+
+            if (playerState === window.YT.PlayerState.CUED || playerState === window.YT.PlayerState.PLAYING) {
+              updateMetadata(event.target);
+              event.target.setPlaybackRate(state.playbackRate);
+              setIsLoading(false);
+            }
+
+            if (playerState === window.YT.PlayerState.ENDED) {
+              setState(s => ({ ...s, playing: false }));
+              onTrackEnd?.();
+            }
+          },
+        }
+      });
+    }, [containerId, onPlayerReady, onTrackEnd, updateMetadata, state.playbackRate]);
+
+    const loadLocalFile = (
+      url: string,
+      metadata?: { title?: string, author?: string },
+      loadMode: 'load' | 'cue' = 'load'
+    ) => {
+      console.log(`[Deck ${id}] loadLocalFile called:`, { url, loadMode, metadata });
+      // Only init if not already done
+      initAudioEngine();
+      setIsLoading(loadMode !== 'cue');
+
+      // Pause any existing YT stream
+      if (playerRef.current && state.sourceType === 'youtube') {
+        try { playerRef.current.pauseVideo(); } catch (e) { }
+      }
+
+      if (localAudioRef.current) {
+        // Clear current source to prevent memory leak / ghost audio
+        localAudioRef.current.pause();
+        localAudioRef.current.src = url;
+        localAudioRef.current.load();
+
+        // Use URL as stable videoId for local files (not timestamp!)
+        const stableVideoId = `local_${url}`;
+        console.log(`[Deck ${id}] Set audio src, waiting for loadedmetadata. stableVideoId:`, stableVideoId);
+
+        const onLoaded = () => {
+          console.log(`[Deck ${id}] loadedmetadata fired! Duration:`, localAudioRef.current?.duration);
+          setState(s => ({
+            ...s,
+            isReady: true,
+            sourceType: 'local',
+            duration: localAudioRef.current?.duration || 0,
+            title: metadata?.title || url.split('/').pop() || 'Local Track',
+            author: metadata?.author || 'Local File',
+            videoId: stableVideoId,
+            playbackRate: 1.0,
+            playing: false,
+            currentTime: 0,
+            loopActive: false,
+            waveformPeaks: undefined
+          }));
+
+          console.log(`[Deck ${id}] State updated, isReady: true, videoId:`, stableVideoId);
+
+          if (loadMode !== 'cue') {
+            analyzeLocalAudio(url);
+          }
+
+          onPlayerReady({
+            setVolume: (v: number) => { if (localAudioRef.current) localAudioRef.current.volume = v / 100; },
+            playVideo: () => localAudioRef.current?.play(),
+            pauseVideo: () => localAudioRef.current?.pause(),
+            seekTo: (t: number) => { if (localAudioRef.current) localAudioRef.current.currentTime = t; },
+            setPlaybackRate: (r: number) => { if (localAudioRef.current) localAudioRef.current.playbackRate = r; }
+          });
+
+          setIsLoading(false);
+          localAudioRef.current?.removeEventListener('loadedmetadata', onLoaded);
+        };
+
+        localAudioRef.current.addEventListener('loadedmetadata', onLoaded);
+      } else {
+        console.error(`[Deck ${id}] localAudioRef.current is null!`);
+      }
+    };
+
+    const handleTap = useCallback(() => {
+      const now = Date.now();
+      const newHistory = [...tapHistory, now].slice(-4);
+      setTapHistory(newHistory);
+      if (newHistory.length >= 2) {
+        const intervals: number[] = [];
+        for (let i = 1; i < newHistory.length; i++) intervals.push(newHistory[i] - newHistory[i - 1]);
+        const avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
+        setState(s => ({ ...s, bpm: Math.round(60000 / avgInterval) }));
+      }
+    }, [tapHistory]);
+
+    useImperativeHandle(ref, () => ({
+      loadVideo: (url: string, sourceType: TrackSourceType = 'youtube', metadata?: { title?: string, author?: string }) => {
+        if (sourceType === 'local') {
+          loadLocalFile(url, metadata, 'load');
+        } else {
+          const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+          if (vid) {
+            initPlayer(vid, 'load');
+            if (metadata) {
+              setState(s => ({ ...s, title: metadata.title, author: metadata.author }));
+            }
+          }
+        }
+      },
+      cueVideo: (url: string, sourceType: TrackSourceType = 'youtube', metadata?: { title?: string, author?: string }) => {
+        if (sourceType === 'local') {
+          loadLocalFile(url, metadata, 'cue');
+        } else {
+          const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+          if (vid) {
+            initPlayer(vid, 'cue');
+            if (metadata) {
+              setState(s => ({ ...s, title: metadata.title, author: metadata.author }));
+            }
+          }
+        }
+      },
+      togglePlay,
+      triggerHotCue: handleHotCue,
+      toggleLoop: handleToggleLoop,
+      setPlaybackRate: updatePlaybackRate,
+      tapBpm: handleTap
+    }), [handleTap, initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, initAudioEngine]);
+
+    useEffect(() => {
+      const interval = setInterval(() => {
+        if (state.isReady) {
+          let t = 0;
+          let nextDuration: number | null = null;
+          if (state.sourceType === 'youtube' && playerRef.current) {
+            try {
+              t = playerRef.current.getCurrentTime();
+              nextDuration = playerRef.current.getDuration?.() || null;
+            } catch (e) { }
+          } else if (state.sourceType === 'local' && localAudioRef.current) {
+            t = localAudioRef.current.currentTime;
+            nextDuration = localAudioRef.current.duration || null;
+          }
+
+          if (state.loopActive && t >= state.loopEnd) {
+            if (state.sourceType === 'youtube') playerRef.current?.seekTo(state.loopStart, true);
+            else if (localAudioRef.current) localAudioRef.current.currentTime = state.loopStart;
+          }
+          setState(s => {
+            const duration = nextDuration && Math.abs(nextDuration - s.duration) > 0.5
+              ? nextDuration
+              : s.duration;
+            const timeChanged = Math.abs(t - s.currentTime) > 0.05;
+            if (!timeChanged && duration === s.duration) return s;
+            return { ...s, currentTime: t, duration };
+          });
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }, [state.isReady, state.loopActive, state.loopStart, state.loopEnd, state.sourceType]);
+
+    useEffect(() => { onStateUpdate(state); }, [state, onStateUpdate]);
+
+    useEffect(() => {
+      const handleVisibilityChange = () => {
+        if (!document.hidden || !state.playing) return;
+        if (state.sourceType === 'youtube') {
+          playerRef.current?.playVideo?.();
+        } else {
+          localAudioRef.current?.play?.().catch(() => { });
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [state.playing, state.sourceType]);
+
+    const playRingStyle = state.playing
+      ? { borderColor: color, boxShadow: `0 0 24px ${color}55` }
+      : undefined;
+
+    const tempoPct = ((state.playbackRate - 0.5) / 1.0) * 100;
+    const tempoIsZero = Math.abs(state.playbackRate - 1.0) < 0.001;
+
+    const PadsPanel = (
+      <div className="min-w-0 h-full flex flex-col gap-2">
+        <div className="bg-black/20 rounded-xl border border-white/5 p-2 min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+            <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
+              Hot Cues
             </div>
-            <div className="deck-title-stack text-right min-w-0 flex-1 overflow-hidden">
-              <MarqueeText text={state.title || 'Deck Ready'} className="text-sm font-bold text-white uppercase tracking-tight" />
-              <MarqueeText 
-                text={state.author || (state.sourceType === 'local' ? 'Local Media' : 'Insert Media')} 
-                className="text-[10px] text-gray-500 font-bold uppercase tracking-widest opacity-80" 
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center px-3 py-1.5 bg-black/30 rounded-2xl border border-white/5">
-            <div className="flex flex-col">
-              <div className="flex items-baseline gap-1">
-                <div className={`text-2xl font-black mono ${isScanning ? 'animate-pulse text-gray-400' : ''}`} style={!isScanning ? { color } : {}}>
-                  {(state.bpm * state.playbackRate).toFixed(1)}
-                </div>
-                <div className="text-[9px] text-gray-500 font-black uppercase">BPM</div>
-              </div>
-              <div className="text-[9px] text-gray-600 font-black uppercase tracking-widest">Key: <span className="text-white/80">{state.musicalKey}</span></div>
-            </div>
-            <button onClick={handleTap} className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-white">TAP</button>
-          </div>
-
-          <div className="flex items-center justify-center py-1">
             <button
-              onClick={togglePlay}
-              disabled={!state.isReady}
-              className="w-16 h-16 rounded-full bg-gradient-to-b from-[#2A2733] to-[#16151C] border-2 flex items-center justify-center transition-all hover:scale-[1.02] active:scale-95"
-              style={playRingStyle}
+              type="button"
+              onClick={handleClearAllHotCues}
+              className="h-6 px-2 rounded-lg text-[8px] font-black uppercase tracking-widest border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all shrink-0"
             >
-              <span className="material-icons text-3xl text-white">{state.playing ? 'pause' : 'play_arrow'}</span>
+              Clear
             </button>
           </div>
 
-          <Waveform 
-            isPlaying={state.playing} 
-            volume={state.volume * (0.5 + state.eqLow * 0.5)} 
-            color={color} 
+          <div className="grid grid-cols-2 gap-1.5">
+            {[0, 1, 2, 3].map((i) => (
+              <button
+                key={i}
+                onClick={() => handleHotCue(i)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  handleHotCue(i, true);
+                }}
+                title={`Hot Cue ${i + 1} (Right-click to clear)`}
+                aria-label={`Hot Cue ${i + 1}`}
+                className={`h-10 rounded-lg font-black text-[10px] border transition-all select-none
+                  ${state.hotCues[i] !== null
+                    ? 'text-black'
+                    : 'border-white/5 text-gray-700 hover:border-white/20'}
+                `}
+                style={state.hotCues[i] !== null
+                  ? { backgroundColor: CUE_COLORS[i], borderColor: CUE_COLORS[i], boxShadow: `0 0 10px ${CUE_COLORS[i]}44` }
+                  : {}
+                }
+              >
+                <span className="sr-only">{`Hot Cue ${i + 1}`}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-black/20 rounded-xl border border-white/5 p-2 min-w-0">
+          <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2 truncate">
+            Loops
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {[2, 4, 8, 16].map((b) => (
+              <button
+                key={b}
+                onClick={() => handleToggleLoop(b)}
+                className={`h-10 rounded-lg text-[10px] font-black border transition-all select-none
+                  ${state.loopActive && Math.abs((state.loopEnd - state.loopStart) - b * (60 / state.bpm)) < 0.1
+                    ? 'bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]'
+                    : 'border-white/5 text-gray-500 hover:text-white hover:border-white/20'}
+                `}
+              >
+                {b}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+
+    const TransportPanel = (
+      <div className="min-w-0 h-full bg-black/20 rounded-xl border border-white/5 p-2 flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none opacity-60">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(208,188,255,0.12),transparent_60%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-black/30" />
+        </div>
+
+        <div className="absolute top-2 left-2 flex items-center gap-2 min-w-0">
+          <div className={`w-2.5 h-2.5 rounded-full ${state.playing ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
+          <div className="text-xs font-black tracking-tight" style={{ color }}>
+            {id}
+          </div>
+        </div>
+
+        <button
+          onClick={togglePlay}
+          disabled={!state.isReady}
+          className="w-16 h-16 rounded-full bg-gradient-to-b from-[#2A2733] to-[#16151C] border-2 flex items-center justify-center transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100 relative z-10"
+          style={playRingStyle}
+          aria-label={state.playing ? 'Pause' : 'Play'}
+          title="Play / Pause"
+        >
+          <span className="material-icons text-3xl text-white">{state.playing ? 'pause' : 'play_arrow'}</span>
+        </button>
+      </div>
+    );
+
+    return (
+      <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-3 flex flex-col gap-2">
+        <div id={containerId} className="h-0 w-0 overflow-hidden" />
+
+        <audio
+          ref={localAudioRef}
+          style={{ display: 'none' }}
+          onPlay={() => setState(s => ({ ...s, playing: true }))}
+          onPause={() => setState(s => ({ ...s, playing: false }))}
+          onEnded={() => {
+            setState(s => ({ ...s, playing: false }));
+            onTrackEnd?.();
+          }}
+        />
+
+        {/* Top waveform strip */}
+        <div className="w-full min-w-0 h-[clamp(56px,9vh,92px)]">
+          <Waveform
+            isPlaying={state.playing}
+            volume={state.volume * (0.5 + state.eqLow * 0.5)}
+            color={color}
             playbackRate={state.playbackRate}
             currentTime={state.currentTime}
             duration={state.duration}
@@ -752,118 +827,151 @@ const effectNodesRef = useRef<{
           />
         </div>
 
-        {/* Improved Pitch / Tempo Fader */}
-        <div 
-          ref={tempoContainerRef}
-          className="w-12 shrink-0 bg-black/20 rounded-xl border border-white/5 flex flex-col items-center py-4 gap-2 relative group select-none transition-all hover:border-white/20 active:border-[#D0BCFF]/30"
-          onDoubleClick={() => updatePlaybackRate(1.0)}
-      onPointerDown={handleTempoPointerDown}
-          onPointerMove={handleTempoPointerMove}
-          onPointerUp={handleTempoPointerUp}
-          onPointerCancel={handleTempoPointerUp}
-          onWheel={(e) => {
-            e.preventDefault();
-            const delta = -e.deltaY * 0.001; // Fine control with mouse wheel
-            updatePlaybackRate(state.playbackRate + delta);
-          }}
-          title="Click/Drag to Pitch • Scroll for Fine-Tune • Double-click to Reset"
-        >
-           <div className="text-[8px] font-black text-gray-500 uppercase tracking-tighter vertical-text h-10 mb-2">Tempo</div>
-           
-           <div className="flex-1 w-full flex justify-center relative py-2">
-              <div className="absolute inset-y-2 left-2 flex flex-col justify-between items-center pointer-events-none opacity-20">
-                {[...Array(11)].map((_, i) => (
-                  <div key={i} className={`h-px bg-white ${i % 5 === 0 ? 'w-3' : 'w-1.5'}`} />
+        {/* Info strip: track + BPM + Tempo */}
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(118px,150px)_minmax(220px,1fr)] gap-2 items-stretch min-w-0">
+          {/* Track info */}
+          <div className="bg-black/30 rounded-xl border border-white/5 px-2.5 py-2 min-w-0 overflow-hidden">
+            <div className="flex items-start justify-between gap-2 min-w-0">
+              <div className="min-w-0">
+                <MarqueeText
+                  text={state.title || 'Deck Ready'}
+                  className="text-[11px] font-black text-white uppercase tracking-tight"
+                />
+                <MarqueeText
+                  text={state.author || (state.sourceType === 'local' ? 'Local Media' : 'Insert Media')}
+                  className="text-[9px] text-gray-500 font-black uppercase tracking-widest opacity-80"
+                />
+              </div>
+              <div className="shrink-0 text-[9px] font-black uppercase tracking-widest text-white/40">
+                {state.sourceType === 'local' ? 'LOCAL' : 'YT'}
+              </div>
+            </div>
+
+            <div className="mt-1 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-600">
+              <span className={`${isScanning ? 'animate-pulse text-gray-400' : ''}`}>
+                Key: <span className="text-white/80">{state.musicalKey}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* BPM block */}
+          <div className="bg-black/30 rounded-xl border border-white/5 px-2.5 py-2 min-w-0 flex flex-col justify-between">
+            <div className="flex items-baseline justify-between gap-2">
+              <div className="flex items-baseline gap-1 min-w-0">
+                <div
+                  className={`text-2xl font-black mono leading-none ${isScanning ? 'animate-pulse text-gray-400' : ''}`}
+                  style={!isScanning ? { color } : {}}
+                  title="Effective BPM (base BPM × playback rate)"
+                >
+                  {(state.bpm * state.playbackRate).toFixed(1)}
+                </div>
+                <div className="text-[9px] text-gray-500 font-black uppercase">BPM</div>
+              </div>
+              <button
+                onClick={handleTap}
+                className="h-7 px-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-white shrink-0"
+                title="Tap BPM"
+              >
+                TAP
+              </button>
+            </div>
+
+            <div className="text-[8px] text-gray-600 font-black uppercase tracking-widest">
+              Rate: <span className="text-white/70">{state.playbackRate.toFixed(3)}x</span>
+            </div>
+          </div>
+
+          {/* Tempo block (horizontal, drag + wheel + dblclick reset) */}
+          <div
+            ref={tempoContainerRef}
+            className="bg-black/30 rounded-xl border border-white/5 px-2.5 py-2 min-w-0 flex flex-col gap-1.5 select-none hover:border-white/20 active:border-[#D0BCFF]/30 touch-none"
+            onDoubleClick={() => updatePlaybackRate(1.0)}
+            onPointerDown={handleTempoPointerDown}
+            onPointerMove={handleTempoPointerMove}
+            onPointerUp={handleTempoPointerUp}
+            onPointerCancel={handleTempoPointerUp}
+            onWheel={(e) => {
+              e.preventDefault();
+              const delta = -e.deltaY * 0.001; // Fine control with mouse wheel
+              updatePlaybackRate(state.playbackRate + delta);
+            }}
+            title="Drag to Pitch • Scroll for Fine-Tune • Double-click to Reset"
+          >
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">
+                Tempo
+              </div>
+              <div className={`text-[10px] font-black mono transition-all ${tempoIsZero ? 'text-[#D0BCFF]' : 'text-gray-400'}`}>
+                {((state.playbackRate - 1.0) * 100).toFixed(2)}%
+              </div>
+            </div>
+
+            <div className="relative h-8 rounded-lg border border-white/10 bg-black/20 overflow-hidden">
+              {/* Detent (1.0x) */}
+              <div className="absolute inset-y-0 left-1/2 w-px bg-white/20" />
+              <div className={`absolute inset-y-0 left-1/2 w-[3px] -ml-[1px] ${tempoIsZero ? 'bg-[#D0BCFF]/70 shadow-[0_0_10px_#D0BCFF]' : 'bg-transparent'}`} />
+
+              {/* Tick marks */}
+              <div className="absolute inset-0 flex items-center justify-between px-2 pointer-events-none opacity-25">
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <div key={i} className={`bg-white ${i === 4 ? 'h-4 w-[2px]' : 'h-2 w-px'}`} />
                 ))}
               </div>
 
-              <div className="h-full w-8 relative flex items-center justify-center cursor-ns-resize">
-                <div
-                  className="absolute w-10 h-10 bg-[#323038] rounded-md border-2 border-white/20 shadow-[0_8px_16px_rgba(0,0,0,0.6)] flex items-center justify-center transition-all duration-75 pointer-events-none z-10"
-                  style={{
-                    top: `${(1.5 - state.playbackRate) * 100}%`,
-                    transform: 'translateY(-50%)'
-                  }}
-                >
-                  <div className="w-6 h-[2px] bg-[#D0BCFF] shadow-[0_0_8px_#D0BCFF]" />
-                </div>
-
-                <input
-                  type="range"
-                  min="0.5"
-                  max="1.5"
-                  step="0.0001"
-                  value={state.playbackRate}
-                   onInput={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value))}
-                  className="absolute inset-0 cursor-pointer z-20 h-full w-full opacity-0"
-                  style={{ WebkitAppearance: 'slider-vertical', appearance: 'slider-vertical' as any }}
-                />
-              </div>
-           </div>
-
-           <div className="flex flex-col items-center gap-0.5 pb-2">
-             <div className={`text-[9px] font-black mono transition-all ${Math.abs(state.playbackRate - 1.0) < 0.001 ? 'text-[#D0BCFF] scale-110' : 'text-gray-500'}`}>
-                {((state.playbackRate - 1.0) * 100).toFixed(2)}%
-             </div>
-             <div className={`w-1.5 h-1.5 rounded-full transition-all ${Math.abs(state.playbackRate - 1.0) < 0.001 ? 'bg-[#D0BCFF] shadow-[0_0_8px_#D0BCFF]' : 'bg-transparent'}`} />
-           </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 mt-2 items-stretch">
-        <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
-          <div className="flex items-center justify-between px-1">
-            <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Hot Cues</div>
-            <button
-              type="button"
-              onClick={handleClearAllHotCues}
-              className="h-5 px-2 rounded-md text-[8px] font-black uppercase tracking-widest border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all"
-            >
-              Clear All
-            </button>
-          </div>
-          <div className="grid grid-cols-4 gap-1">
-            {[0, 1, 2, 3].map((i) => (
-              <button 
-                key={i} 
-                onClick={() => handleHotCue(i)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  handleHotCue(i, true);
+              {/* Knob */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-10 h-6 rounded-md bg-[#323038] border-2 border-white/20 shadow-[0_8px_16px_rgba(0,0,0,0.6)] flex items-center justify-center pointer-events-none"
+                style={{
+                  left: `calc(${tempoPct}% - 20px)`
                 }}
-                title={`Hot Cue ${i + 1} (Right-click to clear)`}
-                aria-label={`Hot Cue ${i + 1}`}
-                className={`h-8 rounded-lg font-black text-[10px] border transition-all ${state.hotCues[i] !== null ? 'text-black' : 'border-white/5 text-gray-700 hover:border-white/20'}`} 
-                style={state.hotCues[i] !== null ? { backgroundColor: CUE_COLORS[i], borderColor: CUE_COLORS[i], boxShadow: `0 0 10px ${CUE_COLORS[i]}44` } : {}}
               >
-                <span className="sr-only">{`Hot Cue ${i + 1}`}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
-          <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest px-1">Loops</div>
-          <div className="grid grid-cols-4 gap-1">
-            {[2, 4, 8, 16].map((b) => (
-              <button
-                key={b}
-                onClick={() => handleToggleLoop(b)}
-                className={`h-8 rounded-lg text-[10px] font-black border transition-all ${state.loopActive && Math.abs((state.loopEnd - state.loopStart) - b * (60 / state.bpm)) < 0.1 ? 'bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'border-white/5 text-gray-500 hover:text-white hover:border-white/20'}`}
-              >
-                {b}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+                <div className="w-6 h-[2px] bg-[#D0BCFF] shadow-[0_0_8px_#D0BCFF]" />
+              </div>
 
-      {isLoading && (
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="w-12 h-12 border-4 border-[#D0BCFF] border-t-transparent rounded-full animate-spin" />
+              {/* Accessible input overlay */}
+              <input
+                type="range"
+                min="0.5"
+                max="1.5"
+                step="0.0001"
+                value={state.playbackRate}
+                onInput={(e) => updatePlaybackRate(parseFloat(e.currentTarget.value))}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize"
+                aria-label="Tempo / Pitch"
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-gray-600">
+              <span>-50%</span>
+              <span>0</span>
+              <span>+50%</span>
+            </div>
+          </div>
         </div>
-      )}
-    </div>
-  );
-});
+
+        {/* Performance row (pads outside, transport inside) */}
+        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0">
+          {isDeckA ? (
+            <>
+              {PadsPanel}
+              {TransportPanel}
+            </>
+          ) : (
+            <>
+              {TransportPanel}
+              {PadsPanel}
+            </>
+          )}
+        </div>
+
+        {isLoading && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="w-12 h-12 border-4 border-[#D0BCFF] border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+      </div>
+    );
+  }
+);
 
 export default Deck;
