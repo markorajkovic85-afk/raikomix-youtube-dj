@@ -671,7 +671,7 @@ const effectNodesRef = useRef<{
     : undefined;
 
   return (
-    <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-full min-h-0">
+    <div className="m3-card deck-card bg-[#1D1B20] border-white/5 flex flex-col gap-4 p-4 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none self-start h-auto max-h-full min-h-0">
       <div id={containerId} className="h-0 w-0 overflow-hidden" />
       <audio
         ref={localAudioRef}
@@ -685,7 +685,7 @@ const effectNodesRef = useRef<{
       />
 
       {/* ZONE 1: Main (header + bpm + play + waveform + tempo) */}
-      <div className="deck-zone-main flex gap-4 min-w-0 flex-1 min-h-0">
+      <div className="deck-zone-main flex gap-4 min-w-0 min-h-0">
         {/* Main Deck Controls Area */}
         <div className="flex-1 flex flex-col gap-4 min-w-0 min-h-0">
           <div className="flex items-center justify-between gap-4 min-w-0">
@@ -726,8 +726,8 @@ const effectNodesRef = useRef<{
             </button>
           </div>
 
-          {/* Waveform zone: flex-1 + min-h-0 prevents overlap when height is constrained */}
-          <div className="flex-1 min-h-0">
+          {/* Waveform zone: min-h-0 keeps it from forcing overflow when constrained */}
+          <div className="min-h-0">
             <Waveform 
               isPlaying={state.playing} 
               volume={state.volume * (0.5 + state.eqLow * 0.5)} 
@@ -815,7 +815,7 @@ const effectNodesRef = useRef<{
       </div>
 
       {/* ZONE 2: Pads (hot cues + loops) */}
-      <div className="deck-zone-pads shrink-0">
+      <div className="deck-zone-pads mt-2">
         <div className="grid grid-cols-2 gap-3 items-stretch">
           <div className="bg-black/20 p-2 rounded-xl border border-white/5 space-y-2 flex flex-col justify-between">
             <div className="flex items-center justify-between px-1">
