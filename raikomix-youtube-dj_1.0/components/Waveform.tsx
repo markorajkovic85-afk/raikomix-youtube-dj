@@ -66,6 +66,52 @@ const Waveform: React.FC<WaveformProps> = ({
     }
   };
 
+  const drawPlayhead = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    progress: number,
+    mode: 'soft' | 'strong' = 'soft'
+  ) => {
+    const p = Math.min(1, Math.max(0, progress));
+    const x = Math.min(width, Math.max(0, p * width));
+
+    // Subtle, UI-aligned progress indication: faint fill + crisp line.
+    // For the "soft" mode (YouTube/no peaks), add a light tint so position is obvious.
+    if (mode === 'soft') {
+      ctx.save();
+      ctx.globalAlpha = 0.06;
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, x, height);
+      ctx.restore();
+    }
+
+    // Outer glow line (very subtle)
+    ctx.save();
+    ctx.globalAlpha = mode === 'soft' ? 0.45 : 0.6;
+    ctx.shadowBlur = mode === 'soft' ? 10 : 8;
+    ctx.shadowColor = color;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = mode === 'soft' ? 1.4 : 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x, height * 0.12);
+    ctx.lineTo(x, height * 0.88);
+    ctx.stroke();
+    ctx.restore();
+
+    // Inner highlight line (helps on bright/complex waveforms)
+    ctx.save();
+    ctx.globalAlpha = mode === 'soft' ? 0.22 : 0.18;
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, height * 0.14);
+    ctx.lineTo(x, height * 0.86);
+    ctx.stroke();
+    ctx.restore();
+  };
+
   const drawMarkers = (
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -158,16 +204,7 @@ const Waveform: React.FC<WaveformProps> = ({
     }
 
     drawMarkers(ctx, width, height, visibleStart, visibleDuration);
-
-    ctx.shadowBlur = 8;
-    ctx.shadowColor = color;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.2;
-    const playheadX = Math.min(width, Math.max(0, progress * width));
-    ctx.beginPath();
-    ctx.moveTo(playheadX, height * 0.1);
-    ctx.lineTo(playheadX, height * 0.9);
-    ctx.stroke();
+    drawPlayhead(ctx, width, height, clampedProgress, 'strong');
   };
 
   const visibleWindow = useMemo(() => {
@@ -249,6 +286,10 @@ const Waveform: React.FC<WaveformProps> = ({
       ctx.lineTo(width, height * 0.5);
       ctx.stroke();
     }
+
+    // YouTube/no-peaks: subtle but visible progress marker
+    const p = duration > 0 ? currentTime / duration : 0;
+    drawPlayhead(ctx, width, height, p, 'soft');
 
     requestRef.current = requestAnimationFrame(draw);
   };
