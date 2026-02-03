@@ -15,6 +15,11 @@ interface WaveformProps {
   onSeek?: (time: number) => void;
   timeLabel?: string;
   onTimeToggle?: () => void;
+
+  /** Optional styling hooks for ultra-compact layouts */
+  className?: string;
+  /** Ensures waveform can shrink first, but not collapse */
+  minHeightPx?: number;
 }
 
 const defaultCueColors = ['#FFD700', '#00E5FF', '#FF4081', '#76FF03'];
@@ -36,7 +41,9 @@ const Waveform: React.FC<WaveformProps> = ({
   loop,
   onSeek,
   timeLabel,
-  onTimeToggle
+  onTimeToggle,
+  className,
+  minHeightPx = 40
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -183,6 +190,7 @@ const Waveform: React.FC<WaveformProps> = ({
     const width = canvas.width;
     const height = canvas.height;
     ctx.clearRect(0, 0, width, height);
+
     const visibleProgress = visibleWindow.length > 0
       ? (currentTime - visibleWindow.start) / visibleWindow.length
       : 0;
@@ -251,12 +259,17 @@ const Waveform: React.FC<WaveformProps> = ({
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, volume, playbackRate, color, peaks, currentTime, duration, sourceType, hotCues, cueColors, loop, visibleWindow]);
 
   return (
     <div
       ref={containerRef}
-      className="waveform-display w-full h-full min-h-[56px] bg-black/70 rounded-xl overflow-hidden border border-white/5 shadow-inner relative min-w-0"
+      className={[
+        "waveform-display w-full h-full bg-black/70 rounded-lg overflow-hidden border border-white/5 shadow-inner relative min-w-0",
+        className ?? ""
+      ].join(" ")}
+      style={{ minHeight: minHeightPx ? `${minHeightPx}px` : undefined }}
       onClick={(event) => {
         if (!onSeek || duration <= 0) return;
         const rect = event.currentTarget.getBoundingClientRect();
@@ -278,7 +291,7 @@ const Waveform: React.FC<WaveformProps> = ({
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/4 to-transparent pointer-events-none" />
       <button
         type="button"
-        className="absolute top-2 right-3 text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors z-10"
+        className="absolute top-1 right-2 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors z-10"
         onClick={(event) => {
           event.stopPropagation();
           onTimeToggle?.();

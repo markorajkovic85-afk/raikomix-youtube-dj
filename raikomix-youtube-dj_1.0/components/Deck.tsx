@@ -55,7 +55,7 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
   }, [text]);
 
   return (
-    <div ref={containerRef} className="marquee-container w-full min-w-0">
+    <div ref={containerRef} className="marquee-container w-full min-w-0 overflow-hidden">
       <div
         ref={textRef}
         className={`${className} marquee-text ${shouldAnimate ? 'animate-marquee' : 'truncate'}`}
@@ -109,7 +109,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const tempoDraggingRef = useRef(false);
 
     const containerId = `yt-player-${id}`;
-    const isDeckA = id === ('A' as DeckId);
 
     const formatTime = useCallback((timeSeconds: number) => {
       const safeSeconds = Math.max(0, Math.floor(timeSeconds));
@@ -684,107 +683,20 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     }, [state.playing, state.sourceType]);
 
     const playRingStyle = state.playing
-      ? { borderColor: color, boxShadow: `0 0 24px ${color}55` }
+      ? { borderColor: color, boxShadow: `0 0 18px ${color}55` }
       : undefined;
 
     const tempoPct = ((state.playbackRate - 0.5) / 1.0) * 100;
     const tempoIsZero = Math.abs(state.playbackRate - 1.0) < 0.001;
+    const tempoPercentText = ((state.playbackRate - 1.0) * 100).toFixed(2);
 
-    const PadsPanel = (
-      <div className="min-w-0 h-full flex flex-col gap-2">
-        <div className="bg-black/20 rounded-xl border border-white/5 p-2 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
-            <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
-              Hot Cues
-            </div>
-            <button
-              type="button"
-              onClick={handleClearAllHotCues}
-              className="h-6 px-2 rounded-lg text-[8px] font-black uppercase tracking-widest border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all shrink-0"
-            >
-              Clear
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-1.5">
-            {[0, 1, 2, 3].map((i) => (
-              <button
-                key={i}
-                onClick={() => handleHotCue(i)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  handleHotCue(i, true);
-                }}
-                title={`Hot Cue ${i + 1} (Right-click to clear)`}
-                aria-label={`Hot Cue ${i + 1}`}
-                className={`h-10 rounded-lg font-black text-[10px] border transition-all select-none
-                  ${state.hotCues[i] !== null
-                    ? 'text-black'
-                    : 'border-white/5 text-gray-700 hover:border-white/20'}
-                `}
-                style={state.hotCues[i] !== null
-                  ? { backgroundColor: CUE_COLORS[i], borderColor: CUE_COLORS[i], boxShadow: `0 0 10px ${CUE_COLORS[i]}44` }
-                  : {}
-                }
-              >
-                <span className="sr-only">{`Hot Cue ${i + 1}`}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-black/20 rounded-xl border border-white/5 p-2 min-w-0">
-          <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-2 truncate">
-            Loops
-          </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            {[2, 4, 8, 16].map((b) => (
-              <button
-                key={b}
-                onClick={() => handleToggleLoop(b)}
-                className={`h-10 rounded-lg text-[10px] font-black border transition-all select-none
-                  ${state.loopActive && Math.abs((state.loopEnd - state.loopStart) - b * (60 / state.bpm)) < 0.1
-                    ? 'bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]'
-                    : 'border-white/5 text-gray-500 hover:text-white hover:border-white/20'}
-                `}
-              >
-                {b}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-
-    const TransportPanel = (
-      <div className="min-w-0 h-full bg-black/20 rounded-xl border border-white/5 p-2 flex items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none opacity-60">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(208,188,255,0.12),transparent_60%)]" />
-          <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-black/30" />
-        </div>
-
-        <div className="absolute top-2 left-2 flex items-center gap-2 min-w-0">
-          <div className={`w-2.5 h-2.5 rounded-full ${state.playing ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
-          <div className="text-xs font-black tracking-tight" style={{ color }}>
-            {id}
-          </div>
-        </div>
-
-        <button
-          onClick={togglePlay}
-          disabled={!state.isReady}
-          className="w-16 h-16 rounded-full bg-gradient-to-b from-[#2A2733] to-[#16151C] border-2 flex items-center justify-center transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100 relative z-10"
-          style={playRingStyle}
-          aria-label={state.playing ? 'Pause' : 'Play'}
-          title="Play / Pause"
-        >
-          <span className="material-icons text-3xl text-white">{state.playing ? 'pause' : 'play_arrow'}</span>
-        </button>
-      </div>
-    );
+    const loopIsActiveForBeats = (beats: number) => {
+      const beatDuration = 60 / state.bpm;
+      return state.loopActive && Math.abs((state.loopEnd - state.loopStart) - beats * beatDuration) < 0.1;
+    };
 
     return (
-      <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-3 flex flex-col gap-2">
+      <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-2 flex flex-col gap-1.5">
         <div id={containerId} className="h-0 w-0 overflow-hidden" />
 
         <audio
@@ -798,8 +710,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           }}
         />
 
-        {/* Top waveform strip */}
-        <div className="w-full min-w-0 h-[clamp(56px,9vh,92px)]">
+        {/* Waveform: slim + flexible (shrinks first) */}
+        <div className="w-full min-w-0 h-[clamp(40px,6vh,64px)]">
           <Waveform
             isPlaying={state.playing}
             volume={state.volume * (0.5 + state.eqLow * 0.5)}
@@ -824,67 +736,90 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               ? `-${formatTime(state.duration - state.currentTime)}`
               : formatTime(state.currentTime)}
             onTimeToggle={() => setShowRemaining(prev => !prev)}
+            minHeightPx={40}
           />
         </div>
 
-        {/* Info strip: track + BPM + Tempo */}
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(118px,150px)_minmax(220px,1fr)] gap-2 items-stretch min-w-0">
-          {/* Track info */}
-          <div className="bg-black/30 rounded-xl border border-white/5 px-2.5 py-2 min-w-0 overflow-hidden">
-            <div className="flex items-start justify-between gap-2 min-w-0">
+        {/* Row 1: Title + Play */}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5 items-stretch min-w-0">
+          <div className="bg-black/30 rounded-lg border border-white/5 px-2 py-1.5 min-w-0 overflow-hidden flex items-center">
+            <div className="flex items-start justify-between gap-2 min-w-0 w-full">
               <div className="min-w-0">
                 <MarqueeText
                   text={state.title || 'Deck Ready'}
-                  className="text-[11px] font-black text-white uppercase tracking-tight"
+                  className="text-[clamp(10px,1.15vw,12px)] font-black text-white uppercase tracking-tight whitespace-nowrap"
                 />
                 <MarqueeText
                   text={state.author || (state.sourceType === 'local' ? 'Local Media' : 'Insert Media')}
-                  className="text-[9px] text-gray-500 font-black uppercase tracking-widest opacity-80"
+                  className="text-[clamp(8px,1vw,10px)] text-gray-500 font-black uppercase tracking-widest opacity-80 whitespace-nowrap"
                 />
               </div>
-              <div className="shrink-0 text-[9px] font-black uppercase tracking-widest text-white/40">
-                {state.sourceType === 'local' ? 'LOCAL' : 'YT'}
-              </div>
-            </div>
 
-            <div className="mt-1 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-600">
-              <span className={`${isScanning ? 'animate-pulse text-gray-400' : ''}`}>
-                Key: <span className="text-white/80">{state.musicalKey}</span>
-              </span>
+              <div className="shrink-0 flex flex-col items-end gap-0.5">
+                <div className="flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${state.playing ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
+                  <div className="text-[11px] font-black tracking-tight" style={{ color }}>
+                    {id}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-white/40">
+                  <span>{state.sourceType === 'local' ? 'LOCAL' : 'YT'}</span>
+                  <span className={`${isScanning ? 'animate-pulse text-gray-300' : 'text-white/60'}`}>
+                    Key {state.musicalKey}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
+          <button
+            onClick={togglePlay}
+            disabled={!state.isReady}
+            className="w-10 h-10 rounded-lg bg-gradient-to-b from-[#2A2733] to-[#16151C] border-2 flex items-center justify-center transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
+            style={playRingStyle}
+            aria-label={state.playing ? 'Pause' : 'Play'}
+            title="Play / Pause"
+          >
+            <span className="material-icons text-[22px] text-white leading-none">
+              {state.playing ? 'pause' : 'play_arrow'}
+            </span>
+          </button>
+        </div>
+
+        {/* Row 2: BPM + Tempo */}
+        <div className="grid grid-cols-[minmax(0,148px)_minmax(0,1fr)] gap-1.5 items-stretch min-w-0">
           {/* BPM block */}
-          <div className="bg-black/30 rounded-xl border border-white/5 px-2.5 py-2 min-w-0 flex flex-col justify-between">
-            <div className="flex items-baseline justify-between gap-2">
-              <div className="flex items-baseline gap-1 min-w-0">
+          <div className="bg-black/30 rounded-lg border border-white/5 px-2 py-1.5 min-w-0 flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <div className="min-w-0 flex items-baseline gap-1">
                 <div
-                  className={`text-2xl font-black mono leading-none ${isScanning ? 'animate-pulse text-gray-400' : ''}`}
+                  className={`text-[clamp(16px,2.2vw,22px)] font-black mono leading-none ${isScanning ? 'animate-pulse text-gray-400' : ''}`}
                   style={!isScanning ? { color } : {}}
                   title="Effective BPM (base BPM × playback rate)"
                 >
                   {(state.bpm * state.playbackRate).toFixed(1)}
                 </div>
-                <div className="text-[9px] text-gray-500 font-black uppercase">BPM</div>
+                <div className="text-[9px] text-gray-500 font-black uppercase whitespace-nowrap">BPM</div>
               </div>
+
               <button
                 onClick={handleTap}
-                className="h-7 px-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-white shrink-0"
+                className="h-7 px-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-white shrink-0"
                 title="Tap BPM"
               >
                 TAP
               </button>
             </div>
 
-            <div className="text-[8px] text-gray-600 font-black uppercase tracking-widest">
-              Rate: <span className="text-white/70">{state.playbackRate.toFixed(3)}x</span>
+            <div className="text-[8px] text-gray-600 font-black uppercase tracking-widest whitespace-nowrap">
+              Base <span className="text-white/70">{state.bpm}</span> • Rate <span className="text-white/70">{state.playbackRate.toFixed(3)}x</span>
             </div>
           </div>
 
           {/* Tempo block (horizontal, drag + wheel + dblclick reset) */}
           <div
             ref={tempoContainerRef}
-            className="bg-black/30 rounded-xl border border-white/5 px-2.5 py-2 min-w-0 flex flex-col gap-1.5 select-none hover:border-white/20 active:border-[#D0BCFF]/30 touch-none"
+            className="bg-black/30 rounded-lg border border-white/5 px-2 py-1.5 min-w-0 flex flex-col gap-1 select-none hover:border-white/20 active:border-[#D0BCFF]/30 touch-none"
             onDoubleClick={() => updatePlaybackRate(1.0)}
             onPointerDown={handleTempoPointerDown}
             onPointerMove={handleTempoPointerMove}
@@ -898,15 +833,15 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             title="Drag to Pitch • Scroll for Fine-Tune • Double-click to Reset"
           >
             <div className="flex items-center justify-between gap-2 min-w-0">
-              <div className="text-[9px] font-black uppercase tracking-widest text-gray-500">
+              <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 whitespace-nowrap">
                 Tempo
               </div>
-              <div className={`text-[10px] font-black mono transition-all ${tempoIsZero ? 'text-[#D0BCFF]' : 'text-gray-400'}`}>
-                {((state.playbackRate - 1.0) * 100).toFixed(2)}%
+              <div className={`text-[10px] font-black mono transition-all whitespace-nowrap ${tempoIsZero ? 'text-[#D0BCFF]' : 'text-gray-400'}`}>
+                {tempoPercentText}%
               </div>
             </div>
 
-            <div className="relative h-8 rounded-lg border border-white/10 bg-black/20 overflow-hidden">
+            <div className="relative h-7 rounded-md border border-white/10 bg-black/20 overflow-hidden">
               {/* Detent (1.0x) */}
               <div className="absolute inset-y-0 left-1/2 w-px bg-white/20" />
               <div className={`absolute inset-y-0 left-1/2 w-[3px] -ml-[1px] ${tempoIsZero ? 'bg-[#D0BCFF]/70 shadow-[0_0_10px_#D0BCFF]' : 'bg-transparent'}`} />
@@ -920,12 +855,12 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
               {/* Knob */}
               <div
-                className="absolute top-1/2 -translate-y-1/2 w-10 h-6 rounded-md bg-[#323038] border-2 border-white/20 shadow-[0_8px_16px_rgba(0,0,0,0.6)] flex items-center justify-center pointer-events-none"
+                className="absolute top-1/2 -translate-y-1/2 w-8 h-5 rounded-md bg-[#323038] border-2 border-white/20 shadow-[0_8px_16px_rgba(0,0,0,0.6)] flex items-center justify-center pointer-events-none"
                 style={{
-                  left: `calc(${tempoPct}% - 20px)`
+                  left: `calc(${tempoPct}% - 16px)`
                 }}
               >
-                <div className="w-6 h-[2px] bg-[#D0BCFF] shadow-[0_0_8px_#D0BCFF]" />
+                <div className="w-5 h-[2px] bg-[#D0BCFF] shadow-[0_0_8px_#D0BCFF]" />
               </div>
 
               {/* Accessible input overlay */}
@@ -941,7 +876,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               />
             </div>
 
-            <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-gray-600">
+            <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-gray-600 whitespace-nowrap">
               <span>-50%</span>
               <span>0</span>
               <span>+50%</span>
@@ -949,19 +884,82 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
         </div>
 
-        {/* Performance row (pads outside, transport inside) */}
-        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0">
-          {isDeckA ? (
-            <>
-              {PadsPanel}
-              {TransportPanel}
-            </>
-          ) : (
-            <>
-              {TransportPanel}
-              {PadsPanel}
-            </>
-          )}
+        {/* Row 3: Hot Cues + Loops */}
+        <div className="grid grid-cols-2 gap-1.5 items-stretch min-w-0">
+          {/* Hot Cues */}
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 min-w-0 mb-1">
+              <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
+                Hot Cues
+              </div>
+              <button
+                type="button"
+                onClick={handleClearAllHotCues}
+                className="h-6 px-2 rounded-md text-[9px] font-black uppercase tracking-widest border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all shrink-0"
+                title="Clear all hot cues"
+              >
+                Clear
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1 min-w-0">
+              {[0, 1, 2, 3].map((i) => {
+                const isSet = state.hotCues[i] !== null;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => handleHotCue(i)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      handleHotCue(i, true);
+                    }}
+                    title={`Hot Cue ${i + 1} (Right-click to clear)`}
+                    aria-label={`Hot Cue ${i + 1}`}
+                    className={[
+                      "h-9 rounded-md font-black text-[11px] border transition-all select-none min-w-0",
+                      isSet ? "text-black" : "border-white/5 text-gray-600 hover:text-white hover:border-white/20"
+                    ].join(" ")}
+                    style={isSet
+                      ? { backgroundColor: CUE_COLORS[i], borderColor: CUE_COLORS[i], boxShadow: `0 0 10px ${CUE_COLORS[i]}44` }
+                      : {}
+                    }
+                  >
+                    {i + 1}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Loops */}
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between gap-2 min-w-0 mb-1">
+              <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
+                Loops
+              </div>
+              <div className="text-[9px] text-white/30 font-black uppercase tracking-widest whitespace-nowrap">
+                Beats
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1 min-w-0">
+              {[2, 4, 8, 16].map((b) => (
+                <button
+                  key={b}
+                  onClick={() => handleToggleLoop(b)}
+                  className={[
+                    "h-9 rounded-md text-[11px] font-black border transition-all select-none min-w-0",
+                    loopIsActiveForBeats(b)
+                      ? "bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]"
+                      : "border-white/5 text-gray-500 hover:text-white hover:border-white/20"
+                  ].join(" ")}
+                  title={`Loop ${b} beats`}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {isLoading && (
