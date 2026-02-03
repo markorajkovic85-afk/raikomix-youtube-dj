@@ -77,6 +77,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const [showRemaining, setShowRemaining] = useState(false);
     const [bpmConfidence, setBpmConfidence] = useState(1);
     const [keyConfidence, setKeyConfidence] = useState(0);
+    const analysisTokenRef = useRef(0);
 
     const [state, setState] = useState<PlayerState>({
       playing: false,
@@ -361,7 +362,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       }
     };
 
-    const analyzeLocalAudio = async (url: string) => {
+    const analyzeLocalAudio = async (url: string, analysisToken: number, expectedVideoId: string) => {
       try {
         setIsScanning(true);
         const response = await fetch(url);
@@ -377,6 +378,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           skipEdgeSeconds: 10,
           analyzeSeconds: 60
         });
+        if (analysisTokenRef.current !== analysisToken) return;
         const peaks = buildWaveformPeaks(audioBuffer, 900);
         const nextBpm = (analysis.bpm !== null && analysis.confidence >= 0.25)
           ? analysis.bpm
@@ -386,12 +388,15 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           : '-';
         setBpmConfidence(analysis.confidence ?? 0);
         setKeyConfidence(analysis.keyConfidence ?? 0);
-        setState(s => ({
-          ...s,
-          bpm: nextBpm ?? s.bpm,
-          musicalKey: nextKey ?? s.musicalKey,
-          waveformPeaks: peaks.length ? peaks : undefined
-        }));
+        setState(s => {
+          if (s.videoId !== expectedVideoId) return s;
+          return {
+            ...s,
+            bpm: nextBpm ?? s.bpm,
+            musicalKey: nextKey ?? s.musicalKey,
+            waveformPeaks: peaks.length ? peaks : undefined
+          };
+        });
         if (!existingContext) {
           await tempContext.close();
         }
@@ -590,7 +595,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           console.log(`[Deck ${id}] State updated, isReady: true, videoId:`, stableVideoId);
 
           if (loadMode !== 'cue') {
-            analyzeLocalAudio(url);
+            const analysisToken = ++analysisTokenRef.current;
+            analyzeLocalAudio(url, analysisToken, stableVideoId);
           }
 
           onPlayerReady({
@@ -788,6 +794,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                   <span>{state.sourceType === 'local' ? 'LOCAL' : 'YT'}</span>
                   <span className={`${isScanning ? 'animate-pulse text-gray-300' : 'text-white/60'}`}>
                     Key {state.musicalKey}
+                    {keyConfidence > 0 && (
+                      <span className="ml-1 text-white/40">{Math.round(keyConfidence * 100)}%</span>
+                    )}
                   </span>
                 </div>
               </div>
@@ -835,10 +844,16 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </button>
             </div>
 
-            <div className="text-[8px] text-gray-600 font-black uppercase tracking-widest whitespace-nowrap">
-              Base <span className="text-white/70">{state.bpm}</span>
-              {" "}• Conf <span className="text-white/70">{Math.round(bpmConfidence * 100)}%</span>
-              {" "}• Rate <span className="text-white/70">{state.playbackRate.toFixed(3)}x</span>
+            <div className="text-[8px] text-gray-600 font-black uppercase tracking-wide sm:tracking-widest whitespace-normal flex flex-wrap gap-x-1 gap-y-0.5">
+              <span>
+                Base <span className="text-white/70">{state.bpm}</span>
+              </span>
+              <span>
+                • Conf <span className="text-white/70">{Math.round(bpmConfidence * 100)}%</span>
+              </span>
+              <span className="max-[340px]:hidden">
+                • Rate <span className="text-white/70">{state.playbackRate.toFixed(3)}x</span>
+              </span>
             </div>
           </div>
 

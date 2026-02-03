@@ -158,7 +158,7 @@ async function extractMonoPcmSegment(
   const mono = new Float32Array(length);
 
   // Chunked downmix to avoid UI jank on big buffers.
-  const CHUNK = 262_144;
+  const CHUNK = 65_536;
   for (let i = 0; i < length; i++) {
     let s = 0;
     const idx = startSample + i;
