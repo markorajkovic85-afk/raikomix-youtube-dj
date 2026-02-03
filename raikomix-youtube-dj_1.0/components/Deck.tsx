@@ -710,8 +710,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           }}
         />
 
-        {/* Waveform: primary + flexible (fills spare deck height) */}
-        <div className="w-full min-w-0 flex-1 min-h-[clamp(56px,10vh,120px)]">
+        {/* Waveform: compact (reduce height) */}
+        <div className="w-full min-w-0 h-[clamp(40px,6vh,64px)]">
           <Waveform
             isPlaying={state.playing}
             volume={state.volume * (0.5 + state.eqLow * 0.5)}
@@ -736,7 +736,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               ? `-${formatTime(state.duration - state.currentTime)}`
               : formatTime(state.currentTime)}
             onTimeToggle={() => setShowRemaining(prev => !prev)}
-            minHeightPx={56}
+            minHeightPx={40}
           />
         </div>
 
@@ -886,10 +886,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
         </div>
 
-        {/* Row 3: Hot Cues + Loops (flexes to fill spare height) */}
-        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 flex-1 min-h-[120px]">
+        {/* Row 3: Hot Cues + Loops */}
+        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0">
           {/* Hot Cues */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col h-full">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col">
             <div className="flex items-center justify-between gap-2 min-w-0 h-6">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Hot Cues
@@ -904,7 +904,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </button>
             </div>
 
-            <div className="grid grid-cols-4 gap-1 min-w-0 flex-1 content-stretch items-stretch min-h-[44px]">
+            <div className="grid grid-cols-4 gap-1 min-w-0 place-items-center">
               {[0, 1, 2, 3].map((i) => {
                 const isSet = state.hotCues[i] !== null;
                 return (
@@ -918,7 +918,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                     title={`Hot Cue ${i + 1} (Right-click to clear)`}
                     aria-label={`Hot Cue ${i + 1}`}
                     className={[
-                      "h-full min-h-10 rounded-md font-black text-[11px] border transition-all select-none min-w-0",
+                      "w-9 h-9 rounded-md font-black text-[11px] border transition-all select-none min-w-0 flex items-center justify-center leading-none",
                       isSet ? "text-black" : "border-white/5 text-gray-600 hover:text-white hover:border-white/20"
                     ].join(" ")}
                     style={isSet
@@ -934,7 +934,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
 
           {/* Loops */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col h-full">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col">
             <div className="flex items-center justify-between gap-2 min-w-0 h-6">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Loops
@@ -944,13 +944,13 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-1 min-w-0 flex-1 content-stretch items-stretch min-h-[44px]">
+            <div className="grid grid-cols-4 gap-1 min-w-0 place-items-center">
               {[2, 4, 8, 16].map((b) => (
                 <button
                   key={b}
                   onClick={() => handleToggleLoop(b)}
                   className={[
-                    "h-full min-h-10 rounded-md text-[11px] font-black border transition-all select-none min-w-0",
+                    "w-9 h-9 rounded-md text-[11px] font-black border transition-all select-none min-w-0 flex items-center justify-center leading-none",
                     loopIsActiveForBeats(b)
                       ? "bg-green-500 text-black border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]"
                       : "border-white/5 text-gray-500 hover:text-white hover:border-white/20"
