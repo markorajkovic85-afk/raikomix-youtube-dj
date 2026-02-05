@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { CrossfaderCurve } from '../types';
 
@@ -278,7 +277,7 @@ const Mixer: React.FC<MixerProps> = ({
           {/* Channel A Section */}
           <div className="mixer-channel bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0 flex flex-col items-center gap-2">
             <div className="flex flex-col items-center gap-1.5 w-full">
-              <Knob label="Trim" value={deckATrim} onChange={onDeckATrimChange} color="#D0BCFF" size="sm" defaultValue={1} />
+              <Knob label="FX" value={deckATrim} onChange={onDeckATrimChange} color="#D0BCFF" size="sm" min={0} max={1} defaultValue={0} />
               <div className="w-full h-px bg-white/5" />
               <div className="flex flex-col gap-1.5">
                 <Knob label="Hi" value={deckAEq.hi} onChange={(v) => onDeckAEqChange('hi', v)} color="#D0BCFF" />
@@ -317,7 +316,7 @@ const Mixer: React.FC<MixerProps> = ({
           {/* Channel B Section */}
           <div className="mixer-channel bg-black/10 p-1.5 rounded-xl border border-white/5 w-full min-w-0 flex flex-col items-center gap-2">
             <div className="flex flex-col items-center gap-1.5 w-full">
-              <Knob label="Trim" value={deckBTrim} onChange={onDeckBTrimChange} color="#F2B8B5" size="sm" defaultValue={1} />
+              <Knob label="FX" value={deckBTrim} onChange={onDeckBTrimChange} color="#F2B8B5" size="sm" min={0} max={1} defaultValue={0} />
               <div className="w-full h-px bg-white/5" />
               <div className="flex flex-col gap-1.5">
                 <Knob label="Hi" value={deckBEq.hi} onChange={(v) => onDeckBEqChange('hi', v)} color="#F2B8B5" />
