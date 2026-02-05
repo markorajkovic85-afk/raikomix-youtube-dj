@@ -901,7 +901,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         </div>
 
         {/* Row 3: Hot Cues + Loops */}
-        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0">
+        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 min-h-0">
           {/* Hot Cues */}
           <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col min-h-0">
             <div className="flex items-center justify-between gap-2 min-w-0 h-7">
@@ -918,7 +918,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </button>
             </div>
 
-            <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full aspect-square min-w-0">
+            <div className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1 w-full min-w-0">
               {[0, 1, 2, 3].map((i) => {
                 const isSet = state.hotCues[i] !== null;
                 const cueColor = CUE_COLORS[i];
@@ -962,7 +962,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </div>
             </div>
 
-            <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full aspect-square min-w-0">
+            <div className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1 w-full min-w-0">
               {[2, 4, 8, 16].map((b) => (
                 <button
                   key={b}
