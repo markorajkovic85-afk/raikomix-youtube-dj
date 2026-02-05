@@ -1,4 +1,4 @@
-import { useEffect, useState, RefObject } from 'react';
+import { useEffect, useState, RefObject, useCallback } from 'react';
 
 interface ScaleConfig {
   /** Base natural width of the central panel (Deck A + Mixer + Deck B + gaps + padding) */
@@ -14,20 +14,28 @@ interface ScaleConfig {
 }
 
 const DEFAULT_CONFIG: ScaleConfig = {
-  baseWidth: 1000, // ~360 (deck) + 20 (gap) + 224 (mixer) + 20 (gap) + 360 (deck) + 36 (padding)
-  baseHeight: 720, // Approximate natural height at comfortable density
-  minScale: 0.72,
-  maxScale: 1.0,
-  padding: 32, // Breathing room on all sides
+  baseWidth: 1040,  // 380 (deck) + 20 (gap) + 224 (mixer) + 20 (gap) + 380 (deck) + 36 (padding)
+  baseHeight: 720,  // Approximate natural height at comfortable density
+  minScale: 0.72,   // Minimum usable scale
+  maxScale: 1.0,    // Maximum scale (no enlargement beyond design size)
+  padding: 32,      // Breathing room on all sides
 };
 
 /**
  * Dynamically computes the scale factor for the central console panel
  * to fit within available space while maintaining aspect ratio and never overlapping.
  * 
- * Uses ResizeObserver to watch the container and computes:
- * scale = min(availableW / baseW, availableH / baseH, maxScale)
- * clamped to [minScale, maxScale]
+ * Strategy:
+ * 1. Observe container size changes via ResizeObserver
+ * 2. Calculate available space (container - padding)
+ * 3. Compute scale for both dimensions: scaleX = availW / baseW, scaleY = availH / baseH
+ * 4. Take minimum to ensure panel fits in BOTH dimensions
+ * 5. Clamp to [minScale, maxScale]
+ * 
+ * This prevents:
+ * - Overlap with side panels (considers width constraint)
+ * - Clipping at small heights (considers height constraint)
+ * - Broken intermediate widths (uniform scale, not responsive columns)
  */
 export function useFitCentralStage(
   containerRef: RefObject<HTMLElement>,
@@ -37,6 +45,29 @@ export function useFitCentralStage(
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
   const [scale, setScale] = useState(1.0);
 
+  const calculateScale = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return 1.0;
+
+    // Get available space in container
+    const containerRect = container.getBoundingClientRect();
+    const availableWidth = Math.max(0, containerRect.width - finalConfig.padding * 2);
+    const availableHeight = Math.max(0, containerRect.height - finalConfig.padding * 2);
+
+    // Calculate scale factors for both dimensions
+    const scaleX = availableWidth / finalConfig.baseWidth;
+    const scaleY = availableHeight / finalConfig.baseHeight;
+
+    // Take the minimum to ensure panel fits in BOTH dimensions
+    // and clamp to allowed range
+    const computedScale = Math.max(
+      finalConfig.minScale,
+      Math.min(scaleX, scaleY, finalConfig.maxScale)
+    );
+
+    return computedScale;
+  }, [containerRef, finalConfig.baseWidth, finalConfig.baseHeight, finalConfig.minScale, finalConfig.maxScale, finalConfig.padding]);
+
   useEffect(() => {
     const container = containerRef.current;
     const panel = panelRef.current;
@@ -45,44 +76,33 @@ export function useFitCentralStage(
       return;
     }
 
+    // Debounce to avoid excessive re-calculations during window resize
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
     const observer = new ResizeObserver(() => {
-      // Get available space in container
-      const containerRect = container.getBoundingClientRect();
-      const availableWidth = containerRect.width - finalConfig.padding * 2;
-      const availableHeight = containerRect.height - finalConfig.padding * 2;
-
-      // Calculate scale factors for both dimensions
-      const scaleX = availableWidth / finalConfig.baseWidth;
-      const scaleY = availableHeight / finalConfig.baseHeight;
-
-      // Take the minimum to ensure panel fits in both dimensions
-      // and clamp to allowed range
-      const computedScale = Math.max(
-        finalConfig.minScale,
-        Math.min(scaleX, scaleY, finalConfig.maxScale)
-      );
-
-      setScale(computedScale);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
+      timeoutId = setTimeout(() => {
+        const newScale = calculateScale();
+        setScale(newScale);
+      }, 10);
     });
 
     observer.observe(container);
 
     // Initial calculation
-    const containerRect = container.getBoundingClientRect();
-    const availableWidth = containerRect.width - finalConfig.padding * 2;
-    const availableHeight = containerRect.height - finalConfig.padding * 2;
-    const scaleX = availableWidth / finalConfig.baseWidth;
-    const scaleY = availableHeight / finalConfig.baseHeight;
-    const computedScale = Math.max(
-      finalConfig.minScale,
-      Math.min(scaleX, scaleY, finalConfig.maxScale)
-    );
-    setScale(computedScale);
+    const initialScale = calculateScale();
+    setScale(initialScale);
 
     return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       observer.disconnect();
     };
-  }, [containerRef, panelRef, finalConfig.baseWidth, finalConfig.baseHeight, finalConfig.minScale, finalConfig.maxScale, finalConfig.padding]);
+  }, [containerRef, panelRef, calculateScale]);
 
   return scale;
 }
