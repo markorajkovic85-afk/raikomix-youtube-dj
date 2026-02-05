@@ -19,6 +19,7 @@ import { makeId } from './utils/id';
 import EffectsPanel from './components/EffectsPanel';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTheme } from './hooks/useTheme';
+import { useFitCentralStage } from './hooks/useFitCentralStage';
 
 interface ErrorBoundaryProps {
   children?: ReactNode;
@@ -115,8 +116,23 @@ const App: React.FC = () => {
   const manualPauseRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const prevPlayingRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const autoStopRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
+  
+  // Scaling system refs
+  const centralStageContainerRef = useRef<HTMLElement>(null);
+  const centralStagePanelRef = useRef<HTMLDivElement>(null);
+  
   const { theme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
+  
+  // Apply dynamic scaling hook
+  const centralStageScale = useFitCentralStage(centralStageContainerRef, centralStagePanelRef, {
+    baseWidth: 1000,
+    baseHeight: 720,
+    minScale: 0.72,
+    maxScale: 1.0,
+    padding: 32
+  });
+  
   const defaultKeyboardMappings = [
     { action: 'Deck A: Play/Pause', keys: 'Q', detail: 'Toggle deck A playback' },
     { action: 'Deck A: Loop', keys: 'S', detail: 'Enable/disable loop' },
@@ -1264,9 +1280,15 @@ useEffect(() => {
             </section>
           )}
 
-          <section className="perform-stage min-h-0 min-w-0">
+          <section className="perform-stage min-h-0 min-w-0" ref={centralStageContainerRef as React.RefObject<HTMLElement>}>
             <div className="perform-stage__inner central-stage w-full min-h-0">
-              <div className="central-stage__panel">
+              <div 
+                className="central-stage__panel" 
+                ref={centralStagePanelRef}
+                style={{
+                  '--central-stage-scale': centralStageScale
+                } as React.CSSProperties}
+              >
                 <div className="perform-stage__deck central-stage__deck">
                   <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
                 </div>
