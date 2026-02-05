@@ -533,9 +533,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       initAudioEngine();
       setIsLoading(loadMode !== 'cue');
 
-      // Pause any existing YT stream
-      if (playerRef.current && state.sourceType === 'youtube') {
+      // Pause any existing YT stream (don't trust state.sourceType here; it can be stale)
+      if (playerRef.current) {
         try { playerRef.current.pauseVideo(); } catch (e) { }
+        try { playerRef.current.seekTo?.(0, true); } catch (e) { }
       }
 
       if (localAudioRef.current) {
@@ -606,6 +607,12 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         if (sourceType === 'local') {
           loadLocalFile(url, metadata, 'load');
         } else {
+          // Stop local audio when switching to YouTube to avoid double-audio
+          if (localAudioRef.current) {
+            try { localAudioRef.current.pause(); } catch (e) { }
+            try { localAudioRef.current.currentTime = 0; } catch (e) { }
+          }
+
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
             initPlayer(vid, 'load');
@@ -619,6 +626,12 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         if (sourceType === 'local') {
           loadLocalFile(url, metadata, 'cue');
         } else {
+          // Stop local audio when switching to YouTube to avoid double-audio
+          if (localAudioRef.current) {
+            try { localAudioRef.current.pause(); } catch (e) { }
+            try { localAudioRef.current.currentTime = 0; } catch (e) { }
+          }
+
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
             initPlayer(vid, 'cue');
