@@ -27,6 +27,14 @@
       transition: background-color 0.3s ease, color 0.3s ease;
     }
 
+    /* ==========================================
+       MIXER VOLUME FADER HEIGHT VARIABLES
+       ========================================== */
+    :root {
+      --mixer-fader-height: 110px;        /* Deck A and B volume faders */
+      --mixer-master-fader-height: 130px;  /* Master volume fader */
+    }
+
     .mono { font-family: 'JetBrains Mono', monospace; }
     
     /* M3 Slider Styling */
@@ -301,8 +309,10 @@
 
     .central-stage__panel {
       /* Fixed-size base grid - NEVER responsive by column ratio changes
-         Only responds by uniform scaling applied to .central-stage wrapper */
-      --deck-base-width: 380px;
+         Only responds by uniform scaling applied to .central-stage wrapper
+         
+         INCREASED DECK WIDTH: 450px (from 380px) to make volume faders visible */
+      --deck-base-width: 450px;
       --mixer-base-width: 224px;
       --panel-gap: 20px;
       --panel-padding-inline: 18px;

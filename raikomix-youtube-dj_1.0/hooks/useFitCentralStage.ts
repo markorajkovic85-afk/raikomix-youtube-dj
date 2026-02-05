@@ -14,7 +14,7 @@ interface ScaleConfig {
 }
 
 const DEFAULT_CONFIG: ScaleConfig = {
-  baseWidth: 1040,  // 380 (deck) + 20 (gap) + 224 (mixer) + 20 (gap) + 380 (deck) + 36 (padding)
+  baseWidth: 1180,  // 450 (deck) + 20 (gap) + 224 (mixer) + 20 (gap) + 450 (deck) + 36 (padding)
   baseHeight: 720,  // Approximate natural height at comfortable density
   minScale: 0.72,   // Minimum usable scale
   maxScale: 1.0,    // Maximum scale (no enlargement beyond design size)
