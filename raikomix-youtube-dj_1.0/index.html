@@ -569,6 +569,17 @@
     }
 
     /* Responsive overrides */
+    /* Laptop guardrails: keep central console wide while preserving sidepanel visibility */
+    @media (max-width: 1800px) and (min-width: 1025px) {
+      .app-shell__main {
+        grid-template-columns: clamp(0px, var(--left-w), 360px) minmax(0, 1fr) clamp(0px, var(--right-w), 360px);
+      }
+
+      .central-stage__panel {
+        max-width: 1600px;
+      }
+    }
+
     @media (max-width: 1400px) {
       .app-shell__main {
         grid-template-columns: minmax(0, 1fr);
