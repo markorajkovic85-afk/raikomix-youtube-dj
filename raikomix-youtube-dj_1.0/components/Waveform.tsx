@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import type { WaveformData } from '../types';
 
 interface WaveformProps {
   isPlaying: boolean;
@@ -7,7 +8,13 @@ interface WaveformProps {
   playbackRate: number;
   currentTime: number;
   duration: number;
+
+  /** Legacy mono peak envelope (kept for backwards compatibility) */
   peaks?: number[];
+
+  /** Pro waveform data: multi-resolution + stereo + RMS */
+  waveform?: WaveformData;
+
   sourceType?: 'youtube' | 'local';
   hotCues?: Array<number | null>;
   cueColors?: string[];
@@ -27,6 +34,8 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const ZOOM_STEP = 1.15;
 
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
 const Waveform: React.FC<WaveformProps> = ({
   isPlaying,
   volume,
@@ -35,6 +44,7 @@ const Waveform: React.FC<WaveformProps> = ({
   currentTime,
   duration,
   peaks,
+  waveform,
   sourceType = 'youtube',
   hotCues = [],
   cueColors = defaultCueColors,
@@ -77,8 +87,6 @@ const Waveform: React.FC<WaveformProps> = ({
     const p = Math.min(1, Math.max(0, progress));
     const x = Math.min(width, Math.max(0, p * width));
 
-    // Subtle, UI-aligned progress indication: faint fill + crisp line.
-    // For the "soft" mode (YouTube/no peaks), add a light tint so position is obvious.
     if (mode === 'soft') {
       ctx.save();
       ctx.globalAlpha = 0.06;
@@ -87,7 +95,6 @@ const Waveform: React.FC<WaveformProps> = ({
       ctx.restore();
     }
 
-    // Outer glow line (very subtle)
     ctx.save();
     ctx.globalAlpha = mode === 'soft' ? 0.45 : 0.6;
     ctx.shadowBlur = mode === 'soft' ? 10 : 8;
@@ -100,7 +107,6 @@ const Waveform: React.FC<WaveformProps> = ({
     ctx.stroke();
     ctx.restore();
 
-    // Inner highlight line (helps on bright/complex waveforms)
     ctx.save();
     ctx.globalAlpha = mode === 'soft' ? 0.22 : 0.18;
     ctx.shadowBlur = 0;
@@ -150,7 +156,142 @@ const Waveform: React.FC<WaveformProps> = ({
     });
   };
 
-  const drawPeaks = (
+  const pickWaveformLevel = (
+    wf: WaveformData,
+    widthPx: number,
+    visibleDuration: number
+  ) => {
+    const levels = wf.levels;
+    if (!levels || levels.length === 0 || duration <= 0 || visibleDuration <= 0) return null;
+
+    const dpr = sizeRef.current.dpr || 1;
+    const cssWidth = widthPx / dpr;
+
+    // Target a "DJ-like" density (avoid rendering 10k+ bars on large screens).
+    const targetBarsOnScreen = clamp(Math.round(cssWidth / 2.25), 220, 2200);
+    const requiredSamples = Math.round(targetBarsOnScreen * (duration / visibleDuration));
+
+    let best = levels[0];
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (const lvl of levels) {
+      const score = Math.abs(lvl.samples - requiredSamples);
+      if (score < bestScore) {
+        best = lvl;
+        bestScore = score;
+      }
+    }
+    return best;
+  };
+
+  const drawPeaksPro = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    progress: number,
+    visibleStart: number,
+    visibleDuration: number
+  ) => {
+    if (!waveform || waveform.levels.length === 0) return;
+
+    const level = pickWaveformLevel(waveform, width, visibleDuration);
+    if (!level) return;
+
+    const total = level.samples;
+    const startIndex = Math.max(0, Math.floor((visibleStart / duration) * total));
+    const endIndex = Math.min(total, Math.ceil(((visibleStart + visibleDuration) / duration) * total));
+
+    const peakL = level.peakL.slice(startIndex, endIndex);
+    const peakR = level.peakR.slice(startIndex, endIndex);
+    const rmsL = level.rmsL.slice(startIndex, endIndex);
+    const rmsR = level.rmsR.slice(startIndex, endIndex);
+
+    const n = Math.min(peakL.length, peakR.length, rmsL.length, rmsR.length);
+    if (n <= 0) return;
+
+    const barWidth = width / n;
+    const baseLineWidth = Math.max(1, barWidth * 0.7);
+
+    // Safe padding: rounded container + overflow hidden can crop glow/caps.
+    const brightShadowBlur = 4;
+    const safePad = Math.ceil(baseLineWidth / 2 + brightShadowBlur + 1);
+
+    const innerTop = safePad;
+    const innerBottom = height - safePad;
+    const innerHeight = innerBottom - innerTop;
+    if (innerHeight <= 6) return;
+
+    const topLaneCenter = innerTop + innerHeight * 0.25;
+    const bottomLaneCenter = innerTop + innerHeight * 0.75;
+    const laneAmpMax = (innerHeight * 0.5) * 0.44; // leave headroom
+
+    // Professional-ish feel: blend peak + RMS so energy reads better.
+    const blend = (p: number, r: number) => clamp(p * 0.65 + r * 0.35, 0, 1);
+
+    ctx.lineCap = 'round';
+    ctx.lineWidth = baseLineWidth;
+    ctx.shadowBlur = 0;
+
+    // Unplayed base
+    ctx.strokeStyle = `${color}55`;
+    ctx.beginPath();
+    for (let i = 0; i < n; i += 1) {
+      const x = i * barWidth + barWidth / 2;
+      const aL = blend(peakL[i], rmsL[i]) * laneAmpMax;
+      const aR = blend(peakR[i], rmsR[i]) * laneAmpMax;
+
+      ctx.moveTo(x, topLaneCenter - aL);
+      ctx.lineTo(x, topLaneCenter + aL);
+
+      ctx.moveTo(x, bottomLaneCenter - aR);
+      ctx.lineTo(x, bottomLaneCenter + aR);
+    }
+    ctx.stroke();
+
+    // Played overlay
+    const clampedProgress = Math.min(1, Math.max(0, progress));
+    const progressWidth = clampedProgress * width;
+    if (progressWidth > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, progressWidth, height);
+      ctx.clip();
+
+      ctx.strokeStyle = color;
+      ctx.shadowBlur = brightShadowBlur;
+      ctx.shadowColor = color;
+      ctx.beginPath();
+      for (let i = 0; i < n; i += 1) {
+        const x = i * barWidth + barWidth / 2;
+        const aL = blend(peakL[i], rmsL[i]) * laneAmpMax;
+        const aR = blend(peakR[i], rmsR[i]) * laneAmpMax;
+
+        ctx.moveTo(x, topLaneCenter - aL);
+        ctx.lineTo(x, topLaneCenter + aL);
+
+        ctx.moveTo(x, bottomLaneCenter - aR);
+        ctx.lineTo(x, bottomLaneCenter + aR);
+      }
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Subtle center divider (keeps existing UI feel)
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, innerTop + innerHeight * 0.5);
+    ctx.lineTo(width, innerTop + innerHeight * 0.5);
+    ctx.stroke();
+    ctx.restore();
+
+    drawMarkers(ctx, width, height, visibleStart, visibleDuration);
+    drawPlayhead(ctx, width, height, clampedProgress, 'strong');
+  };
+
+  const drawPeaksLegacy = (
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
@@ -191,7 +332,7 @@ const Waveform: React.FC<WaveformProps> = ({
       ctx.rect(0, 0, progressWidth, height);
       ctx.clip();
       ctx.strokeStyle = color;
-      ctx.shadowBlur = 6;
+      ctx.shadowBlur = 4;
       ctx.shadowColor = color;
       ctx.beginPath();
       visiblePeaks.forEach((peak, index) => {
@@ -234,8 +375,15 @@ const Waveform: React.FC<WaveformProps> = ({
       ? (currentTime - visibleWindow.start) / visibleWindow.length
       : 0;
 
+    if (waveform && waveform.levels.length > 0) {
+      drawPeaksPro(ctx, width, height, visibleProgress, visibleWindow.start, visibleWindow.length);
+      if (!runningRef.current) return;
+      requestRef.current = requestAnimationFrame(draw);
+      return;
+    }
+
     if (peaks && peaks.length > 0) {
-      drawPeaks(ctx, width, height, visibleProgress, visibleWindow.start, visibleWindow.length);
+      drawPeaksLegacy(ctx, width, height, visibleProgress, visibleWindow.start, visibleWindow.length);
       if (!runningRef.current) return;
       requestRef.current = requestAnimationFrame(draw);
       return;
@@ -290,7 +438,6 @@ const Waveform: React.FC<WaveformProps> = ({
       ctx.stroke();
     }
 
-    // YouTube/no-peaks: subtle but visible progress marker
     const p = duration > 0 ? currentTime / duration : 0;
     drawPlayhead(ctx, width, height, p, 'soft');
 
@@ -310,7 +457,7 @@ const Waveform: React.FC<WaveformProps> = ({
       requestRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, volume, playbackRate, color, peaks, currentTime, duration, sourceType, hotCues, cueColors, loop, visibleWindow]);
+  }, [isPlaying, volume, playbackRate, color, peaks, waveform, currentTime, duration, sourceType, hotCues, cueColors, loop, visibleWindow]);
 
   return (
     <div
@@ -324,12 +471,13 @@ const Waveform: React.FC<WaveformProps> = ({
         if (!onSeek || duration <= 0) return;
         const rect = event.currentTarget.getBoundingClientRect();
         const pct = (event.clientX - rect.left) / rect.width;
-        const baseStart = peaks && peaks.length > 0 ? visibleWindow.start : 0;
-        const baseDuration = peaks && peaks.length > 0 ? visibleWindow.length : duration;
+        const baseStart = (waveform && waveform.levels.length > 0) || (peaks && peaks.length > 0) ? visibleWindow.start : 0;
+        const baseDuration = (waveform && waveform.levels.length > 0) || (peaks && peaks.length > 0) ? visibleWindow.length : duration;
         onSeek(baseStart + pct * baseDuration);
       }}
       onWheel={(event) => {
-        if (!peaks || peaks.length === 0) return;
+        const hasAnyPeaks = (waveform && waveform.levels.length > 0) || (peaks && peaks.length > 0);
+        if (!hasAnyPeaks) return;
         if (!event.ctrlKey && !event.metaKey) return;
         event.preventDefault();
         setZoomLevel((currentZoom) => {
