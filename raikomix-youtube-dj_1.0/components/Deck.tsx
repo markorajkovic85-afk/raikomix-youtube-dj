@@ -668,7 +668,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             else if (localAudioRef.current) localAudioRef.current.currentTime = state.loopStart;
           }
           setState(s => {
-            const duration = nextDuration && Math.abs(nextDuration - s.duration) > 0.5
+            const duration = nextDuration and abs(nextDuration - s.duration) > 0.5
               ? nextDuration
               : s.duration;
             const timeChanged = Math.abs(t - s.currentTime) > 0.05;
@@ -899,8 +899,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
         </div>
 
-        {/* Row 3: Hot Cues + Loops (flexes to fill spare height) */}
-        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 flex-1 min-h-0">
+        {/* Row 3: Hot Cues + Loops */}
+        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0">
           {/* Hot Cues */}
           <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col min-h-0">
             <div className="flex items-center justify-between gap-2 min-w-0 h-7">
@@ -917,7 +917,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </button>
             </div>
 
-            <div className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1 w-full h-full min-w-0">
+            <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full aspect-square min-w-0">
               {[0, 1, 2, 3].map((i) => {
                 const isSet = state.hotCues[i] !== null;
                 const cueColor = CUE_COLORS[i];
@@ -961,7 +961,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1 w-full h-full min-w-0">
+            <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full aspect-square min-w-0">
               {[2, 4, 8, 16].map((b) => (
                 <button
                   key={b}
