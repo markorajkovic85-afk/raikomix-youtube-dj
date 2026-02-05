@@ -165,9 +165,22 @@ const Waveform: React.FC<WaveformProps> = ({
     const visiblePeaks = peaks.slice(startIndex, endIndex);
     if (visiblePeaks.length === 0) return;
 
-    const centerY = height / 2;
     const barWidth = width / visiblePeaks.length;
     const baseLineWidth = Math.max(1, barWidth * 0.7);
+
+    // IMPORTANT: The waveform container uses rounded corners + overflow hidden.
+    // When the bright (played) overlay uses a glow, the stroke can get clipped at the
+    // top/bottom edges. Draw inside a small safe padding so caps/glow always fit.
+    const brightShadowBlur = 4; // reduced from 6
+    const safePad = Math.ceil(baseLineWidth / 2 + brightShadowBlur + 1);
+
+    const innerTop = safePad;
+    const innerBottom = height - safePad;
+    const innerHeight = innerBottom - innerTop;
+
+    const centerY = innerHeight > 4 ? (innerTop + innerBottom) / 2 : height / 2;
+    const ampMax = innerHeight > 4 ? innerHeight / 2 : height * 0.42;
+    const ampScale = 0.92; // slightly narrower to avoid edge clipping in compact layouts
 
     ctx.lineCap = 'round';
     ctx.lineWidth = baseLineWidth;
@@ -177,7 +190,7 @@ const Waveform: React.FC<WaveformProps> = ({
 
     visiblePeaks.forEach((peak, index) => {
       const x = index * barWidth + barWidth / 2;
-      const amplitude = peak * (height * 0.42);
+      const amplitude = peak * (ampMax * ampScale);
       ctx.moveTo(x, centerY - amplitude);
       ctx.lineTo(x, centerY + amplitude);
     });
@@ -191,12 +204,12 @@ const Waveform: React.FC<WaveformProps> = ({
       ctx.rect(0, 0, progressWidth, height);
       ctx.clip();
       ctx.strokeStyle = color;
-      ctx.shadowBlur = 6;
+      ctx.shadowBlur = brightShadowBlur;
       ctx.shadowColor = color;
       ctx.beginPath();
       visiblePeaks.forEach((peak, index) => {
         const x = index * barWidth + barWidth / 2;
-        const amplitude = peak * (height * 0.42);
+        const amplitude = peak * (ampMax * ampScale);
         ctx.moveTo(x, centerY - amplitude);
         ctx.lineTo(x, centerY + amplitude);
       });
