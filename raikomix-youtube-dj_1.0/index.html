@@ -28,7 +28,7 @@
     }
 
     .mono { font-family: 'JetBrains Mono', monospace; }
-    
+
     /* M3 Slider Styling */
     input[type=range] {
       -webkit-appearance: none;
@@ -51,7 +51,7 @@
       box-shadow: var(--md-sys-elevation-1);
       cursor: pointer;
     }
-    
+
     /* Marquee Animation */
     .marquee-container {
       overflow: hidden;
@@ -274,6 +274,7 @@
          deck + mixer tops/bottoms so nothing stretches when extra space appears. */
       --mixer-width: 224px;
       --deck-min: 360px;
+      --deck-max: 560px;
       --central-gap: 20px;
       --central-padding-block: 16px;
       --central-padding-inline: 18px;
@@ -287,13 +288,14 @@
       justify-content: center;
       height: 100%;
       min-height: 0;
+      width: 100%;
     }
 
     .central-stage__panel {
       /* Scaling strategy: apply a single scale to the panel at tight heights
          so controls stay fixed-size and never stretch. */
       display: grid;
-      grid-template-columns: minmax(var(--deck-min), 1fr) var(--mixer-width) minmax(var(--deck-min), 1fr);
+      grid-template-columns: minmax(var(--deck-min), var(--deck-max)) minmax(0, var(--mixer-width)) minmax(var(--deck-min), var(--deck-max));
       align-items: stretch;
       gap: var(--central-gap);
       height: auto;
@@ -302,6 +304,9 @@
       padding: var(--central-padding-block) var(--central-padding-inline);
       transform: scale(var(--central-stage-scale));
       transform-origin: center;
+      width: 100%;
+      max-width: 1500px;
+      margin: 0 auto;
     }
 
     .perform-stage__inner > *,
@@ -565,6 +570,17 @@
     }
 
     /* Responsive overrides */
+    /* Laptop guardrails: keep central console wide while preserving sidepanel visibility */
+    @media (max-width: 1800px) and (min-width: 1025px) {
+      .app-shell__main {
+        grid-template-columns: clamp(0px, var(--left-w), 360px) minmax(0, 1fr) clamp(0px, var(--right-w), 360px);
+      }
+
+      .central-stage__panel {
+        max-width: 1600px;
+      }
+    }
+
     @media (max-width: 1400px) {
       .app-shell__main {
         grid-template-columns: minmax(0, 1fr);
@@ -592,6 +608,7 @@
       .central-stage {
         --mixer-width: 210px;
         --deck-min: 320px;
+        --deck-max: 520px;
       }
     }
 

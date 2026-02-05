@@ -900,61 +900,59 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         </div>
 
         {/* Row 3: Hot Cues + Loops (flexes to fill spare height) */}
-        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 flex-1 min-h-[120px]">
+        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 flex-1 min-h-0">
           {/* Hot Cues */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col h-full">
-            <div className="flex items-center justify-between gap-2 min-w-0 h-6">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col min-h-0 min-w-0">
+            <div className="flex items-center justify-between gap-2 min-w-0 h-7">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Hot Cues
               </div>
               <button
                 type="button"
                 onClick={handleClearAllHotCues}
-                className="h-6 px-2 rounded-md text-[9px] font-black uppercase tracking-widest border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all shrink-0"
+                className="h-7 px-2 rounded-md text-[9px] font-black uppercase tracking-widest border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all shrink-0"
                 title="Clear all hot cues"
               >
                 Clear
               </button>
             </div>
 
-            <div className="flex-1 min-h-0 flex items-center justify-center">
-              <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full aspect-square min-w-0">
-                {[0, 1, 2, 3].map((i) => {
-                  const isSet = state.hotCues[i] !== null;
-                  const cueColor = CUE_COLORS[i];
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => handleHotCue(i)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        handleHotCue(i, true);
-                      }}
-                      title={`Hot Cue ${i + 1} (Right-click to clear)`}
-                      aria-label={`Hot Cue ${i + 1}`}
-                      className={[
-                        "w-full h-full rounded-md font-black text-[clamp(11px,1.4vw,14px)] border transition-all select-none min-w-0 flex items-center justify-center leading-none",
-                        "bg-transparent",
-                        isSet
-                          ? "border-2"
-                          : "border-white/5 text-gray-600 hover:text-white hover:border-white/20"
-                      ].join(" ")}
-                      style={isSet
-                        ? { borderColor: cueColor, boxShadow: `0 0 10px ${cueColor}22`, color: cueColor }
-                        : {}
-                      }
-                    >
-                      {i + 1}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1 w-full min-w-0">
+              {[0, 1, 2, 3].map((i) => {
+                const isSet = state.hotCues[i] !== null;
+                const cueColor = CUE_COLORS[i];
+                return (
+                  <button
+                    key={i}
+                    onClick={() => handleHotCue(i)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      handleHotCue(i, true);
+                    }}
+                    title={`Hot Cue ${i + 1} (Right-click to clear)`}
+                    aria-label={`Hot Cue ${i + 1}`}
+                    className={[
+                      "w-full h-full rounded-md font-black text-[clamp(11px,1.4vw,14px)] border transition-all select-none min-w-0 flex items-center justify-center leading-none",
+                      "bg-transparent",
+                      isSet
+                        ? "border-2"
+                        : "border-white/5 text-gray-600 hover:text-white hover:border-white/20"
+                    ].join(" ")}
+                    style={isSet
+                      ? { borderColor: cueColor, boxShadow: `0 0 10px ${cueColor}22`, color: cueColor }
+                      : {}
+                    }
+                  >
+                    {i + 1}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Loops */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col h-full">
-            <div className="flex items-center justify-between gap-2 min-w-0 h-6">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col min-h-0 min-w-0">
+            <div className="flex items-center justify-between gap-2 min-w-0 h-7">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Loops
               </div>
@@ -963,29 +961,27 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 flex items-center justify-center">
-              <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full aspect-square min-w-0">
-                {[2, 4, 8, 16].map((b) => (
-                  <button
-                    key={b}
-                    onClick={() => handleToggleLoop(b)}
-                    className={[
-                      "w-full h-full rounded-md text-[clamp(11px,1.4vw,14px)] font-black border transition-all select-none min-w-0 flex items-center justify-center leading-none",
-                      "bg-transparent",
-                      loopIsActiveForBeats(b)
-                        ? "border-2 text-green-400"
-                        : "border-white/5 text-gray-500 hover:text-white hover:border-white/20"
-                    ].join(" ")}
-                    style={loopIsActiveForBeats(b)
-                      ? { borderColor: 'rgba(34,197,94,0.9)', boxShadow: '0 0 10px rgba(34,197,94,0.18)' }
-                      : {}
-                    }
-                    title={`Loop ${b} beats`}
-                  >
-                    {b}
-                  </button>
-                ))}
-              </div>
+            <div className="flex-1 min-h-0 grid grid-cols-2 grid-rows-2 gap-1 w-full min-w-0">
+              {[2, 4, 8, 16].map((b) => (
+                <button
+                  key={b}
+                  onClick={() => handleToggleLoop(b)}
+                  className={[
+                    "w-full h-full rounded-md text-[clamp(11px,1.4vw,14px)] font-black border transition-all select-none min-w-0 flex items-center justify-center leading-none",
+                    "bg-transparent",
+                    loopIsActiveForBeats(b)
+                      ? "border-2 text-green-400"
+                      : "border-white/5 text-gray-500 hover:text-white hover:border-white/20"
+                  ].join(" ")}
+                  style={loopIsActiveForBeats(b)
+                    ? { borderColor: 'rgba(34,197,94,0.9)', boxShadow: '0 0 10px rgba(34,197,94,0.18)' }
+                    : {}
+                  }
+                  title={`Loop ${b} beats`}
+                >
+                  {b}
+                </button>
+              ))}
             </div>
           </div>
         </div>
