@@ -293,7 +293,7 @@
       /* Scaling strategy: apply a single scale to the panel at tight heights
          so controls stay fixed-size and never stretch. */
       display: grid;
-      grid-template-columns: minmax(var(--deck-min), 1fr) var(--mixer-width) minmax(var(--deck-min), 1fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, var(--mixer-width)) minmax(0, 1fr);
       align-items: stretch;
       gap: var(--central-gap);
       height: auto;
