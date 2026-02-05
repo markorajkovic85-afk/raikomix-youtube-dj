@@ -261,7 +261,9 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
           addedAt: Date.now(),
           playCount: 0,
           sourceType: 'local',
-          fileName: file.name
+          fileName: file.name,
+          fileSize: file.size,
+          fileLastModified: file.lastModified
         };
       })
     );
@@ -310,7 +312,9 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
           addedAt: Date.now(),
           playCount: 0,
           sourceType: 'local',
-          fileName: file.name
+          fileName: file.name,
+          fileSize: file.size,
+          fileLastModified: file.lastModified
         };
       })
     );
