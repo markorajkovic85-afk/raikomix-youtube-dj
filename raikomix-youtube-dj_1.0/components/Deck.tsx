@@ -668,10 +668,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             else if (localAudioRef.current) localAudioRef.current.currentTime = state.loopStart;
           }
           setState(s => {
-            const duration =
-              nextDuration != null && Math.abs(nextDuration - s.duration) > 0.5
-                ? nextDuration
-                : s.duration;
+            const duration = nextDuration && Math.abs(nextDuration - s.duration) > 0.5
+              ? nextDuration
+              : s.duration;
             const timeChanged = Math.abs(t - s.currentTime) > 0.05;
             if (!timeChanged && duration === s.duration) return s;
             return { ...s, currentTime: t, duration };
@@ -900,10 +899,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
         </div>
 
-        {/* Row 3: Hot Cues + Loops */}
-        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 min-h-0">
+        {/* Row 3: Hot Cues + Loops (flexes to fill spare height) */}
+        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 flex-1 min-h-0">
           {/* Hot Cues */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col min-h-0">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col min-h-0 min-w-0">
             <div className="flex items-center justify-between gap-2 min-w-0 h-7">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Hot Cues
@@ -952,7 +951,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
 
           {/* Loops */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col min-h-0">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col min-h-0 min-w-0">
             <div className="flex items-center justify-between gap-2 min-w-0 h-7">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Loops
