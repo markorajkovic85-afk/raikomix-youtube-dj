@@ -117,20 +117,20 @@ const App: React.FC = () => {
   const prevPlayingRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const autoStopRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   
-  // Scaling system refs
-  const centralStageContainerRef = useRef<HTMLElement>(null);
+  // Scaling system refs - properly typed for the hook
+  const centralStageContainerRef = useRef<HTMLDivElement>(null);
   const centralStagePanelRef = useRef<HTMLDivElement>(null);
   
   const { theme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   
-  // Apply dynamic scaling hook
+  // Apply dynamic scaling hook with updated base dimensions matching index.html
   const centralStageScale = useFitCentralStage(centralStageContainerRef, centralStagePanelRef, {
-    baseWidth: 1000,
-    baseHeight: 720,
-    minScale: 0.72,
-    maxScale: 1.0,
-    padding: 32
+    baseWidth: 1040,   // 380 + 20 + 224 + 20 + 380 + 36 (padding)
+    baseHeight: 720,   // Natural height at comfortable density
+    minScale: 0.72,    // Minimum usable scale
+    maxScale: 1.0,     // No enlargement beyond design size
+    padding: 32        // Breathing room
   });
   
   const defaultKeyboardMappings = [
@@ -1280,49 +1280,50 @@ useEffect(() => {
             </section>
           )}
 
-          <section className="perform-stage min-h-0 min-w-0" ref={centralStageContainerRef as React.RefObject<HTMLElement>}>
-            <div className="perform-stage__inner central-stage w-full min-h-0">
+          <section className="perform-stage min-h-0 min-w-0" ref={centralStageContainerRef}>
+            <div className="perform-stage__inner w-full min-h-0">
               <div 
-                className="central-stage__panel" 
-                ref={centralStagePanelRef}
+                className="central-stage" 
                 style={{
                   '--central-stage-scale': centralStageScale
                 } as React.CSSProperties}
               >
-                <div className="perform-stage__deck central-stage__deck">
-                  <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
-                </div>
-                <Mixer
-                  crossfader={crossfader}
-                  onCrossfaderChange={setCrossfader}
-                  crossfaderCurve={xFaderCurve}
-                  onCurveChange={setXFaderCurve}
-                  autoDjEnabled={autoDjEnabled}
-                  onToggleAutoDj={() => setAutoDjEnabled(prev => !prev)}
-                  mixLeadSeconds={mixLeadSeconds}
-                  mixDurationSeconds={mixDurationSeconds}
-                  onMixLeadChange={handleMixLeadChange}
-                  onMixDurationChange={handleMixDurationChange}
-                  queueLength={queue.length}
-                  masterVolume={masterVolume}
-                  onMasterVolumeChange={setMasterVolume}
-                  deckAVolume={deckAVolume}
-                  onDeckAVolumeChange={setDeckAVolume}
-                  deckBVolume={deckBVolume}
-                  onDeckBVolumeChange={setDeckBVolume}
-                  deckAPlaying={deckAState?.playing || false}
-                  deckBPlaying={deckBState?.playing || false}
-                  deckATrim={deckAEffectWet}
-                  deckBTrim={deckBEffectWet}
-                  onDeckATrimChange={setDeckAEffectWet}
-                  onDeckBTrimChange={setDeckBEffectWet}
-                  deckAEq={deckAEq}
-                  deckBEq={deckBEq}
-                  onDeckAEqChange={(k, v) => setDeckAEq(p => ({...p, [k]: v}))}
-                  onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))}
-                />
-                <div className="perform-stage__deck central-stage__deck">
-                  <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} onTrackEnd={() => handleTrackEnd('B')} />
+                <div className="central-stage__panel" ref={centralStagePanelRef}>
+                  <div className="perform-stage__deck central-stage__deck">
+                    <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
+                  </div>
+                  <Mixer
+                    crossfader={crossfader}
+                    onCrossfaderChange={setCrossfader}
+                    crossfaderCurve={xFaderCurve}
+                    onCurveChange={setXFaderCurve}
+                    autoDjEnabled={autoDjEnabled}
+                    onToggleAutoDj={() => setAutoDjEnabled(prev => !prev)}
+                    mixLeadSeconds={mixLeadSeconds}
+                    mixDurationSeconds={mixDurationSeconds}
+                    onMixLeadChange={handleMixLeadChange}
+                    onMixDurationChange={handleMixDurationChange}
+                    queueLength={queue.length}
+                    masterVolume={masterVolume}
+                    onMasterVolumeChange={setMasterVolume}
+                    deckAVolume={deckAVolume}
+                    onDeckAVolumeChange={setDeckAVolume}
+                    deckBVolume={deckBVolume}
+                    onDeckBVolumeChange={setDeckBVolume}
+                    deckAPlaying={deckAState?.playing || false}
+                    deckBPlaying={deckBState?.playing || false}
+                    deckATrim={deckAEffectWet}
+                    deckBTrim={deckBEffectWet}
+                    onDeckATrimChange={setDeckAEffectWet}
+                    onDeckBTrimChange={setDeckBEffectWet}
+                    deckAEq={deckAEq}
+                    deckBEq={deckBEq}
+                    onDeckAEqChange={(k, v) => setDeckAEq(p => ({...p, [k]: v}))}
+                    onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))}
+                  />
+                  <div className="perform-stage__deck central-stage__deck">
+                    <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} onTrackEnd={() => handleTrackEnd('B')} />
+                  </div>
                 </div>
               </div>
             </div>
