@@ -668,9 +668,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             else if (localAudioRef.current) localAudioRef.current.currentTime = state.loopStart;
           }
           setState(s => {
-            const duration = nextDuration and abs(nextDuration - s.duration) > 0.5
-              ? nextDuration
-              : s.duration;
+            const duration =
+              nextDuration != null && Math.abs(nextDuration - s.duration) > 0.5
+                ? nextDuration
+                : s.duration;
             const timeChanged = Math.abs(t - s.currentTime) > 0.05;
             if (!timeChanged && duration === s.duration) return s;
             return { ...s, currentTime: t, duration };
