@@ -128,6 +128,10 @@ const Knob: React.FC<{
   );
 };
 
+/**
+ * Professional-grade volume fader with delta-based drag control.
+ * Inspired by Pioneer DJM and Allen & Heath mixer faders.
+ */
 const Fader: React.FC<{
   label: string,
   value: number,
@@ -136,11 +140,19 @@ const Fader: React.FC<{
   height?: string
 }> = ({ label, value, onChange, color, height = 'h-28' }) => {
   const faderRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const activePointerId = useRef<number | null>(null);
+  const startY = useRef(0);
+  const startValue = useRef(0);
 
+  // Professional DJ-grade mouse wheel sensitivity (3x faster than before)
   const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY * -0.0006;
+    const fineControl = e.shiftKey; // Hold Shift for fine control
+    const baseSensitivity = 0.002; // Increased from 0.0006
+    const sensitivity = fineControl ? baseSensitivity * 0.25 : baseSensitivity;
+    const delta = e.deltaY * -sensitivity;
     const newVal = Math.min(1, Math.max(0, value + delta));
     onChange(newVal);
   };
@@ -151,57 +163,129 @@ const Fader: React.FC<{
     return () => el?.removeEventListener('wheel', handleWheel);
   }, [value, onChange]);
 
-  const updateValueFromPointer = (clientY: number) => {
+  // Delta-based drag: relative movement from start position (like real hardware)
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (faderRef.current) {
+      faderRef.current.setPointerCapture(e.pointerId);
+    }
+    activePointerId.current = e.pointerId;
+    setIsDragging(true);
+    startY.current = e.clientY;
+    startValue.current = value;
+    document.body.style.cursor = 'ns-resize';
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging || activePointerId.current !== e.pointerId) return;
+    
     const rect = faderRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const next = Math.min(1, Math.max(0, (rect.bottom - clientY) / rect.height));
-    onChange(next);
+
+    // Delta-based movement with professional sensitivity
+    const deltaY = startY.current - e.clientY; // Inverted: up is positive
+    const fineControl = e.shiftKey; // Hold Shift for precision mode
+    const baseSensitivity = 1.2; // Pixels to value ratio
+    const sensitivity = fineControl ? baseSensitivity * 0.25 : baseSensitivity;
+    const deltaValue = (deltaY / rect.height) * sensitivity;
+    
+    const newVal = Math.min(1, Math.max(0, startValue.current + deltaValue));
+    onChange(newVal);
   };
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    activePointerId.current = e.pointerId;
-    updateValueFromPointer(e.clientY);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLInputElement>) => {
-    if (activePointerId.current !== e.pointerId) return;
-    updateValueFromPointer(e.clientY);
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLInputElement>) => {
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (activePointerId.current !== e.pointerId) return;
     activePointerId.current = null;
+    setIsDragging(false);
+    document.body.style.cursor = 'default';
   };
 
+  const handleDoubleClick = () => {
+    onChange(0.8); // Standard DJ unity gain position
+  };
+
+  const percentage = Math.round(value * 100);
+  const showValue = isDragging || isHovered;
+
   return (
-    <div className="flex flex-col items-center gap-1.5 w-full group relative">
-       <div 
-         ref={faderRef}
-         className={`${height} w-6 bg-black/40 rounded-lg relative flex items-end p-0.5 border border-white/5 overflow-hidden cursor-ns-resize shadow-inner touch-none`}
-       >
-          <div 
-            className="w-full rounded transition-all duration-75" 
-            style={{ 
-              height: `${value * 100}%`,
-              backgroundColor: color,
-              boxShadow: `0 0 15px ${color}66`
-            }} 
-          />
-          <input 
-             type="range" min="0" max="1" step="0.001" value={value} 
-             onChange={(e) => onChange(parseFloat(e.target.value))} 
-             onDoubleClick={() => onChange(0.8)}
-             className="absolute inset-0 opacity-0 cursor-pointer z-20"
-             style={{ WebkitAppearance: 'slider-vertical', appearance: 'slider-vertical' as any }}
-             onPointerDown={handlePointerDown}
-             onPointerMove={handlePointerMove}
-             onPointerUp={handlePointerUp}
-             onPointerCancel={handlePointerUp}
-          />
-       </div>
-       <label className="text-[7px] font-black uppercase tracking-widest" style={{ color: `${color}99` }}>{label}</label>
+    <div 
+      className="flex flex-col items-center gap-1.5 w-full group relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Live value display */}
+      <div 
+        className={`absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-md text-[9px] font-black transition-all duration-150 pointer-events-none whitespace-nowrap z-30 ${
+          showValue ? 'opacity-100 -translate-y-1' : 'opacity-0 translate-y-0'
+        }`}
+        style={{ 
+          backgroundColor: color,
+          color: '#000',
+          boxShadow: `0 4px 12px ${color}66`
+        }}
+      >
+        {percentage}%
+      </div>
+
+      <div 
+        ref={faderRef}
+        className={`${height} w-8 bg-black/50 rounded-lg relative flex items-end p-0.5 border transition-all cursor-ns-resize shadow-inner touch-none ${
+          isDragging 
+            ? 'border-white/30 scale-105 shadow-[0_0_20px_rgba(255,255,255,0.1)]' 
+            : isHovered
+            ? 'border-white/20'
+            : 'border-white/5'
+        }`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onDoubleClick={handleDoubleClick}
+        title="Drag to adjust • Scroll to fine-tune • Shift for precision • Double-click for unity (80%)"
+      >
+        {/* Fader fill with enhanced glow */}
+        <div 
+          className="w-full rounded transition-all duration-100" 
+          style={{ 
+            height: `${value * 100}%`,
+            backgroundColor: color,
+            boxShadow: isDragging 
+              ? `0 0 20px ${color}99, 0 0 10px ${color}66, inset 0 1px 0 rgba(255,255,255,0.3)` 
+              : `0 0 12px ${color}66, inset 0 1px 0 rgba(255,255,255,0.2)`
+          }} 
+        />
+
+        {/* Scale markings for reference */}
+        <div className="absolute inset-x-0 top-0 bottom-0 flex flex-col justify-between py-1 pointer-events-none">
+          {[100, 80, 60, 40, 20, 0].map((mark) => (
+            <div 
+              key={mark} 
+              className="w-full h-px bg-white/5"
+              style={{ opacity: mark === 80 ? 0.2 : 0.08 }} // Highlight unity gain
+            />
+          ))}
+        </div>
+
+        {/* Visual fader cap (like physical fader handle) */}
+        <div 
+          className={`absolute left-0 right-0 h-1.5 rounded-sm transition-all pointer-events-none ${
+            isDragging ? 'bg-white shadow-[0_0_10px_rgba(255,255,255,0.6)]' : 'bg-white/80'
+          }`}
+          style={{ 
+            bottom: `calc(${value * 100}% - 3px)`,
+            boxShadow: isDragging ? `0 0 10px rgba(255,255,255,0.8), 0 2px 4px rgba(0,0,0,0.5)` : '0 2px 4px rgba(0,0,0,0.4)'
+          }}
+        />
+      </div>
+
+      <label 
+        className={`text-[7px] font-black uppercase tracking-widest transition-colors ${
+          isDragging ? 'text-white' : isHovered ? `text-[${color}]` : 'text-gray-500'
+        }`}
+        style={{ color: isDragging || isHovered ? color : undefined }}
+      >
+        {label}
+      </label>
     </div>
   );
 };
