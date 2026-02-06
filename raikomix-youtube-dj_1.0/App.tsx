@@ -5,7 +5,7 @@ import LibraryPanel from './components/LibraryPanel';
 import QueuePanel from './components/QueuePanel';
 import SearchPanel from './components/SearchPanel';
 import Toast, { ToastType } from './components/Toast';
-import { PlayerState, DeckId, CrossfaderCurve, QueueItem, LibraryTrack, YouTubeSearchResult, TrackSourceType, EffectType } from './types';
+import { PlayerState, DeckId, CrossfaderCurve, QueueItem, LibraryTrack, YouTubeSearchResult, TrackSourceType, EffectType, PlayerControl } from './types';
 import {
   loadLibrary,
   saveLibrary,
@@ -20,6 +20,7 @@ import EffectsPanel from './components/EffectsPanel';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTheme } from './hooks/useTheme';
 import { useFitCentralStage } from './hooks/useFitCentralStage';
+import { AutoDJStateMachine } from './services/AutoDJStateMachine';
 
 interface ErrorBoundaryProps {
   children?: ReactNode;
@@ -74,8 +75,8 @@ const App: React.FC = () => {
   const [library, setLibrary] = useState<LibraryTrack[]>(() => loadLibrary());
   const [deckAState, setDeckAState] = useState<PlayerState | null>(null);
   const [deckBState, setDeckBState] = useState<PlayerState | null>(null);
-  const [masterPlayerA, setMasterPlayerA] = useState<any>(null);
-  const [masterPlayerB, setMasterPlayerB] = useState<any>(null);
+  const [masterPlayerA, setMasterPlayerA] = useState<PlayerControl | null>(null);
+  const [masterPlayerB, setMasterPlayerB] = useState<PlayerControl | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [crossfader, setCrossfader] = useState(0);
   const [xFaderCurve, setXFaderCurve] = useState<CrossfaderCurve>('SMOOTH');
@@ -116,6 +117,13 @@ const App: React.FC = () => {
   const manualPauseRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const prevPlayingRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const autoStopRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
+  
+  // Auto DJ State Machine (PR #1 - Core Infrastructure)
+  const autoDJStateMachine = useRef(new AutoDJStateMachine());
+  
+  // Master gain nodes for Web Audio API crossfader (PR #1 - Crossfader Fix)
+  const masterGainA = useRef<GainNode | null>(null);
+  const masterGainB = useRef<GainNode | null>(null);
   
   // Scaling system refs - properly typed for the hook
   const centralStageContainerRef = useRef<HTMLDivElement>(null);
