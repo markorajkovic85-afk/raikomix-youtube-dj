@@ -820,7 +820,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       : null;
 
     return (
-      <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-1.5 flex flex-col gap-1.5">
+      <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none self-start h-auto max-h-full min-h-0 p-1.5 flex flex-col gap-1.5">
         <audio
           ref={localAudioRef}
           style={{ display: 'none' }}
@@ -1217,7 +1217,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         </div>
 
         {/* Row 3: Hot Cues + Loops (flexes to fill spare height) */}
-        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 min-h-[104px]">
+        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 flex-1 min-h-[120px]">
           {/* Hot Cues */}
           <div className="bg-black/20 rounded-lg border border-white/5 p-1 min-w-0 overflow-hidden flex flex-col h-full">
             <div className="flex items-center justify-between gap-2 min-w-0 h-5">
