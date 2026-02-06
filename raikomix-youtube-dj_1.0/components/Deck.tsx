@@ -25,6 +25,8 @@ interface DeckProps {
   effect: EffectType | null;
   effectWet: number;
   effectIntensity: number;
+  sharedAudioContext: AudioContext | null;
+  masterGainNode: GainNode | null;
 }
 
 export interface DeckHandle {
@@ -73,7 +75,7 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 const Deck = forwardRef<DeckHandle, DeckProps>(
-  ({ id, color, onStateUpdate, onPlayerReady, onTrackEnd, eq, effect, effectWet, effectIntensity }, ref) => {
+  ({ id, color, onStateUpdate, onPlayerReady, onTrackEnd, eq, effect, effectWet, effectIntensity, sharedAudioContext, masterGainNode }, ref) => {
     const [isLoading, setIsLoading] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     const [tapHistory, setTapHistory] = useState<number[]>([]);
@@ -145,11 +147,15 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     // Audio Engine (manages all Web Audio nodes)
     const audioEngine = useRef(new DeckAudioEngine(id));
 
-    // Initialize Audio Engine - Safe version that doesn't re-create source node
+    // Initialize Audio Engine with shared context support
     const initAudioEngine = useCallback(() => {
       if (!localAudioRef.current) return;
-      audioEngine.current.initialize(localAudioRef.current);
-    }, []);
+      audioEngine.current.initialize(
+        localAudioRef.current,
+        sharedAudioContext,
+        masterGainNode
+      );
+    }, [sharedAudioContext, masterGainNode]);
 
     const applyEffectChain = useCallback((effectType: EffectType | null) => {
       audioEngine.current.applyEffect(effectType, effectIntensity);
@@ -520,8 +526,12 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         localAudioRef.current.src = url;
         localAudioRef.current.load();
         
-        // Initialize audio engine with new source
-        audioEngine.current.initialize(localAudioRef.current);
+        // Initialize audio engine with new source and shared context
+        audioEngine.current.initialize(
+          localAudioRef.current,
+          sharedAudioContext,
+          masterGainNode
+        );
 
         const stableVideoId = `local_${url}`;
         const onLoaded = () => {
@@ -619,7 +629,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       toggleLoop: handleToggleLoop,
       setPlaybackRate: updatePlaybackRate,
       tapBpm: handleTap
-    }), [handleTap, initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, initAudioEngine]);
+    }), [handleTap, initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, sharedAudioContext, masterGainNode]);
 
     useEffect(() => {
       const interval = setInterval(() => {
