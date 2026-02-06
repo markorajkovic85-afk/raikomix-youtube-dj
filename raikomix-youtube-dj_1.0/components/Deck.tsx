@@ -12,8 +12,8 @@ import { DeckId, EffectType, PlayerState, TrackSourceType } from '../types';
 import Waveform from './Waveform';
 import { detectBpmFromAudioBuffer, extractBPMFromTitle } from '../utils/bpmDetection';
 import { parseYouTubeTitle } from '../utils/youtubeApi';
-import { createEffectChain } from '../utils/effectsChain';
 import { buildWaveformData } from '../utils/waveform';
+import { DeckAudioEngine } from '../utils/audioEngine';
 
 interface DeckProps {
   id: DeckId;
@@ -142,149 +142,34 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }, []);
 
-    // Web Audio API Refs
-    const audioCtxRef = useRef<AudioContext | null>(null);
-    const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-    const nodesRef = useRef<{
-      low: BiquadFilterNode;
-      mid: BiquadFilterNode;
-      hi: BiquadFilterNode;
-      filter: BiquadFilterNode;
-      gain: GainNode;
-      dryGain: GainNode;
-      wetGain: GainNode;
-      mixGain: GainNode;
-      effectInput: GainNode;
-      effectOutput: GainNode;
-    } | null>(null);
-
-    const effectNodesRef = useRef<{
-      nodes: AudioNode[];
-      dispose?: () => void;
-    } | null>(null);
+    // Audio Engine (manages all Web Audio nodes)
+    const audioEngine = useRef(new DeckAudioEngine(id));
 
     // Initialize Audio Engine - Safe version that doesn't re-create source node
     const initAudioEngine = useCallback(() => {
-      if (sourceNodeRef.current || !localAudioRef.current) return;
-
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const source = ctx.createMediaElementSource(localAudioRef.current);
-
-      const low = ctx.createBiquadFilter();
-      low.type = 'lowshelf';
-      low.frequency.value = 200;
-
-      const mid = ctx.createBiquadFilter();
-      mid.type = 'peaking';
-      mid.frequency.value = 1000;
-      mid.Q.value = 1;
-
-      const hi = ctx.createBiquadFilter();
-      hi.type = 'highshelf';
-      hi.frequency.value = 10000;
-
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'allpass';
-
-      const gainNode = ctx.createGain();
-      const dryGain = ctx.createGain();
-      const wetGain = ctx.createGain();
-      const mixGain = ctx.createGain();
-      const effectInput = ctx.createGain();
-      const effectOutput = ctx.createGain();
-
-      // Connection chain: source -> low -> mid -> hi -> filter -> dry/wet -> mix -> destination
-      source.connect(low);
-      low.connect(mid);
-      mid.connect(hi);
-      hi.connect(filter);
-      filter.connect(dryGain);
-      filter.connect(effectInput);
-      dryGain.connect(mixGain);
-      effectOutput.connect(wetGain);
-      wetGain.connect(mixGain);
-      mixGain.connect(gainNode);
-      gainNode.connect(ctx.destination);
-
-      audioCtxRef.current = ctx;
-      sourceNodeRef.current = source;
-      nodesRef.current = { low, mid, hi, filter, gain: gainNode, dryGain, wetGain, mixGain, effectInput, effectOutput };
-    }, []);
-
-    const clearEffectChain = useCallback(() => {
-      if (!nodesRef.current) return;
-      const { effectInput } = nodesRef.current;
-      try {
-        effectInput.disconnect();
-      } catch (e) { }
-      if (effectNodesRef.current) {
-        effectNodesRef.current.nodes.forEach(node => {
-          try {
-            node.disconnect();
-          } catch (e) { }
-        });
-        effectNodesRef.current.dispose?.();
-      }
-      effectNodesRef.current = null;
+      if (!localAudioRef.current) return;
+      audioEngine.current.initialize(localAudioRef.current);
     }, []);
 
     const applyEffectChain = useCallback((effectType: EffectType | null) => {
-      if (!nodesRef.current || !audioCtxRef.current) return;
-      const { effectInput, effectOutput } = nodesRef.current;
-      clearEffectChain();
-
-      if (!effectType) {
-        effectInput.connect(effectOutput);
-        return;
-      }
-
-      const chain = createEffectChain(audioCtxRef.current, effectType, effectIntensity);
-      if (!chain) {
-        effectInput.connect(effectOutput);
-        return;
-      }
-      effectNodesRef.current = { nodes: chain.nodes, dispose: chain.dispose };
-      effectInput.connect(chain.input);
-      chain.output.connect(effectOutput);
-    }, [clearEffectChain, effectIntensity]);
+      audioEngine.current.applyEffect(effectType, effectIntensity);
+    }, [effectIntensity]);
 
     // Sync EQ nodes with props
     useEffect(() => {
-      if (nodesRef.current && audioCtxRef.current) {
-        const { low, mid, hi, filter } = nodesRef.current;
-        const now = audioCtxRef.current.currentTime;
-        const ramp = 0.05;
-
-        // Map 0-2 to -12dB to +12dB
-        low.gain.setTargetAtTime((eq.low - 1.0) * 12, now, ramp);
-        mid.gain.setTargetAtTime((eq.mid - 1.0) * 12, now, ramp);
-        hi.gain.setTargetAtTime((eq.hi - 1.0) * 12, now, ramp);
-
-        // Bi-polar filter knob
-        if (eq.filter < -0.05) {
-          filter.type = 'highpass';
-          filter.frequency.setTargetAtTime(Math.pow(10, Math.abs(eq.filter) * 2) * 20, now, ramp);
-        } else if (eq.filter > 0.05) {
-          filter.type = 'lowpass';
-          filter.frequency.setTargetAtTime(20000 - (eq.filter * 19800), now, ramp);
-        } else {
-          filter.type = 'allpass';
-        }
-      }
+      audioEngine.current.updateEQ({
+        low: eq.low,
+        mid: eq.mid,
+        hi: eq.hi,
+        filter: eq.filter
+      });
     }, [eq]);
 
     useEffect(() => {
-      if (!nodesRef.current || !audioCtxRef.current) return;
-      const { dryGain, wetGain } = nodesRef.current;
-      const wet = Math.min(1, Math.max(0, effectWet));
-      const now = audioCtxRef.current.currentTime;
-      const ramp = 0.05;
-      dryGain.gain.setTargetAtTime(Math.cos(wet * Math.PI * 0.5), now, ramp);
-      wetGain.gain.setTargetAtTime(Math.sin(wet * Math.PI * 0.5), now, ramp);
+      audioEngine.current.updateWetDryMix(effectWet);
     }, [effectWet]);
 
     useEffect(() => {
-      if (!nodesRef.current || !audioCtxRef.current) return;
       applyEffectChain(effect);
     }, [applyEffectChain, effect]);
 
@@ -446,7 +331,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         setIsScanning(true);
         const response = await fetch(url);
         const arrayBuffer = await response.arrayBuffer();
-        const existingContext = audioCtxRef.current;
+        const existingContext = audioEngine.current.getContext();
         const tempContext = existingContext ?? new (window.AudioContext || (window as any).webkitAudioContext)();
         const audioBuffer = await tempContext.decodeAudioData(arrayBuffer.slice(0));
         const bpm = detectBpmFromAudioBuffer(audioBuffer);
@@ -529,9 +414,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
     const togglePlay = useCallback(() => {
       // Resume context if suspended (browser policy)
-      if (audioCtxRef.current?.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
+      audioEngine.current.resumeContext();
 
       if (state.sourceType === 'youtube') {
         state.playing ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo();
@@ -615,28 +498,33 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       loadMode: 'load' | 'cue' = 'load'
     ) => {
       console.log(`[Deck ${id}] loadLocalFile called:`, { url, loadMode, metadata });
-      // Only init if not already done
-      initAudioEngine();
+      
+      // CRITICAL: Clean up previous source REGARDLESS of type
+      if (state.sourceType === 'youtube') {
+        try { playerRef.current?.pauseVideo(); } catch (e) {}
+        try { playerRef.current?.stopVideo(); } catch (e) {}
+      }
+      
+      // CRITICAL: Cleanup audio engine before switching source
+      audioEngine.current.cleanup();
+      
       setIsLoading(loadMode !== 'cue');
 
-      // Pause any existing YT stream (don't trust state.sourceType here; it can be stale)
-      if (playerRef.current) {
-        try { playerRef.current.pauseVideo(); } catch (e) { }
-        try { playerRef.current.seekTo?.(0, true); } catch (e) { }
-      }
-
       if (localAudioRef.current) {
-        // Clear current source to prevent memory leak / ghost audio
+        // Clear current source
         localAudioRef.current.pause();
+        localAudioRef.current.src = '';
+        localAudioRef.current.load();
+        
+        // Set new source
         localAudioRef.current.src = url;
         localAudioRef.current.load();
+        
+        // Initialize audio engine with new source
+        audioEngine.current.initialize(localAudioRef.current);
 
-        // Use URL as stable videoId for local files (not timestamp!)
         const stableVideoId = `local_${url}`;
-        console.log(`[Deck ${id}] Set audio src, waiting for loadedmetadata. stableVideoId:`, stableVideoId);
-
         const onLoaded = () => {
-          console.log(`[Deck ${id}] loadedmetadata fired! Duration:`, localAudioRef.current?.duration);
           setState(s => ({
             ...s,
             isReady: true,
@@ -652,8 +540,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             waveform: undefined,
             waveformPeaks: undefined
           }));
-
-          console.log(`[Deck ${id}] State updated, isReady: true, videoId:`, stableVideoId);
 
           if (loadMode !== 'cue') {
             analyzeLocalAudio(url);
@@ -781,6 +667,13 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       document.addEventListener('visibilitychange', handleVisibilityChange);
       return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [state.playing, state.sourceType]);
+
+    // Cleanup audio engine on unmount
+    useEffect(() => {
+      return () => {
+        audioEngine.current.cleanup();
+      };
+    }, []);
 
     const playRingStyle = state.playing
       ? { borderColor: color, boxShadow: `0 0 18px ${color}55` }
