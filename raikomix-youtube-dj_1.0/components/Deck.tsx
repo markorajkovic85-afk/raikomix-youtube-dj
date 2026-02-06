@@ -128,6 +128,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const tempoPointerIdRef = useRef<number | null>(null);
     const tempoDraggingRef = useRef(false);
 
+    // Video seek line pointer handling (thin scrub strip)
+    const videoSeekRef = useRef<HTMLDivElement>(null);
+    const videoSeekPointerIdRef = useRef<number | null>(null);
+    const videoSeekDraggingRef = useRef(false);
+
     const containerId = `yt-player-${id}`;
 
     const formatTime = useCallback((timeSeconds: number) => {
@@ -352,6 +357,56 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       tempoPointerIdRef.current = null;
       if (tempoContainerRef.current?.hasPointerCapture(event.pointerId)) {
         tempoContainerRef.current.releasePointerCapture(event.pointerId);
+      }
+    }, []);
+
+    const seekToTime = useCallback((time: number) => {
+      if (!state.duration || !Number.isFinite(time)) return;
+      const t = clamp(time, 0, state.duration);
+      if (state.sourceType === 'youtube') playerRef.current?.seekTo(t, true);
+      else if (localAudioRef.current) localAudioRef.current.currentTime = t;
+      // Optimistic update so the playhead feels responsive
+      setState(s => ({ ...s, currentTime: t }));
+    }, [state.duration, state.sourceType]);
+
+    const getSeekTimeFromPointer = useCallback((clientX: number) => {
+      if (!videoSeekRef.current || !state.duration) return null;
+      const rect = videoSeekRef.current.getBoundingClientRect();
+      const ratio = (clientX - rect.left) / rect.width;
+      const clampedRatio = clamp(ratio, 0, 1);
+      return clampedRatio * state.duration;
+    }, [state.duration]);
+
+    const handleVideoSeekPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      if (!videoSeekRef.current || !state.duration) return;
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      videoSeekRef.current.setPointerCapture(event.pointerId);
+      videoSeekPointerIdRef.current = event.pointerId;
+      videoSeekDraggingRef.current = true;
+
+      const time = getSeekTimeFromPointer(event.clientX);
+      if (time !== null) seekToTime(time);
+    }, [getSeekTimeFromPointer, seekToTime, state.duration]);
+
+    const handleVideoSeekPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      if (!videoSeekDraggingRef.current) return;
+      if (videoSeekPointerIdRef.current !== event.pointerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const time = getSeekTimeFromPointer(event.clientX);
+      if (time !== null) seekToTime(time);
+    }, [getSeekTimeFromPointer, seekToTime]);
+
+    const handleVideoSeekPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      if (videoSeekPointerIdRef.current !== event.pointerId) return;
+      videoSeekDraggingRef.current = false;
+      videoSeekPointerIdRef.current = null;
+      if (videoSeekRef.current?.hasPointerCapture(event.pointerId)) {
+        videoSeekRef.current.releasePointerCapture(event.pointerId);
       }
     }, []);
 
@@ -742,6 +797,27 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
     const canShowVideo = state.sourceType === 'youtube';
     const showVideo = visualMode === 'video' && canShowVideo;
+    const transportHeightPx = 12;
+
+    const playheadPct = state.duration > 0
+      ? clamp(state.currentTime / state.duration, 0, 1) * 100
+      : 0;
+
+    const loopStartPct = state.loopActive && state.duration > 0
+      ? clamp(state.loopStart / state.duration, 0, 1) * 100
+      : null;
+
+    const loopEndPct = state.loopActive && state.duration > 0
+      ? clamp(state.loopEnd / state.duration, 0, 1) * 100
+      : null;
+
+    const loopLeftPct = (loopStartPct !== null && loopEndPct !== null)
+      ? Math.min(loopStartPct, loopEndPct)
+      : null;
+
+    const loopRightPct = (loopStartPct !== null && loopEndPct !== null)
+      ? Math.max(loopStartPct, loopEndPct)
+      : null;
 
     return (
       <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-2 flex flex-col gap-2">
@@ -758,50 +834,196 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
         {/* Visual Stage (Waveform + optional Artistic Video overlay) */}
         <div className="w-full min-w-0 flex-1 min-h-[clamp(56px,10vh,120px)]">
-          <div className="deck-visual-stage">
+          <div className="deck-visual-stage relative">
             <div
               className={`deck-video-shell ${showVideo ? 'deck-video-shell--on' : ''}`}
               style={{ ['--deck-accent' as any]: color } as React.CSSProperties}
               aria-hidden={!showVideo}
             >
-              <div id={containerId} className="deck-yt-host" />
+              {/* IMPORTANT: prevent pointer events from reaching the YouTube iframe */}
+              <div id={containerId} className="deck-yt-host" style={{ pointerEvents: 'none' }} />
+
               <div className="deck-video-overlay deck-video-tint" />
               <div className="deck-video-overlay deck-video-scanlines" />
               <div className="deck-video-overlay deck-video-noise" />
               <div className="deck-video-overlay deck-video-glitch" />
               <div className="deck-video-overlay deck-video-vignette" />
+
+              {/* Interaction shield: catches mouse/touch so YT never receives input (leave thin seek line free) */}
+              {showVideo && (
+                <div
+                  className="deck-video-overlay deck-video-interaction-shield"
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: `${transportHeightPx}px`,
+                    zIndex: 50,
+                    pointerEvents: 'auto',
+                    background: 'transparent'
+                  }}
+                  onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onPointerMove={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onPointerUp={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onPointerCancel={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  aria-hidden
+                />
+              )}
             </div>
 
-            <div className={showVideo ? 'opacity-0 pointer-events-none' : 'opacity-100'} style={{ height: '100%' }}>
-              <Waveform
-                isPlaying={state.playing}
-                volume={state.volume * (0.5 + state.eqLow * 0.5)}
-                color={color}
-                playbackRate={state.playbackRate}
-                currentTime={state.currentTime}
-                duration={state.duration}
-                waveform={state.waveform}
-                peaks={state.waveformPeaks}
-                sourceType={state.sourceType}
-                hotCues={state.hotCues}
-                cueColors={CUE_COLORS}
-                eq={{ low: state.eqLow, mid: state.eqMid, high: state.eqHigh }}
-                loop={{
-                  active: state.loopActive,
-                  start: state.loopStart,
-                  end: state.loopEnd
-                }}
-                onSeek={(time) => {
-                  if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
-                  else if (localAudioRef.current) localAudioRef.current.currentTime = time;
-                }}
-                timeLabel={showRemaining
-                  ? `-${formatTime(state.duration - state.currentTime)}`
-                  : formatTime(state.currentTime)}
-                onTimeToggle={() => setShowRemaining(prev => !prev)}
-                minHeightPx={56}
-              />
-            </div>
+            {/* Waveform (full-height in wave mode; thin seek line in video mode) */}
+            {showVideo ? (
+              <div
+                ref={videoSeekRef}
+                className="absolute left-0 right-0 bottom-0 z-50 touch-none select-none"
+                style={{ height: `${transportHeightPx}px`, cursor: 'ew-resize' }}
+                onPointerDown={handleVideoSeekPointerDown}
+                onPointerMove={handleVideoSeekPointerMove}
+                onPointerUp={handleVideoSeekPointerUp}
+                onPointerCancel={handleVideoSeekPointerUp}
+                title="Scrub / Seek"
+                aria-label="Scrub / Seek"
+                role="slider"
+                aria-valuemin={0}
+                aria-valuemax={state.duration || 0}
+                aria-valuenow={state.currentTime || 0}
+              >
+                <div
+                  className="relative w-full h-full"
+                  style={{
+                    background: 'rgba(0,0,0,0.15)',
+                    borderTop: '1px solid rgba(255,255,255,0.08)'
+                  }}
+                >
+                  {/* Loop region */}
+                  {state.loopActive && loopLeftPct !== null && loopRightPct !== null && (
+                    <>
+                      <div
+                        className="absolute inset-y-0 pointer-events-none"
+                        style={{
+                          left: `${loopLeftPct}%`,
+                          width: `${Math.max(0, loopRightPct - loopLeftPct)}%`,
+                          background: 'rgba(34,197,94,0.16)'
+                        }}
+                      />
+                      <div
+                        className="absolute inset-y-0 pointer-events-none"
+                        style={{
+                          left: `${loopLeftPct}%`,
+                          width: '1px',
+                          background: 'rgba(34,197,94,0.95)',
+                          boxShadow: '0 0 10px rgba(34,197,94,0.35)'
+                        }}
+                      />
+                      <div
+                        className="absolute inset-y-0 pointer-events-none"
+                        style={{
+                          left: `${loopRightPct}%`,
+                          width: '1px',
+                          background: 'rgba(34,197,94,0.95)',
+                          boxShadow: '0 0 10px rgba(34,197,94,0.35)'
+                        }}
+                      />
+                    </>
+                  )}
+
+                  {/* Hot cue markers */}
+                  {state.duration > 0 && state.hotCues.map((cue, i) => {
+                    if (cue === null) return null;
+                    const pct = clamp(cue / state.duration, 0, 1) * 100;
+                    const cueColor = CUE_COLORS[i] || '#fff';
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        className="absolute top-0 bottom-0"
+                        style={{
+                          left: `${pct}%`,
+                          transform: 'translateX(-50%)',
+                          width: '12px',
+                          background: 'transparent',
+                          border: 'none',
+                          padding: 0,
+                          margin: 0,
+                          cursor: 'pointer'
+                        }}
+                        onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          seekToTime(cue);
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleHotCue(i, true);
+                        }}
+                        title={`Hot Cue ${i + 1} (Right-click to clear)`}
+                        aria-label={`Hot Cue ${i + 1}`}
+                      >
+                        <div
+                          className="absolute left-1/2"
+                          style={{
+                            top: '1px',
+                            transform: 'translateX(-50%)',
+                            width: '9px',
+                            height: '9px',
+                            background: cueColor,
+                            clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+                            boxShadow: `0 0 10px ${cueColor}55`
+                          }}
+                        />
+                      </button>
+                    );
+                  })}
+
+                  {/* Playhead */}
+                  <div
+                    className="absolute inset-y-0"
+                    style={{
+                      left: `${playheadPct}%`,
+                      width: '2px',
+                      transform: 'translateX(-1px)',
+                      background: color,
+                      boxShadow: `0 0 10px ${color}88`
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className={'opacity-100'} style={{ height: '100%' }}>
+                <Waveform
+                  isPlaying={state.playing}
+                  volume={state.volume * (0.5 + state.eqLow * 0.5)}
+                  color={color}
+                  playbackRate={state.playbackRate}
+                  currentTime={state.currentTime}
+                  duration={state.duration}
+                  waveform={state.waveform}
+                  peaks={state.waveformPeaks}
+                  sourceType={state.sourceType}
+                  hotCues={state.hotCues}
+                  cueColors={CUE_COLORS}
+                  eq={{ low: state.eqLow, mid: state.eqMid, high: state.eqHigh }}
+                  loop={{
+                    active: state.loopActive,
+                    start: state.loopStart,
+                    end: state.loopEnd
+                  }}
+                  onSeek={(time) => {
+                    if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
+                    else if (localAudioRef.current) localAudioRef.current.currentTime = time;
+                  }}
+                  timeLabel={showRemaining
+                    ? `-${formatTime(state.duration - state.currentTime)}`
+                    : formatTime(state.currentTime)}
+                  onTimeToggle={() => setShowRemaining(prev => !prev)}
+                  minHeightPx={56}
+                />
+              </div>
+            )}
           </div>
         </div>
 
