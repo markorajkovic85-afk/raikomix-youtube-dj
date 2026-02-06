@@ -820,7 +820,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       : null;
 
     return (
-      <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-2 flex flex-col gap-2">
+      <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-1.5 flex flex-col gap-1.5">
         <audio
           ref={localAudioRef}
           style={{ display: 'none' }}
@@ -1029,7 +1029,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
         {/* Row 1: Title + Play */}
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-stretch min-w-0">
-          <div className="bg-black/30 rounded-lg border border-white/5 px-2 py-1.5 min-w-0 overflow-hidden flex items-center">
+          <div className="bg-black/30 rounded-lg border border-white/5 px-2 py-1 min-w-0 overflow-hidden flex items-center">
             <div className="flex items-start justify-between gap-2 min-w-0 w-full">
               <div className="min-w-0">
                 <MarqueeText
@@ -1121,7 +1121,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         {/* Row 2: BPM + Tempo */}
         <div className="grid grid-cols-[minmax(0,148px)_minmax(0,1fr)] gap-2 items-stretch min-w-0">
           {/* BPM block */}
-          <div className="bg-black/30 rounded-lg border border-white/5 px-2 py-1.5 min-w-0 flex flex-col justify-between">
+          <div className="bg-black/30 rounded-lg border border-white/5 px-2 py-1 min-w-0 flex flex-col justify-between">
             <div className="flex items-center justify-between gap-2 min-w-0">
               <div className="min-w-0 flex items-baseline gap-1">
                 <div
@@ -1151,7 +1151,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           {/* Tempo block (horizontal, drag + wheel + dblclick reset) */}
           <div
             ref={tempoContainerRef}
-            className="bg-black/30 rounded-lg border border-white/5 px-2 py-1.5 min-w-0 flex flex-col gap-1 select-none hover:border-white/20 active:border-[#D0BCFF]/30 touch-none"
+            className="bg-black/30 rounded-lg border border-white/5 px-2 py-1 min-w-0 flex flex-col gap-1 select-none hover:border-white/20 active:border-[#D0BCFF]/30 touch-none"
             onDoubleClick={() => updatePlaybackRate(1.0)}
             onPointerDown={handleTempoPointerDown}
             onPointerMove={handleTempoPointerMove}
@@ -1217,17 +1217,17 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         </div>
 
         {/* Row 3: Hot Cues + Loops (flexes to fill spare height) */}
-        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 flex-1 min-h-[120px]">
+        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 min-h-[104px]">
           {/* Hot Cues */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col h-full">
-            <div className="flex items-center justify-between gap-2 min-w-0 h-6">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1 min-w-0 overflow-hidden flex flex-col h-full">
+            <div className="flex items-center justify-between gap-2 min-w-0 h-5">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Hot Cues
               </div>
               <button
                 type="button"
                 onClick={handleClearAllHotCues}
-                className="h-6 px-2 rounded-md text-[9px] font-black uppercase tracking-widest border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all shrink-0"
+                className="h-5 px-2 rounded-md text-[9px] font-black uppercase tracking-widest border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all shrink-0"
                 title="Clear all hot cues"
               >
                 Clear
@@ -1235,7 +1235,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             </div>
 
             <div className="flex-1 min-h-0 flex items-center justify-center">
-              <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full aspect-square min-w-0">
+              <div className="grid grid-cols-2 grid-rows-2 gap-0.5 w-full aspect-square min-w-0">
                 {[0, 1, 2, 3].map((i) => {
                   const isSet = state.hotCues[i] !== null;
                   const cueColor = CUE_COLORS[i];
@@ -1270,8 +1270,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
 
           {/* Loops */}
-          <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col h-full">
-            <div className="flex items-center justify-between gap-2 min-w-0 h-6">
+          <div className="bg-black/20 rounded-lg border border-white/5 p-1 min-w-0 overflow-hidden flex flex-col h-full">
+            <div className="flex items-center justify-between gap-2 min-w-0 h-5">
               <div className="text-[9px] text-gray-500 font-black uppercase tracking-widest truncate">
                 Loops
               </div>
@@ -1281,7 +1281,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             </div>
 
             <div className="flex-1 min-h-0 flex items-center justify-center">
-              <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full aspect-square min-w-0">
+              <div className="grid grid-cols-2 grid-rows-2 gap-0.5 w-full aspect-square min-w-0">
                 {[2, 4, 8, 16].map((b) => (
                   <button
                     key={b}
