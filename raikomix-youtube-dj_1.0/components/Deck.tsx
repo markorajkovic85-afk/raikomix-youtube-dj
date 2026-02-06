@@ -743,6 +743,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             sourceType={state.sourceType}
             hotCues={state.hotCues}
             cueColors={CUE_COLORS}
+            eq={{ low: state.eqLow, mid: state.eqMid, high: state.eqHigh }}
             loop={{
               active: state.loopActive,
               start: state.loopStart,

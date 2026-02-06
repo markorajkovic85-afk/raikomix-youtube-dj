@@ -15,6 +15,9 @@ interface WaveformProps {
   /** Pro waveform data: multi-resolution + (stored stereo + RMS) + optional band mix */
   waveform?: WaveformData;
 
+  /** Optional: reflect deck EQ knobs in the waveform visualization */
+  eq?: { low: number; mid: number; high: number };
+
   sourceType?: 'youtube' | 'local';
   hotCues?: Array<number | null>;
   cueColors?: string[];
@@ -90,14 +93,12 @@ const bandHsla = (
 ) => {
   const rgb = parseHex(baseHex);
   if (!rgb) {
-    // Fallback: just use provided color as rgba-ish tint via globalAlpha usage.
     return baseHex;
   }
 
   const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
 
-  // Keep same hue; vary lightness/saturation subtly for a "pro" monochrome depth effect.
-  // low: slightly darker/denser, mid: neutral, high: slightly brighter.
+  // Same hue; subtle depth differences.
   const s2 = clamp01(s * (which === 'mid' ? 1.05 : 0.95));
   const l2 = clamp01(
     which === 'low'
@@ -122,6 +123,7 @@ const Waveform: React.FC<WaveformProps> = ({
   duration,
   peaks,
   waveform,
+  eq,
   sourceType = 'youtube',
   hotCues = [],
   cueColors = defaultCueColors,
@@ -315,6 +317,15 @@ const Waveform: React.FC<WaveformProps> = ({
       return { l: l / sum, m: m / sum, h: h / sum };
     };
 
+    // Visual EQ mapping: knob range is ~0..2 with 1 = neutral.
+    const visFromKnob = (knob: number | undefined) => {
+      const k = knob ?? 1;
+      return clamp(0.25 + 0.75 * k, 0.10, 1.30);
+    };
+    const eqLowVis = visFromKnob(eq?.low);
+    const eqMidVis = visFromKnob(eq?.mid);
+    const eqHighVis = visFromKnob(eq?.high);
+
     const amps: number[] = new Array(n);
     const mixL: number[] = new Array(n);
     const mixM: number[] = new Array(n);
@@ -345,26 +356,29 @@ const Waveform: React.FC<WaveformProps> = ({
         ctx.clip();
       }
 
-      ctx.strokeStyle = bandHsla(color, which, alpha);
+      const bandVis = which === 'low' ? eqLowVis : which === 'mid' ? eqMidVis : eqHighVis;
+      const a = clamp01(alpha * bandVis);
+      ctx.strokeStyle = bandHsla(color, which, a);
 
       ctx.beginPath();
       for (let i = 0; i < n; i += 1) {
         const x = i * barWidth + barWidth / 2;
-        const a = amps[i] * (which === 'low' ? mixL[i] : which === 'mid' ? mixM[i] : mixH[i]);
-        ctx.moveTo(x, centerY - a);
-        ctx.lineTo(x, centerY + a);
+        const bandMix = which === 'low' ? mixL[i] : which === 'mid' ? mixM[i] : mixH[i];
+        const amp = amps[i] * bandMix;
+        ctx.moveTo(x, centerY - amp);
+        ctx.lineTo(x, centerY + amp);
       }
       ctx.stroke();
 
       if (useClip) ctx.restore();
     };
 
-    // Base (unplayed): monochrome depth via lightness variation.
+    // Base (unplayed)
     drawLayer('low', 0.30);
     drawLayer('mid', 0.34);
     drawLayer('high', 0.30);
 
-    // Played overlay: brighter + subtle glow.
+    // Played overlay
     ctx.save();
     ctx.shadowBlur = brightShadowBlur;
     ctx.shadowColor = bandHsla(color, 'mid', 0.10);
@@ -544,7 +558,24 @@ const Waveform: React.FC<WaveformProps> = ({
       requestRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlaying, volume, playbackRate, color, peaks, waveform, currentTime, duration, sourceType, hotCues, cueColors, loop, visibleWindow]);
+  }, [
+    isPlaying,
+    volume,
+    playbackRate,
+    color,
+    peaks,
+    waveform,
+    currentTime,
+    duration,
+    sourceType,
+    hotCues,
+    cueColors,
+    loop,
+    visibleWindow,
+    eq?.low,
+    eq?.mid,
+    eq?.high
+  ]);
 
   return (
     <div
