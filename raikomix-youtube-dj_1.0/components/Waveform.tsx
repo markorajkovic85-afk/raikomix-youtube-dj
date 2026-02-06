@@ -12,7 +12,7 @@ interface WaveformProps {
   /** Legacy mono peak envelope (kept for backwards compatibility) */
   peaks?: number[];
 
-  /** Pro waveform data: multi-resolution + stereo + RMS */
+  /** Pro waveform data: multi-resolution + (stored stereo + RMS) + optional band mix */
   waveform?: WaveformData;
 
   sourceType?: 'youtube' | 'local';
@@ -35,6 +35,83 @@ const MAX_ZOOM = 6;
 const ZOOM_STEP = 1.15;
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+const clamp01 = (v: number) => clamp(v, 0, 1);
+
+const parseHex = (hex: string) => {
+  const m = hex.trim().match(/^#?([0-9a-f]{6}|[0-9a-f]{3})$/i);
+  if (!m) return null;
+  const raw = m[1];
+  const full = raw.length === 3
+    ? raw.split('').map((c) => c + c).join('')
+    : raw;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return { r, g, b };
+};
+
+const rgbToHsl = (r8: number, g8: number, b8: number) => {
+  const r = r8 / 255;
+  const g = g8 / 255;
+  const b = b8 / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+
+  if (d !== 0) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    switch (max) {
+      case r:
+        h = ((g - b) / d) % 6;
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      default:
+        h = (r - g) / d + 4;
+        break;
+    }
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+
+  return { h, s, l };
+};
+
+const bandHsla = (
+  baseHex: string,
+  which: 'low' | 'mid' | 'high',
+  alpha: number
+) => {
+  const rgb = parseHex(baseHex);
+  if (!rgb) {
+    // Fallback: just use provided color as rgba-ish tint via globalAlpha usage.
+    return baseHex;
+  }
+
+  const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
+
+  // Keep same hue; vary lightness/saturation subtly for a "pro" monochrome depth effect.
+  // low: slightly darker/denser, mid: neutral, high: slightly brighter.
+  const s2 = clamp01(s * (which === 'mid' ? 1.05 : 0.95));
+  const l2 = clamp01(
+    which === 'low'
+      ? l * 0.78
+      : which === 'high'
+        ? l + (1 - l) * 0.22
+        : l
+  );
+
+  const sPct = Math.round(s2 * 100);
+  const lPct = Math.round(l2 * 100);
+
+  return `hsla(${Math.round(h)}, ${sPct}%, ${lPct}%, ${alpha})`;
+};
 
 const Waveform: React.FC<WaveformProps> = ({
   isPlaying,
@@ -167,7 +244,6 @@ const Waveform: React.FC<WaveformProps> = ({
     const dpr = sizeRef.current.dpr || 1;
     const cssWidth = widthPx / dpr;
 
-    // Target a "DJ-like" density (avoid rendering 10k+ bars on large screens).
     const targetBarsOnScreen = clamp(Math.round(cssWidth / 2.25), 220, 2200);
     const requiredSamples = Math.round(targetBarsOnScreen * (duration / visibleDuration));
 
@@ -183,7 +259,7 @@ const Waveform: React.FC<WaveformProps> = ({
     return best;
   };
 
-  const drawPeaksPro = (
+  const drawSingleLaneBands = (
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
@@ -205,14 +281,17 @@ const Waveform: React.FC<WaveformProps> = ({
     const rmsL = level.rmsL.slice(startIndex, endIndex);
     const rmsR = level.rmsR.slice(startIndex, endIndex);
 
+    const low = level.bandLow?.slice(startIndex, endIndex);
+    const mid = level.bandMid?.slice(startIndex, endIndex);
+    const high = level.bandHigh?.slice(startIndex, endIndex);
+
     const n = Math.min(peakL.length, peakR.length, rmsL.length, rmsR.length);
     if (n <= 0) return;
 
     const barWidth = width / n;
     const baseLineWidth = Math.max(1, barWidth * 0.7);
 
-    // Safe padding: rounded container + overflow hidden can crop glow/caps.
-    const brightShadowBlur = 4;
+    const brightShadowBlur = 3;
     const safePad = Math.ceil(baseLineWidth / 2 + brightShadowBlur + 1);
 
     const innerTop = safePad;
@@ -220,75 +299,82 @@ const Waveform: React.FC<WaveformProps> = ({
     const innerHeight = innerBottom - innerTop;
     if (innerHeight <= 6) return;
 
-    const topLaneCenter = innerTop + innerHeight * 0.25;
-    const bottomLaneCenter = innerTop + innerHeight * 0.75;
-    const laneAmpMax = (innerHeight * 0.5) * 0.44; // leave headroom
+    const centerY = innerTop + innerHeight * 0.5;
+    const laneAmpMax = (innerHeight * 0.5) * 0.46;
 
-    // Professional-ish feel: blend peak + RMS so energy reads better.
     const blend = (p: number, r: number) => clamp(p * 0.65 + r * 0.35, 0, 1);
+
+    const getMix = (i: number) => {
+      const l = low?.[i];
+      const m = mid?.[i];
+      const h = high?.[i];
+      if (l === undefined || m === undefined || h === undefined) {
+        return { l: 0.22, m: 0.50, h: 0.28 };
+      }
+      const sum = Math.max(1e-6, l + m + h);
+      return { l: l / sum, m: m / sum, h: h / sum };
+    };
+
+    const amps: number[] = new Array(n);
+    const mixL: number[] = new Array(n);
+    const mixM: number[] = new Array(n);
+    const mixH: number[] = new Array(n);
+
+    for (let i = 0; i < n; i += 1) {
+      const p = Math.max(peakL[i] ?? 0, peakR[i] ?? 0);
+      const r = Math.max(rmsL[i] ?? 0, rmsR[i] ?? 0);
+      amps[i] = blend(p, r) * laneAmpMax;
+      const mix = getMix(i);
+      mixL[i] = mix.l;
+      mixM[i] = mix.m;
+      mixH[i] = mix.h;
+    }
 
     ctx.lineCap = 'round';
     ctx.lineWidth = baseLineWidth;
     ctx.shadowBlur = 0;
 
-    // Unplayed base
-    ctx.strokeStyle = `${color}55`;
-    ctx.beginPath();
-    for (let i = 0; i < n; i += 1) {
-      const x = i * barWidth + barWidth / 2;
-      const aL = blend(peakL[i], rmsL[i]) * laneAmpMax;
-      const aR = blend(peakR[i], rmsR[i]) * laneAmpMax;
+    const drawLayer = (which: 'low' | 'mid' | 'high', alpha: number, clipProgress?: number) => {
+      const useClip = clipProgress !== undefined;
+      if (useClip) {
+        const progressWidth = Math.min(1, Math.max(0, clipProgress)) * width;
+        if (progressWidth <= 0) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, progressWidth, height);
+        ctx.clip();
+      }
 
-      ctx.moveTo(x, topLaneCenter - aL);
-      ctx.lineTo(x, topLaneCenter + aL);
+      ctx.strokeStyle = bandHsla(color, which, alpha);
 
-      ctx.moveTo(x, bottomLaneCenter - aR);
-      ctx.lineTo(x, bottomLaneCenter + aR);
-    }
-    ctx.stroke();
-
-    // Played overlay
-    const clampedProgress = Math.min(1, Math.max(0, progress));
-    const progressWidth = clampedProgress * width;
-    if (progressWidth > 0) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, progressWidth, height);
-      ctx.clip();
-
-      ctx.strokeStyle = color;
-      ctx.shadowBlur = brightShadowBlur;
-      ctx.shadowColor = color;
       ctx.beginPath();
       for (let i = 0; i < n; i += 1) {
         const x = i * barWidth + barWidth / 2;
-        const aL = blend(peakL[i], rmsL[i]) * laneAmpMax;
-        const aR = blend(peakR[i], rmsR[i]) * laneAmpMax;
-
-        ctx.moveTo(x, topLaneCenter - aL);
-        ctx.lineTo(x, topLaneCenter + aL);
-
-        ctx.moveTo(x, bottomLaneCenter - aR);
-        ctx.lineTo(x, bottomLaneCenter + aR);
+        const a = amps[i] * (which === 'low' ? mixL[i] : which === 'mid' ? mixM[i] : mixH[i]);
+        ctx.moveTo(x, centerY - a);
+        ctx.lineTo(x, centerY + a);
       }
       ctx.stroke();
 
-      ctx.restore();
-    }
+      if (useClip) ctx.restore();
+    };
 
-    // Subtle center divider (keeps existing UI feel)
+    // Base (unplayed): monochrome depth via lightness variation.
+    drawLayer('low', 0.30);
+    drawLayer('mid', 0.34);
+    drawLayer('high', 0.30);
+
+    // Played overlay: brighter + subtle glow.
     ctx.save();
-    ctx.globalAlpha = 0.08;
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, innerTop + innerHeight * 0.5);
-    ctx.lineTo(width, innerTop + innerHeight * 0.5);
-    ctx.stroke();
+    ctx.shadowBlur = brightShadowBlur;
+    ctx.shadowColor = bandHsla(color, 'mid', 0.10);
+    drawLayer('low', 0.78, progress);
+    drawLayer('mid', 0.84, progress);
+    drawLayer('high', 0.78, progress);
     ctx.restore();
 
     drawMarkers(ctx, width, height, visibleStart, visibleDuration);
-    drawPlayhead(ctx, width, height, clampedProgress, 'strong');
+    drawPlayhead(ctx, width, height, progress, 'strong');
   };
 
   const drawPeaksLegacy = (
@@ -376,7 +462,7 @@ const Waveform: React.FC<WaveformProps> = ({
       : 0;
 
     if (waveform && waveform.levels.length > 0) {
-      drawPeaksPro(ctx, width, height, visibleProgress, visibleWindow.start, visibleWindow.length);
+      drawSingleLaneBands(ctx, width, height, visibleProgress, visibleWindow.start, visibleWindow.length);
       if (!runningRef.current) return;
       requestRef.current = requestAnimationFrame(draw);
       return;
@@ -389,6 +475,7 @@ const Waveform: React.FC<WaveformProps> = ({
       return;
     }
 
+    // fallback "youtube" idle visualization
     const centerY = height / 2;
     const amplitude = isPlaying ? (height / 3.5) * (volume / 100) : 2;
     const frequency = 0.015;
@@ -471,8 +558,9 @@ const Waveform: React.FC<WaveformProps> = ({
         if (!onSeek || duration <= 0) return;
         const rect = event.currentTarget.getBoundingClientRect();
         const pct = (event.clientX - rect.left) / rect.width;
-        const baseStart = (waveform && waveform.levels.length > 0) || (peaks && peaks.length > 0) ? visibleWindow.start : 0;
-        const baseDuration = (waveform && waveform.levels.length > 0) || (peaks && peaks.length > 0) ? visibleWindow.length : duration;
+        const hasAnyPeaks = (waveform && waveform.levels.length > 0) || (peaks && peaks.length > 0);
+        const baseStart = hasAnyPeaks ? visibleWindow.start : 0;
+        const baseDuration = hasAnyPeaks ? visibleWindow.length : duration;
         onSeek(baseStart + pct * baseDuration);
       }}
       onWheel={(event) => {

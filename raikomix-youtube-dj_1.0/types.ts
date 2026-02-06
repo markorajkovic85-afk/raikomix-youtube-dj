@@ -1,9 +1,18 @@
 export interface WaveformLevel {
   samples: number;
+
+  /** Peak envelope (per-block max abs), per channel */
   peakL: number[];
   peakR: number[];
+
+  /** RMS envelope (per-block rms), per channel */
   rmsL: number[];
   rmsR: number[];
+
+  /** Optional per-block frequency mix ratios (0..1, sum≈1). */
+  bandLow?: number[];
+  bandMid?: number[];
+  bandHigh?: number[];
 }
 
 export interface WaveformData {
@@ -71,7 +80,7 @@ export interface PlayerState {
   loopStart: number;
   loopEnd: number;
 
-  /** Pro waveform data (multi-res + stereo + RMS) */
+  /** Pro waveform data (multi-res + stereo + RMS + optional band mix) */
   waveform?: WaveformData;
 
   /** Legacy mono peaks (kept for backwards compatibility) */
