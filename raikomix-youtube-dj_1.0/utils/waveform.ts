@@ -35,29 +35,39 @@ const normalizeLevel = (level: WaveformLevel, percentile: number) => {
   };
 };
 
+const downsample2x = <T>(arr: T[], reducer: (a: T, b: T) => T): T[] => {
+  const nextLen = Math.floor(arr.length / 2);
+  const out: T[] = new Array(nextLen);
+  for (let i = 0; i < nextLen; i += 1) {
+    const a = arr[i * 2];
+    const b = arr[i * 2 + 1];
+    out[i] = reducer(a, b);
+  }
+  return out;
+};
+
 const downsampleLevel2x = (prev: {
   samples: number;
   peakL: number[];
   peakR: number[];
   msL: number[];
   msR: number[];
+  bandLow?: number[];
+  bandMid?: number[];
+  bandHigh?: number[];
 }) => {
   const nextSamples = Math.floor(prev.samples / 2);
-  const peakL: number[] = new Array(nextSamples);
-  const peakR: number[] = new Array(nextSamples);
-  const msL: number[] = new Array(nextSamples);
-  const msR: number[] = new Array(nextSamples);
 
-  for (let i = 0; i < nextSamples; i += 1) {
-    const a = i * 2;
-    const b = a + 1;
-    peakL[i] = Math.max(prev.peakL[a] ?? 0, prev.peakL[b] ?? 0);
-    peakR[i] = Math.max(prev.peakR[a] ?? 0, prev.peakR[b] ?? 0);
-    msL[i] = ((prev.msL[a] ?? 0) + (prev.msL[b] ?? 0)) / 2;
-    msR[i] = ((prev.msR[a] ?? 0) + (prev.msR[b] ?? 0)) / 2;
-  }
+  const peakL = downsample2x(prev.peakL, (a, b) => Math.max(a ?? 0, b ?? 0));
+  const peakR = downsample2x(prev.peakR, (a, b) => Math.max(a ?? 0, b ?? 0));
+  const msL = downsample2x(prev.msL, (a, b) => ((a ?? 0) + (b ?? 0)) / 2);
+  const msR = downsample2x(prev.msR, (a, b) => ((a ?? 0) + (b ?? 0)) / 2);
 
-  return { samples: nextSamples, peakL, peakR, msL, msR };
+  const bandLow = prev.bandLow ? downsample2x(prev.bandLow, (a, b) => ((a ?? 0) + (b ?? 0)) / 2) : undefined;
+  const bandMid = prev.bandMid ? downsample2x(prev.bandMid, (a, b) => ((a ?? 0) + (b ?? 0)) / 2) : undefined;
+  const bandHigh = prev.bandHigh ? downsample2x(prev.bandHigh, (a, b) => ((a ?? 0) + (b ?? 0)) / 2) : undefined;
+
+  return { samples: nextSamples, peakL, peakR, msL, msR, bandLow, bandMid, bandHigh };
 };
 
 export const buildWaveformData = (
@@ -66,6 +76,13 @@ export const buildWaveformData = (
     maxSamples?: number;
     minSamples?: number;
     normalizePercentile?: number;
+
+    /** Frequency band split points (Hz) */
+    lowCutHz?: number;
+    highCutHz?: number;
+
+    /** Whether to compute band mix ratios for coloring */
+    includeBands?: boolean;
   }
 ): WaveformData => {
   const channels = audioBuffer.numberOfChannels;
@@ -85,6 +102,11 @@ export const buildWaveformData = (
   const minSamples = Math.max(256, Math.min(maxSamples, options?.minSamples ?? 512));
   const normalizePercentile = options?.normalizePercentile ?? 0.95;
 
+  const includeBands = options?.includeBands ?? true;
+  const lowCutHz = options?.lowCutHz ?? 250;
+  const highCutHz = options?.highCutHz ?? 2500;
+
+  const sampleRate = audioBuffer.sampleRate;
   const left = audioBuffer.getChannelData(0);
   const right = audioBuffer.getChannelData(Math.min(1, channels - 1));
 
@@ -96,6 +118,18 @@ export const buildWaveformData = (
   const msL: number[] = new Array(baseSamples);
   const msR: number[] = new Array(baseSamples);
 
+  const bandLow: number[] | undefined = includeBands ? new Array(baseSamples) : undefined;
+  const bandMid: number[] | undefined = includeBands ? new Array(baseSamples) : undefined;
+  const bandHigh: number[] | undefined = includeBands ? new Array(baseSamples) : undefined;
+
+  // One-pole filters on MONO signal to approximate low/mid/high energy.
+  const lowAlpha = includeBands ? (1 - Math.exp(-2 * Math.PI * lowCutHz / sampleRate)) : 0;
+  const hpAlpha = includeBands ? Math.exp(-2 * Math.PI * highCutHz / sampleRate) : 0;
+
+  let lowState = 0;
+  let hpState = 0;
+  let hpPrevX = 0;
+
   for (let i = 0; i < baseSamples; i += 1) {
     const start = i * blockSize;
     const end = i === baseSamples - 1 ? totalSamples : Math.min(totalSamples, start + blockSize);
@@ -105,6 +139,10 @@ export const buildWaveformData = (
     let sL = 0;
     let sR = 0;
     let count = 0;
+
+    let eLow = 0;
+    let eMid = 0;
+    let eHigh = 0;
 
     for (let j = start; j < end; j += 1) {
       const l = left[j] ?? 0;
@@ -118,16 +156,52 @@ export const buildWaveformData = (
       sL += l * l;
       sR += r * r;
       count += 1;
+
+      if (includeBands) {
+        const x = (l + r) * 0.5;
+
+        // Low: one-pole lowpass
+        lowState = lowState + lowAlpha * (x - lowState);
+        const low = lowState;
+
+        // High: one-pole highpass
+        hpState = hpAlpha * (hpState + x - hpPrevX);
+        hpPrevX = x;
+        const high = hpState;
+
+        // Mid: remainder
+        const mid = x - low - high;
+
+        eLow += low * low;
+        eMid += mid * mid;
+        eHigh += high * high;
+      }
     }
 
     peakL[i] = pL;
     peakR[i] = pR;
     msL[i] = count ? sL / count : 0;
     msR[i] = count ? sR / count : 0;
+
+    if (includeBands && bandLow && bandMid && bandHigh) {
+      const tot = Math.max(1e-12, eLow + eMid + eHigh);
+      bandLow[i] = clamp01(eLow / tot);
+      bandMid[i] = clamp01(eMid / tot);
+      bandHigh[i] = clamp01(eHigh / tot);
+    }
   }
 
-  const pyramidRaw: Array<{ samples: number; peakL: number[]; peakR: number[]; msL: number[]; msR: number[] }> = [
-    { samples: baseSamples, peakL, peakR, msL, msR }
+  const pyramidRaw: Array<{
+    samples: number;
+    peakL: number[];
+    peakR: number[];
+    msL: number[];
+    msR: number[];
+    bandLow?: number[];
+    bandMid?: number[];
+    bandHigh?: number[];
+  }> = [
+    { samples: baseSamples, peakL, peakR, msL, msR, bandLow, bandMid, bandHigh }
   ];
 
   while (pyramidRaw[pyramidRaw.length - 1].samples / 2 >= minSamples && pyramidRaw.length < 6) {
@@ -143,7 +217,10 @@ export const buildWaveformData = (
         peakL: [...lvl.peakL],
         peakR: [...lvl.peakR],
         rmsL,
-        rmsR
+        rmsR,
+        bandLow: lvl.bandLow ? [...lvl.bandLow] : undefined,
+        bandMid: lvl.bandMid ? [...lvl.bandMid] : undefined,
+        bandHigh: lvl.bandHigh ? [...lvl.bandHigh] : undefined
       };
     })
     .map((lvl) => normalizeLevel(lvl, normalizePercentile));
@@ -159,7 +236,12 @@ export const buildWaveformData = (
 
 // Legacy helper retained for older call sites (returns a mono envelope).
 export const buildWaveformPeaks = (audioBuffer: AudioBuffer, samples = 900): number[] => {
-  const data = buildWaveformData(audioBuffer, { maxSamples: Math.max(512, samples), minSamples: Math.max(256, Math.floor(samples / 2)) });
+  const data = buildWaveformData(audioBuffer, {
+    maxSamples: Math.max(512, samples),
+    minSamples: Math.max(256, Math.floor(samples / 2)),
+    includeBands: false
+  });
+
   const level = data.levels.reduce((best, lvl) => {
     if (!best) return lvl;
     return Math.abs(lvl.samples - samples) < Math.abs(best.samples - samples) ? lvl : best;
