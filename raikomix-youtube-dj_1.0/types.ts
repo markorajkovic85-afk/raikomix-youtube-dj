@@ -1,3 +1,19 @@
+export interface WaveformLevel {
+  samples: number;
+  peakL: number[];
+  peakR: number[];
+  rmsL: number[];
+  rmsR: number[];
+}
+
+export interface WaveformData {
+  version: 1;
+  duration: number;
+  sampleRate: number;
+  channels: number;
+  levels: WaveformLevel[];
+}
+
 export type DeckId = 'A' | 'B';
 export type CrossfaderCurve = 'SMOOTH' | 'CUT' | 'DIP';
 export type EffectType =
@@ -54,6 +70,11 @@ export interface PlayerState {
   loopActive: boolean;
   loopStart: number;
   loopEnd: number;
+
+  /** Pro waveform data (multi-res + stereo + RMS) */
+  waveform?: WaveformData;
+
+  /** Legacy mono peaks (kept for backwards compatibility) */
   waveformPeaks?: number[];
 }
 

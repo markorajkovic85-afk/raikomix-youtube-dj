@@ -12,7 +12,7 @@ import Waveform from './Waveform';
 import { detectBpmFromAudioBuffer, extractBPMFromTitle } from '../utils/bpmDetection';
 import { parseYouTubeTitle } from '../utils/youtubeApi';
 import { createEffectChain } from '../utils/effectsChain';
-import { buildWaveformPeaks } from '../utils/waveform';
+import { buildWaveformData } from '../utils/waveform';
 
 interface DeckProps {
   id: DeckId;
@@ -97,8 +97,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       eqMid: eq.mid,
       eqLow: eq.low,
       filter: eq.filter,
+      waveform: undefined,
       waveformPeaks: undefined
-    });
+    } as any);
 
     const playerRef = useRef<any>(null);
     const localAudioRef = useRef<HTMLAudioElement>(null);
@@ -368,12 +369,15 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         const tempContext = existingContext ?? new (window.AudioContext || (window as any).webkitAudioContext)();
         const audioBuffer = await tempContext.decodeAudioData(arrayBuffer.slice(0));
         const bpm = detectBpmFromAudioBuffer(audioBuffer);
-        const peaks = buildWaveformPeaks(audioBuffer, 900);
+        const waveform = buildWaveformData(audioBuffer);
+
         setState(s => ({
           ...s,
           bpm: bpm ?? s.bpm,
-          waveformPeaks: peaks.length ? peaks : undefined
+          waveform: waveform.levels.length ? waveform : undefined,
+          waveformPeaks: undefined
         }));
+
         if (!existingContext) {
           await tempContext.close();
         }
@@ -474,6 +478,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             playing: false,
             currentTime: 0,
             loopActive: false,
+            waveform: undefined,
             waveformPeaks: undefined
           }));
           if (loadMode === 'cue') {
@@ -563,6 +568,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             playing: false,
             currentTime: 0,
             loopActive: false,
+            waveform: undefined,
             waveformPeaks: undefined
           }));
 
@@ -732,6 +738,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             playbackRate={state.playbackRate}
             currentTime={state.currentTime}
             duration={state.duration}
+            waveform={state.waveform}
             peaks={state.waveformPeaks}
             sourceType={state.sourceType}
             hotCues={state.hotCues}
