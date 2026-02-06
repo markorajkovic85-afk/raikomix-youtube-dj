@@ -11,7 +11,7 @@ export const loadLibrary = (): LibraryTrack[] => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return [];
     const data = JSON.parse(saved);
-      const tracks = Array.isArray(data)
+    const tracks = Array.isArray(data)
       ? data
       : Array.isArray(data?.tracks)
         ? data.tracks
@@ -62,7 +62,7 @@ export const loadPlaylists = (): Playlist[] => {
   try {
     const saved = localStorage.getItem(PLAYLISTS_KEY);
     if (!saved) return [];
-      const data = JSON.parse(saved);
+    const data = JSON.parse(saved);
     if (!Array.isArray(data)) return [];
     return data
       .filter((playlist) => playlist && typeof playlist === 'object')
@@ -94,6 +94,26 @@ export const exportLibrary = (library: LibraryTrack[]): void => {
   URL.revokeObjectURL(url);
 };
 
+const formatArtistTitleLine = (track: LibraryTrack): string => {
+  const artist = String(track.author || '').replace(/\s+/g, ' ').trim();
+  const title = String(track.title || '').replace(/\s+/g, ' ').trim();
+  if (artist && title) return `${artist} - ${title}`;
+  return title || artist || String(track.videoId || '').trim() || 'Unknown';
+};
+
+// Export format compatible with playlist importers like TuneMyMusic: one line per track in the form "Artist - Track Name".
+export const exportLibraryAsText = (library: LibraryTrack[]): void => {
+  const lines = library.map(formatArtistTitleLine).filter(Boolean);
+  const dataStr = lines.join('\n');
+  const blob = new Blob([dataStr], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `raikomix-library-${new Date().toISOString().split('T')[0]}.txt`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
 export const extractVideoId = (url: string): string | null => {
   const match1 = url.match(/[?&]v=([^&]+)/);
   if (match1) return match1[1];
@@ -111,7 +131,7 @@ export const addTrackToLibrary = (
   const videoId = extractVideoId(url);
   if (!videoId) return { success: false, error: 'Invalid YouTube URL' };
   if (library.some(t => t.videoId === videoId)) return { success: false, error: 'Track already in library' };
-  
+
   const track: LibraryTrack = {
     id: makeId(),
     videoId,
@@ -148,8 +168,8 @@ export const updateTrackMetadata = (
 ): LibraryTrack[] => {
   return library.map(track => {
     if (track.videoId === videoId) {
-      return { 
-        ...track, 
+      return {
+        ...track,
         title: metadata.title || track.title,
         author: metadata.author || track.author,
         album: metadata.album || track.album

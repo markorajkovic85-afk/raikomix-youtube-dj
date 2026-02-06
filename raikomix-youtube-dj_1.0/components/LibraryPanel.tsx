@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LibraryTrack, Playlist, DeckId } from '../types';
-import { exportLibrary, loadPlaylists, savePlaylists, revokeLocalTrackUrls } from '../utils/libraryStorage';
+import { exportLibrary, exportLibraryAsText, loadPlaylists, savePlaylists, revokeLocalTrackUrls } from '../utils/libraryStorage';
 import { makeId } from '../utils/id';
 import { extractPlaylistId, fetchPlaylistItems } from '../utils/youtubeApi';
 
@@ -270,7 +270,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
- const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -318,7 +318,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
     onImportLibrary((prev) => [...prev, ...newTracks]);
     if (folderInputRef.current) folderInputRef.current.value = '';
   };
- 
+
   const toggleSelect = (id: string) => {
     const next = new Set(selectedTracks);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -358,7 +358,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
   ).sort((a, b) => b.addedAt - a.addedAt);
 
   return (
-     <div className="flex flex-col gap-4 p-4 bg-[#1C1B1F] rounded-xl border border-white/5 h-full min-h-0 overflow-hidden relative">
+    <div className="flex flex-col gap-4 p-4 bg-[#1C1B1F] rounded-xl border border-white/5 h-full min-h-0 overflow-hidden relative">
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -367,7 +367,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         accept="audio/*" 
         className="hidden" 
       />
-<input 
+      <input 
         type="file" 
         ref={folderInputRef} 
         onChange={handleFolderSelect} 
@@ -377,7 +377,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
         multiple 
         className="hidden" 
       />
-       
+
       <div className="flex justify-between items-center">
         <div className="flex flex-col">
           <h3 className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Collection ({library.length})</h3>
@@ -407,7 +407,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
           <button onClick={() => fileInputRef.current?.click()} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white" title="Import Local Files">
             <span className="material-symbols-outlined text-sm">folder_open</span>
           </button>
-           <button onClick={() => folderInputRef.current?.click()} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white" title="Import Folder">
+          <button onClick={() => folderInputRef.current?.click()} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white" title="Import Folder">
             <span className="material-symbols-outlined text-sm">folder_special</span>
           </button>
           <button onClick={() => setShowBulkAdd(true)} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white" title="Import YouTube Playlist">
@@ -415,6 +415,9 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
           </button>
           <button onClick={() => exportLibrary(library)} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white" title="Export JSON">
             <span className="material-symbols-outlined text-sm">download</span>
+          </button>
+          <button onClick={() => exportLibraryAsText(library)} className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white" title="Export TXT (Artist - Track Name)">
+            <span className="material-symbols-outlined text-sm">description</span>
           </button>
         </div>
       </div>
@@ -468,7 +471,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
             <span className="material-symbols-outlined text-4xl mb-2">inventory_2</span>
             <p className="text-[10px] font-black uppercase tracking-widest">Library Empty</p>
           </div>
-          ) : filtered.map(t => {
+        ) : filtered.map(t => {
           const hasBeenPlayed = t.playCount > 0;
           const isSelected = selectedTracks.has(t.id);
           const playedOpacity = hasBeenPlayed ? (isSelected ? 'opacity-80' : 'opacity-60 hover:opacity-100') : '';
@@ -479,61 +482,61 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
             `File: ${t.fileName || 'N/A'}`
           ].join('\n');
           return (
-          <div
-            key={t.id}
-            title={tooltipText}
-            tabIndex={0}
-            onTouchStart={(event) => event.currentTarget.focus()}
-            className={`group relative flex items-center gap-3 p-3 min-h-[72px] rounded-xl border transition-all overflow-hidden ${
-              isSelected ? 'bg-[#D0BCFF]/10 border-[#D0BCFF]/50' : 'bg-black/20 border-white/5 hover:border-white/20'
-            } ${playedOpacity}`}
-          >
-            <input type="checkbox" checked={selectedTracks.has(t.id)} onChange={() => toggleSelect(t.id)} className="w-4 h-4 accent-[#D0BCFF] shrink-0" />
-            <div className="relative shrink-0">
-              <img
-                src={t.thumbnailUrl}
-                alt=""
-                className="w-14 h-10 rounded-lg object-cover shadow-lg"
-                onError={(event) => {
-                  event.currentTarget.src = fallbackThumbnail;
-                }}
-              />
-              {t.sourceType === 'local' && (
-                <div className="absolute -top-1 -right-1 bg-blue-500 border border-black w-2.5 h-2.5 rounded-full" title="Local File" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0 pr-24 relative" onDoubleClick={() => setEditingTrack(t)}>
-              <div className="text-[11px] font-bold text-white truncate leading-tight group-hover:text-[#D0BCFF] transition-colors">{t.title}</div>
-              <div className="text-[9px] text-gray-500 truncate uppercase font-bold tracking-tighter">{t.author}</div>
-              {hasBeenPlayed && (
-                <span className="absolute top-0 right-0 text-[8px] font-black uppercase tracking-widest text-gray-500 border border-white/10 rounded-full px-2 py-1">
-                  Played
-                </span>
-              )}
-            </div>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 pointer-events-none transition group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
-              <button 
-                onClick={() => onAddToQueue(t)} 
-                className="w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
-                title="Add to Queue"
-              >
-                <span className="material-symbols-outlined text-sm">playlist_add</span>
-              </button>
-              <button onClick={() => onLoadToDeck(t, 'A')} className="w-7 h-7 rounded-lg bg-[#D0BCFF] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">A</button>
-              <button onClick={() => onLoadToDeck(t, 'B')} className="w-7 h-7 rounded-lg bg-[#F2B8B5] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">B</button>
-              <button onClick={() => { revokeLocalTrackUrls([t]); onRemove(t.id); }} className="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all" title="Remove"><span className="material-symbols-outlined text-sm">delete</span></button>
-            </div>
-            <div className="pointer-events-none absolute left-12 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-black/90 p-3 text-[9px] text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-              <div className="font-bold text-[#D0BCFF] mb-1">Track Details</div>
-              <div className="space-y-1 text-gray-200">
-                <div><span className="text-gray-500">Title:</span> {t.title || 'Unknown Title'}</div>
-                <div><span className="text-gray-500">Artist:</span> {t.author || 'Unknown Artist'}</div>
-                <div><span className="text-gray-500">Album:</span> {t.album || 'Unknown Album'}</div>
-                <div><span className="text-gray-500">File:</span> {t.fileName || 'N/A'}</div>
+            <div
+              key={t.id}
+              title={tooltipText}
+              tabIndex={0}
+              onTouchStart={(event) => event.currentTarget.focus()}
+              className={`group relative flex items-center gap-3 p-3 min-h-[72px] rounded-xl border transition-all overflow-hidden ${
+                isSelected ? 'bg-[#D0BCFF]/10 border-[#D0BCFF]/50' : 'bg-black/20 border-white/5 hover:border-white/20'
+              } ${playedOpacity}`}
+            >
+              <input type="checkbox" checked={selectedTracks.has(t.id)} onChange={() => toggleSelect(t.id)} className="w-4 h-4 accent-[#D0BCFF] shrink-0" />
+              <div className="relative shrink-0">
+                <img
+                  src={t.thumbnailUrl}
+                  alt=""
+                  className="w-14 h-10 rounded-lg object-cover shadow-lg"
+                  onError={(event) => {
+                    event.currentTarget.src = fallbackThumbnail;
+                  }}
+                />
+                {t.sourceType === 'local' && (
+                  <div className="absolute -top-1 -right-1 bg-blue-500 border border-black w-2.5 h-2.5 rounded-full" title="Local File" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0 pr-24 relative" onDoubleClick={() => setEditingTrack(t)}>
+                <div className="text-[11px] font-bold text-white truncate leading-tight group-hover:text-[#D0BCFF] transition-colors">{t.title}</div>
+                <div className="text-[9px] text-gray-500 truncate uppercase font-bold tracking-tighter">{t.author}</div>
+                {hasBeenPlayed && (
+                  <span className="absolute top-0 right-0 text-[8px] font-black uppercase tracking-widest text-gray-500 border border-white/10 rounded-full px-2 py-1">
+                    Played
+                  </span>
+                )}
+              </div>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 pointer-events-none transition group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
+                <button 
+                  onClick={() => onAddToQueue(t)} 
+                  className="w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
+                  title="Add to Queue"
+                >
+                  <span className="material-symbols-outlined text-sm">playlist_add</span>
+                </button>
+                <button onClick={() => onLoadToDeck(t, 'A')} className="w-7 h-7 rounded-lg bg-[#D0BCFF] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">A</button>
+                <button onClick={() => onLoadToDeck(t, 'B')} className="w-7 h-7 rounded-lg bg-[#F2B8B5] text-black text-[10px] font-black hover:scale-110 active:scale-90 transition-all">B</button>
+                <button onClick={() => { revokeLocalTrackUrls([t]); onRemove(t.id); }} className="w-7 h-7 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center hover:bg-red-500/30 transition-all" title="Remove"><span className="material-symbols-outlined text-sm">delete</span></button>
+              </div>
+              <div className="pointer-events-none absolute left-12 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-black/90 p-3 text-[9px] text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                <div className="font-bold text-[#D0BCFF] mb-1">Track Details</div>
+                <div className="space-y-1 text-gray-200">
+                  <div><span className="text-gray-500">Title:</span> {t.title || 'Unknown Title'}</div>
+                  <div><span className="text-gray-500">Artist:</span> {t.author || 'Unknown Artist'}</div>
+                  <div><span className="text-gray-500">Album:</span> {t.album || 'Unknown Album'}</div>
+                  <div><span className="text-gray-500">File:</span> {t.fileName || 'N/A'}</div>
+                </div>
               </div>
             </div>
-          </div>
-           );
+          );
         })}
       </div>
 
@@ -551,7 +554,7 @@ const LibraryPanel: React.FC<LibraryPanelProps> = ({
               placeholder="https://www.youtube.com/playlist?list=..." 
               className="w-full h-48 bg-black/60 border border-white/10 rounded-2xl p-4 text-[13px] text-white focus:outline-none mb-6 resize-none shadow-inner" 
             />
-            
+
             {importStatus && (
               <div className={`mb-4 px-4 py-3 rounded-xl text-center border transition-all ${importStatus.startsWith('Error') ? 'bg-red-500/10 border-red-500/30' : 'bg-[#D0BCFF]/10 border-[#D0BCFF]/30'}`}>
                 <p className={`text-[11px] font-black uppercase tracking-widest ${importStatus.startsWith('Error') ? 'text-red-400' : 'text-[#D0BCFF] animate-pulse'}`}>
