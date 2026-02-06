@@ -140,6 +140,44 @@ export interface Playlist {
   color?: string;
 }
 
+/**
+ * Player Control Interface
+ * Standardized interface for controlling both YouTube and local audio players
+ * Fixes P2: Type Safety Improvements
+ */
+export interface PlayerControl {
+  setVolume: (volume: number) => void;
+  playVideo: () => void;
+  pauseVideo: () => void;
+  seekTo: (time: number, allowSeekAhead?: boolean) => void;
+  setPlaybackRate: (rate: number) => void;
+  getCurrentTime?: () => number;
+  getDuration?: () => number;
+  getVideoData?: () => { title: string; author: string };
+}
+
+/**
+ * Auto DJ Error Types
+ * Defines all possible error conditions in Auto DJ state machine
+ */
+export type AutoDJError = 
+  | { code: 'DECK_NOT_READY'; deck: DeckId }
+  | { code: 'QUEUE_EMPTY' }
+  | { code: 'PRELOAD_FAILED'; videoId: string; reason: string }
+  | { code: 'STALE_TRANSACTION'; transactionId: string }
+  | { code: 'INVALID_TRANSITION'; from: string; to: string };
+
+/**
+ * YouTube API Error Types
+ * Defines specific error conditions when interacting with YouTube API
+ */
+export type YouTubeAPIError =
+  | { code: 'VIDEO_NOT_FOUND'; videoId: string }
+  | { code: 'EMBED_NOT_ALLOWED'; videoId: string }
+  | { code: 'NETWORK_ERROR'; message: string }
+  | { code: 'API_KEY_INVALID' }
+  | { code: 'QUOTA_EXCEEDED' };
+
 declare global {
   interface Window {
     onYouTubeIframeAPIReady: () => void;
