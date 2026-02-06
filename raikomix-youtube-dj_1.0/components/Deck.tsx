@@ -803,6 +803,22 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       ? clamp(state.currentTime / state.duration, 0, 1) * 100
       : 0;
 
+    const loopStartPct = state.loopActive && state.duration > 0
+      ? clamp(state.loopStart / state.duration, 0, 1) * 100
+      : null;
+
+    const loopEndPct = state.loopActive && state.duration > 0
+      ? clamp(state.loopEnd / state.duration, 0, 1) * 100
+      : null;
+
+    const loopLeftPct = (loopStartPct !== null && loopEndPct !== null)
+      ? Math.min(loopStartPct, loopEndPct)
+      : null;
+
+    const loopRightPct = (loopStartPct !== null && loopEndPct !== null)
+      ? Math.max(loopStartPct, loopEndPct)
+      : null;
+
     return (
       <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-2 flex flex-col gap-2">
         <audio
@@ -881,6 +897,89 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                     borderTop: '1px solid rgba(255,255,255,0.08)'
                   }}
                 >
+                  {/* Loop region */}
+                  {state.loopActive && loopLeftPct !== null && loopRightPct !== null && (
+                    <>
+                      <div
+                        className="absolute inset-y-0 pointer-events-none"
+                        style={{
+                          left: `${loopLeftPct}%`,
+                          width: `${Math.max(0, loopRightPct - loopLeftPct)}%`,
+                          background: 'rgba(34,197,94,0.16)'
+                        }}
+                      />
+                      <div
+                        className="absolute inset-y-0 pointer-events-none"
+                        style={{
+                          left: `${loopLeftPct}%`,
+                          width: '1px',
+                          background: 'rgba(34,197,94,0.95)',
+                          boxShadow: '0 0 10px rgba(34,197,94,0.35)'
+                        }}
+                      />
+                      <div
+                        className="absolute inset-y-0 pointer-events-none"
+                        style={{
+                          left: `${loopRightPct}%`,
+                          width: '1px',
+                          background: 'rgba(34,197,94,0.95)',
+                          boxShadow: '0 0 10px rgba(34,197,94,0.35)'
+                        }}
+                      />
+                    </>
+                  )}
+
+                  {/* Hot cue markers */}
+                  {state.duration > 0 && state.hotCues.map((cue, i) => {
+                    if (cue === null) return null;
+                    const pct = clamp(cue / state.duration, 0, 1) * 100;
+                    const cueColor = CUE_COLORS[i] || '#fff';
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        className="absolute top-0 bottom-0"
+                        style={{
+                          left: `${pct}%`,
+                          transform: 'translateX(-50%)',
+                          width: '12px',
+                          background: 'transparent',
+                          border: 'none',
+                          padding: 0,
+                          margin: 0,
+                          cursor: 'pointer'
+                        }}
+                        onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          seekToTime(cue);
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleHotCue(i, true);
+                        }}
+                        title={`Hot Cue ${i + 1} (Right-click to clear)`}
+                        aria-label={`Hot Cue ${i + 1}`}
+                      >
+                        <div
+                          className="absolute left-1/2"
+                          style={{
+                            top: '1px',
+                            transform: 'translateX(-50%)',
+                            width: '9px',
+                            height: '9px',
+                            background: cueColor,
+                            clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+                            boxShadow: `0 0 10px ${cueColor}55`
+                          }}
+                        />
+                      </button>
+                    );
+                  })}
+
+                  {/* Playhead */}
                   <div
                     className="absolute inset-y-0"
                     style={{
