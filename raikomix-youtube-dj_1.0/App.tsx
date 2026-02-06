@@ -67,6 +67,23 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
+// ========================================
+// TRANSACTION STATE MACHINE (P0-1 FIX)
+// ========================================
+
+/**
+ * Unified transaction state for Auto DJ transitions.
+ * Replaces separate preloadedTrackRef/earlyStartedTrackRef to prevent race conditions.
+ */
+interface TransitionTransaction {
+  id: string;                    // Unique transaction ID
+  state: 'PRELOADING' | 'READY' | 'PLAYING' | 'MIXING';
+  targetDeck: DeckId;           // Deck receiving new track
+  sourceDeck: DeckId;           // Deck currently playing
+  queueItem: QueueItem;         // Track being loaded
+  startedAt: number;            // Timestamp for timeout detection
+}
+
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'PERFORM' | 'LIBRARY'>('LIBRARY');
   const [libraryOpen, setLibraryOpen] = useState(true);
@@ -111,8 +128,10 @@ const App: React.FC = () => {
   const lastAutoDeckRef = useRef<DeckId>('B');
   const autoLoadDeckRef = useRef<DeckId | null>(null);
   const lastMixVideoRef = useRef<{ A?: string | null; B?: string | null }>({});
-  const preloadedTrackRef = useRef<{ deck: DeckId; itemId: string; videoId: string } | null>(null);
-  const earlyStartedTrackRef = useRef<{ deck: DeckId; videoId: string } | null>(null);
+  
+  // REPLACED: preloadedTrackRef, earlyStartedTrackRef → activeTransactionRef
+  const activeTransactionRef = useRef<TransitionTransaction | null>(null);
+  
   const manualPauseRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const prevPlayingRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const autoStopRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
@@ -390,8 +409,9 @@ const App: React.FC = () => {
   const applyEffectToTarget = (effect: EffectType | null) => {
     if (fxTarget === 'A') toggleEffect('A', effect);
     else if (fxTarget === 'B') toggleEffect('B', effect);
-    else if (fxTarget === 'PADS') togglePadEffect(effect);
-    else {
+    else if (fxTarget === 'PADS') {
+      togglePadEffect(effect);
+    } else {
       toggleEffect('A', effect);
       toggleEffect('B', effect);
     }
@@ -752,6 +772,19 @@ const App: React.FC = () => {
     if (state.isReady && state.title && state.videoId && state.sourceType === 'youtube') {
       setLibrary(prev => updateTrackMetadata(state.videoId, { title: state.title, author: state.author }, prev));
     }
+    
+    // AUTO DJ TRANSACTION: Advance transaction when deck becomes ready
+    const txn = activeTransactionRef.current;
+    if (txn && txn.targetDeck === id && txn.state === 'PRELOADING' && state.isReady && !state.playing) {
+      console.log(`[TXN ${txn.id}] Deck ${id} ready → advancing to READY state`);
+      txn.state = 'READY';
+    }
+    
+    // AUTO DJ TRANSACTION: Advance transaction when deck starts playing
+    if (txn && txn.targetDeck === id && txn.state === 'READY' && state.playing) {
+      console.log(`[TXN ${txn.id}] Deck ${id} playing → advancing to PLAYING state`);
+      txn.state = 'PLAYING';
+    }
   }, []);
 
   const handleLoadVideo = useCallback((
@@ -765,6 +798,13 @@ const App: React.FC = () => {
   ) => {
     const ref = deck === 'A' ? deckARef : deckBRef;
     if (ref.current) {
+      // AUTO DJ TRANSACTION: Cancel transaction if manual load to that deck
+      const txn = activeTransactionRef.current;
+      if (txn && txn.targetDeck === deck && txn.state !== 'MIXING') {
+        console.log(`[TXN ${txn.id}] Manual load to ${deck} → canceling transaction`);
+        activeTransactionRef.current = null;
+      }
+      
       if (mode === 'cue') {
         ref.current.cueVideo(url, sourceType, { title, author });
       } else {
@@ -815,6 +855,14 @@ const App: React.FC = () => {
 
   const startAutoMix = useCallback((fromDeck: DeckId, targetDeck: DeckId) => {
     if (mixInProgressRef.current) return;
+    
+    // AUTO DJ TRANSACTION: Advance to MIXING state
+    const txn = activeTransactionRef.current;
+    if (txn && txn.targetDeck === targetDeck && txn.state === 'PLAYING') {
+      console.log(`[TXN ${txn.id}] Starting crossfade → advancing to MIXING state`);
+      txn.state = 'MIXING';
+    }
+    
     mixInProgressRef.current = true;
     const fromValue = crossfader;
     const targetValue = targetDeck === 'A' ? -1 : 1;
@@ -831,6 +879,13 @@ const App: React.FC = () => {
         mixInProgressRef.current = false;
         mixAnimationRef.current = null;
         stopDeck(fromDeck);
+        
+        // AUTO DJ TRANSACTION: Complete transaction after crossfade
+        const completedTxn = activeTransactionRef.current;
+        if (completedTxn && completedTxn.targetDeck === targetDeck && completedTxn.state === 'MIXING') {
+          console.log(`[TXN ${completedTxn.id}] Crossfade complete → transaction finished`);
+          activeTransactionRef.current = null;
+        }
       }
     };
     mixAnimationRef.current = requestAnimationFrame(step);
@@ -845,33 +900,87 @@ const App: React.FC = () => {
     return nextItem;
   }, [queue, handleLoadVideo]);
 
-  const preloadNextQueueItem = useCallback((targetDeck: DeckId) => {
+  // ========================================
+  // TRANSACTION HELPER FUNCTIONS (P0-1 FIX)
+  // ========================================
+  
+  /**
+   * Start a new Auto DJ transition transaction.
+   * Replaces preloadNextQueueItem with atomic transaction lifecycle.
+   */
+  const startTransition = useCallback((targetDeck: DeckId, sourceDeck: DeckId): TransitionTransaction | null => {
     const nextItem = queue[0];
     if (!nextItem) {
-      console.warn('[PRELOAD] No queue item to preload');
+      console.warn('[TXN] No queue item to start transition');
       return null;
     }
-    const alreadyPreloaded = preloadedTrackRef.current;
-    if (alreadyPreloaded && alreadyPreloaded.itemId === nextItem.id && alreadyPreloaded.deck === targetDeck) {
-      console.log('[PRELOAD] Already preloaded, skipping');
-      return nextItem;
+    
+    // Cancel any existing transaction first
+    if (activeTransactionRef.current) {
+      console.warn(`[TXN] Canceling existing transaction ${activeTransactionRef.current.id}`);
+      activeTransactionRef.current = null;
     }
-    console.log(`[PRELOAD] Loading ${nextItem.title} to ${targetDeck} in CUE mode`);
-    console.log('[PRELOAD] Item:', {
-      id: nextItem.id,
-      videoId: nextItem.videoId,
-      url: nextItem.url,
-      sourceType: nextItem.sourceType
-    });
-    handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author, 'cue');
-    preloadedTrackRef.current = { deck: targetDeck, itemId: nextItem.id, videoId: nextItem.videoId };
-    console.log('[PRELOAD] Set preloadedTrackRef:', preloadedTrackRef.current);
-    return nextItem;
+    
+    const txnId = makeId();
+    const transaction: TransitionTransaction = {
+      id: txnId,
+      state: 'PRELOADING',
+      targetDeck,
+      sourceDeck,
+      queueItem: nextItem,
+      startedAt: Date.now()
+    };
+    
+    activeTransactionRef.current = transaction;
+    console.log(`[TXN ${txnId}] Started: ${nextItem.title} → ${targetDeck} (from ${sourceDeck})`);
+    
+    // Load track to target deck in CUE mode
+    handleLoadVideo(
+      nextItem.videoId,
+      nextItem.url,
+      targetDeck,
+      nextItem.sourceType || 'youtube',
+      nextItem.title,
+      nextItem.author,
+      'cue'
+    );
+    
+    return transaction;
   }, [queue, handleLoadVideo]);
-
-  const triggerDeckPlay = useCallback((deck: DeckId) => {
-    const ref = deck === 'A' ? deckARef : deckBRef;
-    setTimeout(() => ref.current?.togglePlay(), 0);
+  
+  /**
+   * Validate that transaction is still active and in expected state.
+   * Returns true if transaction is valid for the given deck and state.
+   */
+  const validateTransaction = useCallback((expectedDeck?: DeckId, expectedState?: TransitionTransaction['state']): boolean => {
+    const txn = activeTransactionRef.current;
+    if (!txn) return false;
+    
+    if (expectedDeck && txn.targetDeck !== expectedDeck) {
+      console.warn(`[TXN ${txn.id}] Validation failed: expected deck ${expectedDeck}, got ${txn.targetDeck}`);
+      return false;
+    }
+    
+    if (expectedState && txn.state !== expectedState) {
+      console.warn(`[TXN ${txn.id}] Validation failed: expected state ${expectedState}, got ${txn.state}`);
+      return false;
+    }
+    
+    return true;
+  }, []);
+  
+  /**
+   * Remove queue item for completed transaction.
+   */
+  const completeTransaction = useCallback((txnId: string) => {
+    const txn = activeTransactionRef.current;
+    if (!txn || txn.id !== txnId) {
+      console.warn(`[TXN] Cannot complete: transaction ${txnId} not active`);
+      return;
+    }
+    
+    console.log(`[TXN ${txnId}] Completing: removing queue item ${txn.queueItem.id}`);
+    setQueue(prev => prev.filter(item => item.id !== txn.queueItem.id));
   }, []);
 
   const queueAutoMix = useCallback((fromDeck: DeckId) => {
@@ -882,22 +991,36 @@ const App: React.FC = () => {
       startAutoMix(fromDeck, targetDeck);
       return;
     }
-    const preloaded = preloadedTrackRef.current;
-    const queuedItem = queue[0];
-    if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === targetDeck) {
-      setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
-      const pending = { deck: targetDeck, fromDeck, item: queuedItem };
+    
+    // AUTO DJ TRANSACTION: Use transaction if it's in READY or PLAYING state
+    const txn = activeTransactionRef.current;
+    if (txn && txn.targetDeck === targetDeck && (txn.state === 'READY' || txn.state === 'PLAYING')) {
+      console.log(`[TXN ${txn.id}] Queue mix: transaction in ${txn.state} state`);
+      
+      if (txn.state === 'READY') {
+        // Track is ready but not playing yet - start it
+        const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
+        setTimeout(() => targetRef.current?.togglePlay(), 0);
+      }
+      
+      // Complete the transaction (remove from queue)
+      completeTransaction(txn.id);
+      
+      // Set pending mix to trigger crossfade when ready
+      const pending = { deck: targetDeck, fromDeck, item: txn.queueItem };
       pendingMixRef.current = pending;
       setPendingMix(pending);
-      preloadedTrackRef.current = null;
       return;
     }
+    
+    // Fallback: no valid transaction, load directly
+    console.log('[AUTO DJ] No valid transaction, loading directly');
     const nextItem = loadNextQueueItem(targetDeck, 'load');
     if (!nextItem) return;
     const pending = { deck: targetDeck, fromDeck, item: nextItem };
     pendingMixRef.current = pending;
     setPendingMix(pending);
-  }, [deckAState, deckBState, queue, loadNextQueueItem, startAutoMix]);
+  }, [deckAState, deckBState, loadNextQueueItem, startAutoMix, completeTransaction]);
 
   const handleTrackEnd = useCallback((deckId: DeckId) => {
     if (!autoDjEnabled) return;
@@ -933,27 +1056,38 @@ const App: React.FC = () => {
     muteDeck, pitchDeck, resetEq
   });
 
+  // ========================================
+  // AUTO DJ MAIN LOOP (P0-1 REFACTORED)
+  // ========================================
+  
   useEffect(() => {
     if (!autoDjEnabled) return;
     const interval = setInterval(() => {
       if (mixInProgressRef.current || pendingMixRef.current || queue.length === 0) return;
       const deckAPlaying = deckAState?.playing || false;
       const deckBPlaying = deckBState?.playing || false;
-      console.log(`[AUTO DJ STATE] A.playing=${deckAPlaying} B.playing=${deckBPlaying} queue=${queue.length}`);
+
+      // CASE 1: No decks playing - start first track
       if (!deckAPlaying && !deckBPlaying) {
         if (manualPauseRef.current.A || manualPauseRef.current.B) return;
         if (autoLoadDeckRef.current) return;
+        
         const nextDeck = lastAutoDeckRef.current === 'A' ? 'B' : 'A';
-        const preloaded = preloadedTrackRef.current;
-        const queuedItem = queue[0];
-        if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === nextDeck) {
-          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
+        const txn = activeTransactionRef.current;
+        
+        // Check if we have a ready transaction for this deck
+        if (txn && txn.targetDeck === nextDeck && txn.state === 'READY') {
+          console.log(`[TXN ${txn.id}] No decks playing → starting ${nextDeck} with ready transaction`);
+          completeTransaction(txn.id);
           autoLoadDeckRef.current = nextDeck;
-          preloadedTrackRef.current = null;
           setCrossfader(nextDeck === 'A' ? -1 : 1);
-          triggerDeckPlay(nextDeck);
+          const targetRef = nextDeck === 'A' ? deckARef : deckBRef;
+          setTimeout(() => targetRef.current?.togglePlay(), 0);
           return;
         }
+        
+        // No transaction - load directly
+        console.log('[AUTO DJ] No decks playing → loading next track');
         const nextItem = loadNextQueueItem(nextDeck, 'load');
         if (!nextItem) {
           autoLoadDeckRef.current = null;
@@ -961,121 +1095,72 @@ const App: React.FC = () => {
         }
         autoLoadDeckRef.current = nextDeck;
         setCrossfader(nextDeck === 'A' ? -1 : 1);
-        triggerDeckPlay(nextDeck);
+        const targetRef = nextDeck === 'A' ? deckARef : deckBRef;
+        setTimeout(() => targetRef.current?.togglePlay(), 0);
         return;
       }
+
+      // CASE 2: One deck playing - manage transition
       const activeDeck = getActiveDeck();
       if (!activeDeck) return;
       const activeState = activeDeck === 'A' ? deckAState : deckBState;
       if (!activeState?.duration || !activeState.isReady) return;
       if (activeState.videoId && lastMixVideoRef.current[activeDeck] === activeState.videoId) return;
+
       const remaining = activeState.duration - activeState.currentTime;
       const leadTime = Math.min(Math.max(1, mixLeadSeconds), activeState.duration);
       const preloadTime = Math.min(activeState.duration, Math.max(leadTime + 6, leadTime * 2));
       const playStartTime = leadTime + Math.max(2, mixDurationSeconds);
       const targetDeck = activeDeck === 'A' ? 'B' : 'A';
       const targetState = targetDeck === 'A' ? deckAState : deckBState;
-      if (remaining <= preloadTime + 5) {
-        console.group(`⏰ [AUTO DJ] ${remaining.toFixed(1)}s remaining on ${activeDeck}`);
-        console.log('🎯 Target Deck:', targetDeck);
-        console.log('📊 Preload Time:', preloadTime);
-        console.log('✅ Condition 1: remaining <= preloadTime?', remaining, '<=', preloadTime, '=', remaining <= preloadTime);
-        console.log('✅ Condition 2: queue.length > 0?', queue.length > 0);
-        console.log('✅ Condition 3: !targetState?.playing?', !targetState?.playing, '(targetState.playing=' + targetState?.playing + ')');
-        console.log('✅ Condition 4: !pendingMixRef.current?', !pendingMixRef.current);
-        console.log('📦 Queue[0]:', queue[0]?.title);
-        console.log('🎛️ Target State:', targetState);
-        console.log('💾 Preloaded:', preloadedTrackRef.current);
-        console.groupEnd();
-      }
-      if (remaining <= preloadTime && queue.length > 0 && !targetState?.playing && !pendingMixRef.current) {
-        console.log(`🎵🎵🎵 [AUTO DJ] PRELOAD TRIGGERED → ${targetDeck}`);
-        preloadNextQueueItem(targetDeck);
-      } else if (remaining <= preloadTime && queue.length > 0) {
-        console.warn(`❌ [AUTO DJ] PRELOAD BLOCKED! targetPlaying=${targetState?.playing} pending=${!!pendingMixRef.current}`);
-      }
 
-      // Start next track playing BEFORE crossfade begins
-      if (remaining <= playStartTime && remaining > leadTime && queue.length > 0 && !targetState?.playing && !pendingMixRef.current) {
-        const alreadyStarted = earlyStartedTrackRef.current;
-        const preloaded = preloadedTrackRef.current;
-        const queuedItem = queue[0];
-
-        // Only start once per track
-        if (alreadyStarted?.deck === targetDeck && alreadyStarted?.videoId === activeState.videoId) {
-          // Already started this track - skip
-          console.log(`[Auto DJ] Already started ${targetDeck} for this track`);
-        } else if (preloaded && queuedItem && preloaded.itemId === queuedItem.id && preloaded.deck === targetDeck) {
-          // CASE 1: Preloaded track ready - start playing it NOW
-          console.log(`[Auto DJ] Starting ${targetDeck} early (preloaded) at ${remaining.toFixed(1)}s remaining`);
-
-          // Remove from queue
-          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
-
-          // Mark as started
-          earlyStartedTrackRef.current = { deck: targetDeck, videoId: activeState.videoId };
-
-          // Clear preload ref
-          preloadedTrackRef.current = null;
-
-          // Start playing
-          const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
-          setTimeout(() => {
-            targetRef.current?.togglePlay();
-          }, 150);
-        } else if (queuedItem && !preloaded) {
-          // CASE 2: FAILSAFE - No preload exists, load and play immediately
-          console.log(`[Auto DJ] FAILSAFE: Loading ${targetDeck} directly (no preload) at ${remaining.toFixed(1)}s remaining`);
-
-          // Load track to target deck
-          handleLoadVideo(
-            queuedItem.videoId,
-            queuedItem.url,
-            targetDeck,
-            queuedItem.sourceType || 'youtube',
-            queuedItem.title,
-            queuedItem.author,
-            'load'  // Use 'load' mode, not 'cue'
-          );
-
-          // Remove from queue
-          setQueue(prev => prev.filter(item => item.id !== queuedItem.id));
-
-          // Mark as started
-          earlyStartedTrackRef.current = { deck: targetDeck, videoId: activeState.videoId };
-
-          // Clear any stale preload
-          preloadedTrackRef.current = null;
-
-          // Start playing after a short delay for loading
-          const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
-          setTimeout(() => {
-            console.log(`[Auto DJ] Starting ${targetDeck} after failsafe load`);
-            targetRef.current?.togglePlay();
-          }, 500);
+      // STAGE 1: PRELOAD (at preloadTime seconds remaining)
+      if (remaining <= preloadTime && !targetState?.playing) {
+        const txn = activeTransactionRef.current;
+        
+        // Only start new transaction if no transaction exists
+        if (!txn) {
+          console.log(`[AUTO DJ] ${remaining.toFixed(1)}s remaining → starting preload to ${targetDeck}`);
+          startTransition(targetDeck, activeDeck);
         }
       }
+
+      // STAGE 2: START PLAYING (at playStartTime seconds remaining)
+      if (remaining <= playStartTime && remaining > leadTime && !targetState?.playing) {
+        const txn = activeTransactionRef.current;
+        
+        if (txn && txn.targetDeck === targetDeck && txn.state === 'READY') {
+          console.log(`[TXN ${txn.id}] ${remaining.toFixed(1)}s remaining → starting playback early`);
+          const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
+          setTimeout(() => targetRef.current?.togglePlay(), 150);
+        } else if (txn && txn.targetDeck === targetDeck && txn.state === 'PRELOADING') {
+          console.log(`[TXN ${txn.id}] Still preloading at ${remaining.toFixed(1)}s - waiting for READY state`);
+        } else if (!txn) {
+          console.warn(`[AUTO DJ] FAILSAFE: No transaction at ${remaining.toFixed(1)}s - loading directly`);
+          const nextItem = loadNextQueueItem(targetDeck, 'load');
+          if (nextItem) {
+            const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
+            setTimeout(() => targetRef.current?.togglePlay(), 500);
+          }
+        }
+      }
+
+      // STAGE 3: START CROSSFADE (at leadTime seconds remaining)
       if (remaining <= leadTime) {
         lastMixVideoRef.current[activeDeck] = activeState.videoId;
-
-        // Check if we already started the target deck early
-        const startedEarly = earlyStartedTrackRef.current?.deck === targetDeck;
-
-        if (targetState?.playing || startedEarly) {
-          // Target deck is already playing - just start crossfade
-          console.log(`Auto DJ: Starting crossfade at ${remaining.toFixed(1)}s remaining`);
+        
+        // Check if target deck is already playing (from early start)
+        if (targetState?.playing) {
+          console.log(`[AUTO DJ] ${remaining.toFixed(1)}s remaining → starting crossfade (target already playing)`);
           startAutoMix(activeDeck, targetDeck);
-
-          // Clear early start ref
-          earlyStartedTrackRef.current = null;
         } else {
-          // Target deck not playing - use pendingMix flow
+          console.log(`[AUTO DJ] ${remaining.toFixed(1)}s remaining → queueing mix`);
           queueAutoMix(activeDeck);
         }
       }
     }, 250);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, triggerDeckPlay, queueAutoMix, preloadNextQueueItem, handleLoadVideo, startAutoMix]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction]);
 
   useEffect(() => {
     if (autoDjEnabled) return;
@@ -1083,18 +1168,20 @@ const App: React.FC = () => {
     autoLoadDeckRef.current = null;
     setPendingMix(null);
     lastMixVideoRef.current = {};
-    preloadedTrackRef.current = null;
+    activeTransactionRef.current = null; // Clear transaction when Auto DJ disabled
     manualPauseRef.current = { A: false, B: false };
     prevPlayingRef.current = { A: false, B: false };
     autoStopRef.current = { A: false, B: false };
-    earlyStartedTrackRef.current = null;
   }, [autoDjEnabled]);
 
   useEffect(() => {
-    if (!preloadedTrackRef.current) return;
+    // AUTO DJ TRANSACTION: Invalidate transaction if queue changes
+    const txn = activeTransactionRef.current;
+    if (!txn) return;
     const queuedItem = queue[0];
-    if (!queuedItem || queuedItem.id !== preloadedTrackRef.current.itemId) {
-      preloadedTrackRef.current = null;
+    if (!queuedItem || queuedItem.id !== txn.queueItem.id) {
+      console.log(`[TXN ${txn.id}] Queue changed → canceling transaction`);
+      activeTransactionRef.current = null;
     }
   }, [queue]);
 
@@ -1118,7 +1205,7 @@ const App: React.FC = () => {
     setPendingMix(null);
   }, [pendingMix, deckAState, deckBState, startAutoMix]);
 
-useEffect(() => {
+  useEffect(() => {
     if (!autoDjEnabled || !autoLoadDeckRef.current) return;
     const autoDeck = autoLoadDeckRef.current;
     const targetState = autoDeck === 'A' ? deckAState : deckBState;
