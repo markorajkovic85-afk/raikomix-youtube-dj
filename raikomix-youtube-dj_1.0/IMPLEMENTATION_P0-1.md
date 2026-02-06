@@ -1,81 +1,141 @@
-# P0-1: Auto DJ Track Transition Failures - Implementation Progress
+# P0-1: Auto DJ Track Transition Failures - Implementation Plan
 
-## Status: IN PROGRESS
-**Date Started:** February 7, 2026, 12:30 AM CET  
-**Branch:** fix/p0-1-transaction-state-machine  
-**Developer:** RaikoMix Development Team (via Perplexity AI)
+## Status: ✅ IN PROGRESS - Phase 2
 
-## Overview
-Implementing transaction-based state machine to fix ~20% Auto DJ transition failure rate.
+## Root Cause Analysis
 
-## Root Cause
-Three unsynchronized refs cause race conditions:
-- `preloadedTrackRef` - assumes cued track is still valid
-- `earlyStartedTrackRef` - doesn't validate playback success  
-- `pendingMixRef` - cleared separately from other refs
+### Problem
+The Auto DJ system uses **three separate refs** without synchronization causing race conditions:
 
-## Solution
-Replace with single `activeTransactionRef` using atomic state machine:
+1. **`preloadedTrackRef`** (line 116) - Assumes cued track is still valid
+2. **`earlyStartedTrackRef`** (line 118) - Never validates if playback succeeded  
+3. **`pendingMixRef`** (line 112) - Cleared separately causing desync
+
+### Critical Failure Scenarios
+
+**Scenario 1: Preload Invalidation**
 ```
-preload → ready → playing → crossfading → complete
+1. Track A → 15s remaining → Preload Track B  
+2. User manually loads Track C to Deck B  
+3. Track A → 8s remaining → System assumes Track B still preloaded  
+4. System starts playback on Deck B → Track C plays instead  
+5. Queue desync: Track B removed but Track C playing
 ```
 
-## Implementation Checklist
+**Scenario 2: Early Start Failure**
+```
+1. Track A → 10s remaining → Start Track B early  
+2. Track B fails to load (network issue, YouTube block)  
+3. earlyStartedTrackRef marks as "started" anyway  
+4. Track A → 6s remaining → System skips crossfade (thinks B is playing)  
+5. Result: Dead air when Track A ends
+```
 
-### Phase 1: Type Definitions
-- [x] Add `AutoDJStage` type to types.ts
-- [x] Add `AutoDJTransaction` interface to types.ts
+## Solution: Transaction State Machine
 
-### Phase 2: Ref Replacement (App.tsx lines 114-118)
-- [ ] Remove `preloadedTrackRef`
-- [ ] Remove `earlyStartedTrackRef`
-- [ ] Add `activeTransactionRef`
+### Design Principles
+- **Single source of truth**: One ref tracks entire transition lifecycle
+- **Atomic operations**: Start/complete/cancel as single units
+- **Validation gates**: Check state before every critical action
+- **Explicit cleanup**: Clear state only after confirmed success/failure
 
-### Phase 3: Transaction Functions (App.tsx after line 580)
-- [ ] Implement `createTransaction()`
-- [ ] Implement `validateStage()` 
-- [ ] Implement `advanceTransaction()` with retry logic
-- [ ] Implement `clearTransaction()`
+### Implementation
 
-### Phase 4: Auto DJ Refactor (App.tsx lines 843-912)
-- [ ] Refactor preload logic to use transactions
-- [ ] Refactor early start logic (lines 843-862)
-- [ ] Refactor crossfade trigger (lines 883-912)
-- [ ] Remove all old ref references
+#### 1. State Machine Structure
+```typescript
+interface TransitionTransaction {
+  id: string;                    // Unique transaction ID
+  state: 'PRELOADING' | 'READY' | 'PLAYING' | 'MIXING';
+  targetDeck: DeckId;           // Deck receiving new track
+  sourceDeck: DeckId;           // Deck currently playing
+  queueItem: QueueItem;         // Track being loaded
+  startedAt: number;            // Timestamp for timeout detection
+}
+```
 
-### Phase 5: State Monitoring (New useEffect)
-- [ ] Add transaction state advancement hook
-- [ ] Monitor deck state changes
-- [ ] Auto-advance transaction stages
+#### 2. Transaction Lifecycle
+```
+PRELOADING → Track cued to target deck
+   ↓
+READY → Track confirmed loaded and ready
+   ↓  
+PLAYING → Track started on target deck
+   ↓
+MIXING → Crossfade in progress
+   ↓
+null → Transaction complete, cleanup
+```
 
-### Phase 6: Cleanup
-- [ ] Update autoDjEnabled useEffect
-- [ ] Ensure transaction cleared on Auto DJ disable
+#### 3. Helper Functions
+```typescript
+// Start new transaction (replaces preloadNextQueueItem)
+function startTransition(targetDeck, queueItem): string
 
-### Phase 7: Testing
-- [ ] 100 consecutive Auto DJ transitions (0 failures)
-- [ ] Manual deck loading during Auto DJ
-- [ ] Network failure simulation
-- [ ] User pause/resume during transitions
-- [ ] Empty queue handling
-- [ ] Rapid enable/disable Auto DJ toggle
+// Validate transaction still valid
+function validateTransaction(id): boolean
 
-## Expected Outcomes
-- ✅ 100% transition success rate (vs. current 80%)
-- ✅ Proper retry logic on failures
-- ✅ No stale refs after any failure scenario
-- ✅ Atomic state management prevents race conditions
+// Advance transaction to next state
+function advanceTransaction(id, newState): boolean
 
-## Files Modified
-1. `types.ts` - ✅ COMPLETE
-2. `App.tsx` - ⏳ IN PROGRESS
+// Cancel and cleanup transaction
+function cancelTransaction(id): void
+```
 
-## Next Steps
-1. Implement transaction helper functions
-2. Refactor Auto DJ useEffect
-3. Add state monitoring hook
-4. Run 100-transition validation test
+## Implementation Steps
 
-## Reference
-- Notion Bug Tracker: https://www.notion.so/2ff94f2b779981c3afd3f3402d5b5d93
-- GitHub Repo: https://github.com/markorajkovic85-afk/raikomix-youtube-dj
+### ✅ Phase 1: Setup (COMPLETED)
+- [x] Create feature branch `fix/p0-1-transaction-state-machine`
+- [x] Create IMPLEMENTATION_P0-1.md tracking document
+- [x] Update Notion bug tracker with analysis
+- [x] First commit pushed
+
+### 🔄 Phase 2: Refactor Auto DJ Logic (IN PROGRESS)
+- [ ] Replace `preloadedTrackRef`, `earlyStartedTrackRef` with `activeTransactionRef`
+- [ ] Implement transaction helper functions
+- [ ] Refactor Auto DJ interval logic (lines 843-912)
+- [ ] Add validation checks before state transitions
+- [ ] Commit changes
+
+### Phase 3: Testing & Validation
+- [ ] Test Scenario 1: Manual deck override during preload
+- [ ] Test Scenario 2: Network failure during early start
+- [ ] Test Scenario 3: Rapid queue changes
+- [ ] Test Scenario 4: Normal happy path (5+ transitions)
+- [ ] Document test results
+
+### Phase 4: Integration & Documentation
+- [ ] Update Notion with test results
+- [ ] Create pull request with detailed description
+- [ ] Add inline code comments explaining state machine
+- [ ] Update user-facing documentation if needed
+
+## Code Changes Required
+
+### Files to Modify
+1. **App.tsx** (primary changes)
+   - Lines 116-118: Remove old refs, add `activeTransactionRef`
+   - Lines 843-912: Complete Auto DJ logic refactor
+   - Add transaction helper functions after line 840
+
+### Backward Compatibility
+- No API changes visible to users
+- Existing queue/library data unaffected
+- Settings preserved
+
+## Success Criteria
+- [ ] Zero race conditions in 100+ consecutive Auto DJ transitions
+- [ ] Manual deck loads properly cancel pending transitions  
+- [ ] Network failures don't cause dead air
+- [ ] Queue remains synchronized with actual playback
+- [ ] No performance regression (transition timing within 200ms variance)
+
+## Rollback Plan
+If critical issues found:
+1. Revert to `main` branch
+2. Keep bug P0-1 in "In Progress" status
+3. Analyze failure mode
+4. Adjust implementation plan
+
+---
+
+**Next Action**: Begin Phase 2 refactoring of Auto DJ logic
