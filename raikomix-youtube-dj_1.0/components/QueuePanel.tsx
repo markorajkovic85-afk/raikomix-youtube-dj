@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QueueItem, DeckId } from '../types';
-import { exportQueue } from '../utils/queueStorage';
+import { exportQueue, exportQueueAsText } from '../utils/queueStorage';
 
 interface QueuePanelProps {
   queue: QueueItem[];
@@ -68,13 +68,20 @@ const QueuePanel: React.FC<QueuePanelProps> = ({
       <div className="flex items-center justify-between px-2">
         <h3 className="text-xs font-black uppercase tracking-widest text-gray-500">Play Queue ({queue.length})</h3>
         {queue.length > 0 && (
-         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => exportQueue(queue)}
               className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white"
               title="Export Queue JSON"
             >
               <span className="material-symbols-outlined text-sm">download</span>
+            </button>
+            <button
+              onClick={() => exportQueueAsText(queue)}
+              className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:text-white"
+              title="Export Queue TXT (Artist - Track Name)"
+            >
+              <span className="material-symbols-outlined text-sm">description</span>
             </button>
             <button 
               onClick={onClear}
