@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { PlayerState, DeckId, TrackSourceType, EffectType, PlayerControl, AutoDJError, YouTubeAPIError } from '../types';
-import DeckAudioEngine from '../utils/audioEngine';
+import { DeckAudioEngine } from '../utils/audioEngine';
 
 export interface DeckProps {
   id: DeckId;
