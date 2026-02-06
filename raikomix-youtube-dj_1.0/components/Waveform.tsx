@@ -291,7 +291,8 @@ const Waveform: React.FC<WaveformProps> = ({
     if (n <= 0) return;
 
     const barWidth = width / n;
-    const baseLineWidth = Math.max(1, barWidth * 0.7);
+    // Slightly wider bars for better readability (still leaves gaps).
+    const baseLineWidth = Math.max(1.2, barWidth * 0.85);
 
     const brightShadowBlur = 3;
     const safePad = Math.ceil(baseLineWidth / 2 + brightShadowBlur + 1);
@@ -408,7 +409,7 @@ const Waveform: React.FC<WaveformProps> = ({
 
     const centerY = height / 2;
     const barWidth = width / visiblePeaks.length;
-    const baseLineWidth = Math.max(1, barWidth * 0.7);
+    const baseLineWidth = Math.max(1.2, barWidth * 0.85);
 
     ctx.lineCap = 'round';
     ctx.lineWidth = baseLineWidth;
