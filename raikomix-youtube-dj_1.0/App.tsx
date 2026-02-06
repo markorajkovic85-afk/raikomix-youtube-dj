@@ -1289,7 +1289,7 @@ useEffect(() => {
                 } as React.CSSProperties}
               >
                 <div className="central-stage__panel" ref={centralStagePanelRef}>
-                  <div className="perform-stage__deck central-stage__deck">
+                  <div className="perform-stage__deck central-stage__deck self-start">
                     <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
                   </div>
                   <Mixer
@@ -1321,7 +1321,7 @@ useEffect(() => {
                     onDeckAEqChange={(k, v) => setDeckAEq(p => ({...p, [k]: v}))}
                     onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))}
                   />
-                  <div className="perform-stage__deck central-stage__deck">
+                  <div className="perform-stage__deck central-stage__deck self-start">
                     <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} onTrackEnd={() => handleTrackEnd('B')} />
                   </div>
                 </div>
