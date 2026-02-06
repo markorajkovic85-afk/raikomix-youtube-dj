@@ -128,6 +128,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const tempoPointerIdRef = useRef<number | null>(null);
     const tempoDraggingRef = useRef(false);
 
+    // Video seek line pointer handling (thin scrub strip)
+    const videoSeekRef = useRef<HTMLDivElement>(null);
+    const videoSeekPointerIdRef = useRef<number | null>(null);
+    const videoSeekDraggingRef = useRef(false);
+
     const containerId = `yt-player-${id}`;
 
     const formatTime = useCallback((timeSeconds: number) => {
@@ -352,6 +357,56 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       tempoPointerIdRef.current = null;
       if (tempoContainerRef.current?.hasPointerCapture(event.pointerId)) {
         tempoContainerRef.current.releasePointerCapture(event.pointerId);
+      }
+    }, []);
+
+    const seekToTime = useCallback((time: number) => {
+      if (!state.duration || !Number.isFinite(time)) return;
+      const t = clamp(time, 0, state.duration);
+      if (state.sourceType === 'youtube') playerRef.current?.seekTo(t, true);
+      else if (localAudioRef.current) localAudioRef.current.currentTime = t;
+      // Optimistic update so the playhead feels responsive
+      setState(s => ({ ...s, currentTime: t }));
+    }, [state.duration, state.sourceType]);
+
+    const getSeekTimeFromPointer = useCallback((clientX: number) => {
+      if (!videoSeekRef.current || !state.duration) return null;
+      const rect = videoSeekRef.current.getBoundingClientRect();
+      const ratio = (clientX - rect.left) / rect.width;
+      const clampedRatio = clamp(ratio, 0, 1);
+      return clampedRatio * state.duration;
+    }, [state.duration]);
+
+    const handleVideoSeekPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      if (!videoSeekRef.current || !state.duration) return;
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      videoSeekRef.current.setPointerCapture(event.pointerId);
+      videoSeekPointerIdRef.current = event.pointerId;
+      videoSeekDraggingRef.current = true;
+
+      const time = getSeekTimeFromPointer(event.clientX);
+      if (time !== null) seekToTime(time);
+    }, [getSeekTimeFromPointer, seekToTime, state.duration]);
+
+    const handleVideoSeekPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      if (!videoSeekDraggingRef.current) return;
+      if (videoSeekPointerIdRef.current !== event.pointerId) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const time = getSeekTimeFromPointer(event.clientX);
+      if (time !== null) seekToTime(time);
+    }, [getSeekTimeFromPointer, seekToTime]);
+
+    const handleVideoSeekPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      if (videoSeekPointerIdRef.current !== event.pointerId) return;
+      videoSeekDraggingRef.current = false;
+      videoSeekPointerIdRef.current = null;
+      if (videoSeekRef.current?.hasPointerCapture(event.pointerId)) {
+        videoSeekRef.current.releasePointerCapture(event.pointerId);
       }
     }, []);
 
@@ -742,7 +797,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
     const canShowVideo = state.sourceType === 'youtube';
     const showVideo = visualMode === 'video' && canShowVideo;
-    const transportHeightPx = 56;
+    const transportHeightPx = 12;
+
+    const playheadPct = state.duration > 0
+      ? clamp(state.currentTime / state.duration, 0, 1) * 100
+      : 0;
 
     return (
       <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-2 flex flex-col gap-2">
@@ -774,7 +833,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               <div className="deck-video-overlay deck-video-glitch" />
               <div className="deck-video-overlay deck-video-vignette" />
 
-              {/* Interaction shield: catches mouse/touch so YT never receives input (leave transport strip free) */}
+              {/* Interaction shield: catches mouse/touch so YT never receives input (leave thin seek line free) */}
               {showVideo && (
                 <div
                   className="deck-video-overlay deck-video-interaction-shield"
@@ -798,40 +857,39 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               )}
             </div>
 
-            {/* Waveform (full-height in wave mode; bottom transport strip in video mode) */}
+            {/* Waveform (full-height in wave mode; thin seek line in video mode) */}
             {showVideo ? (
               <div
-                className="absolute left-0 right-0 bottom-0 z-50 pointer-events-auto"
-                style={{ height: `${transportHeightPx}px` }}
+                ref={videoSeekRef}
+                className="absolute left-0 right-0 bottom-0 z-50 touch-none select-none"
+                style={{ height: `${transportHeightPx}px`, cursor: 'ew-resize' }}
+                onPointerDown={handleVideoSeekPointerDown}
+                onPointerMove={handleVideoSeekPointerMove}
+                onPointerUp={handleVideoSeekPointerUp}
+                onPointerCancel={handleVideoSeekPointerUp}
+                title="Scrub / Seek"
+                aria-label="Scrub / Seek"
+                role="slider"
+                aria-valuemin={0}
+                aria-valuemax={state.duration || 0}
+                aria-valuenow={state.currentTime || 0}
               >
-                <div className="h-full bg-black/40 backdrop-blur-sm border-t border-white/10">
-                  <Waveform
-                    isPlaying={state.playing}
-                    volume={state.volume * (0.5 + state.eqLow * 0.5)}
-                    color={color}
-                    playbackRate={state.playbackRate}
-                    currentTime={state.currentTime}
-                    duration={state.duration}
-                    waveform={state.waveform}
-                    peaks={state.waveformPeaks}
-                    sourceType={state.sourceType}
-                    hotCues={state.hotCues}
-                    cueColors={CUE_COLORS}
-                    eq={{ low: state.eqLow, mid: state.eqMid, high: state.eqHigh }}
-                    loop={{
-                      active: state.loopActive,
-                      start: state.loopStart,
-                      end: state.loopEnd
+                <div
+                  className="relative w-full h-full"
+                  style={{
+                    background: 'rgba(0,0,0,0.15)',
+                    borderTop: '1px solid rgba(255,255,255,0.08)'
+                  }}
+                >
+                  <div
+                    className="absolute inset-y-0"
+                    style={{
+                      left: `${playheadPct}%`,
+                      width: '2px',
+                      transform: 'translateX(-1px)',
+                      background: color,
+                      boxShadow: `0 0 10px ${color}88`
                     }}
-                    onSeek={(time) => {
-                      if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
-                      else if (localAudioRef.current) localAudioRef.current.currentTime = time;
-                    }}
-                    timeLabel={showRemaining
-                      ? `-${formatTime(state.duration - state.currentTime)}`
-                      : formatTime(state.currentTime)}
-                    onTimeToggle={() => setShowRemaining(prev => !prev)}
-                    minHeightPx={transportHeightPx}
                   />
                 </div>
               </div>
