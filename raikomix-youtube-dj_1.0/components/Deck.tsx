@@ -103,6 +103,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
     const playerRef = useRef<any>(null);
     const localAudioRef = useRef<HTMLAudioElement>(null);
+    const lastYoutubeLoadModeRef = useRef<'load' | 'cue'>('load');
 
     // Tempo (horizontal) pointer handling
     const tempoContainerRef = useRef<HTMLDivElement>(null);
@@ -388,22 +389,29 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       }
     };
 
-    const updateMetadata = useCallback((player: any) => {
+    const updateMetadata = useCallback((
+      player: any,
+      options?: { markReady?: boolean; analyze?: boolean }
+    ) => {
       if (!player) return;
       const data = player.getVideoData ? player.getVideoData() : {};
       const { title, author } = parseYouTubeTitle(data.title || 'Unknown Track', data.author || 'YouTube Stream');
       const initialBpm = extractBPMFromTitle(data.title || '') || 120;
+      const markReady = options?.markReady ?? true;
+      const shouldAnalyze = options?.analyze ?? true;
 
       setState(s => ({
         ...s,
-        isReady: true,
+        isReady: markReady,
         duration: player.getDuration() || 0,
         title,
         author,
         bpm: initialBpm
       }));
 
-      analyzeTrackMetadata(title, author);
+      if (markReady && shouldAnalyze) {
+        analyzeTrackMetadata(title, author);
+      }
     }, []);
 
     const handleToggleLoop = useCallback((beats: number = 4) => {
@@ -460,19 +468,21 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     }, [state.playing, state.sourceType]);
 
     const initPlayer = useCallback((videoId: string, loadMode: 'load' | 'cue' = 'load') => {
+      lastYoutubeLoadModeRef.current = loadMode;
+
       if (!window.YT || !window.YT.Player) {
         setTimeout(() => initPlayer(videoId, loadMode), 500);
         return;
       }
 
+      // NOTE: We always "cue" the track to ensure deterministic silent preload.
+      // Playback is controlled only via togglePlay().
       if (playerRef.current) {
         try {
-          // Reset state for existing player to avoid GUI freeze/glitch
-          // IMPORTANT: Keep isReady=true for cue mode so Auto DJ can trigger playback
           setState(s => ({
             ...s,
             videoId,
-            isReady: loadMode === 'cue' ? true : false,
+            isReady: false,
             sourceType: 'youtube',
             playbackRate: 1.0,
             playing: false,
@@ -481,12 +491,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             waveform: undefined,
             waveformPeaks: undefined
           }));
-          if (loadMode === 'cue') {
-            playerRef.current.cueVideoById(videoId);
-          } else {
-            playerRef.current.loadVideoById(videoId);
-          }
-          setIsLoading(loadMode !== 'cue');
+          playerRef.current.cueVideoById(videoId);
+          setIsLoading(loadMode === 'load');
         } catch (e) {
           setIsLoading(false);
         }
@@ -499,7 +505,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         events: {
           onReady: (event: any) => {
             const p = event.target;
-            updateMetadata(p);
             onPlayerReady({
               setVolume: (v: number) => p.setVolume(v),
               playVideo: () => p.playVideo(),
@@ -507,15 +512,39 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               seekTo: (t: number) => p.seekTo(t, true),
               setPlaybackRate: (r: number) => p.setPlaybackRate(r)
             });
-            setIsLoading(false);
+
+            setState(s => ({
+              ...s,
+              videoId,
+              isReady: false,
+              sourceType: 'youtube',
+              playing: false,
+              currentTime: 0
+            }));
+
+            try {
+              p.cueVideoById(videoId);
+            } catch (e) { }
+
+            setIsLoading(loadMode === 'load');
           },
           onStateChange: (event: any) => {
             const playerState = event.data;
             setState(s => ({ ...s, playing: playerState === window.YT.PlayerState.PLAYING }));
 
-            if (playerState === window.YT.PlayerState.CUED || playerState === window.YT.PlayerState.PLAYING) {
-              updateMetadata(event.target);
-              event.target.setPlaybackRate(state.playbackRate);
+            if (playerState === window.YT.PlayerState.CUED) {
+              updateMetadata(event.target, {
+                markReady: true,
+                analyze: lastYoutubeLoadModeRef.current === 'load'
+              });
+              try { event.target.pauseVideo?.(); } catch (e) { }
+              try { event.target.setPlaybackRate(state.playbackRate); } catch (e) { }
+              setIsLoading(false);
+            }
+
+            if (playerState === window.YT.PlayerState.PLAYING) {
+              updateMetadata(event.target, { markReady: true, analyze: true });
+              try { event.target.setPlaybackRate(state.playbackRate); } catch (e) { }
               setIsLoading(false);
             }
 
@@ -536,7 +565,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       console.log(`[Deck ${id}] loadLocalFile called:`, { url, loadMode, metadata });
       // Only init if not already done
       initAudioEngine();
-      setIsLoading(loadMode !== 'cue');
+      setIsLoading(loadMode === 'load');
 
       // Pause any existing YT stream (don't trust state.sourceType here; it can be stale)
       if (playerRef.current) {
@@ -556,6 +585,12 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
         const onLoaded = () => {
           console.log(`[Deck ${id}] loadedmetadata fired! Duration:`, localAudioRef.current?.duration);
+
+          if (loadMode === 'cue' && localAudioRef.current) {
+            try { localAudioRef.current.pause(); } catch (e) { }
+            try { localAudioRef.current.currentTime = 0; } catch (e) { }
+          }
+
           setState(s => ({
             ...s,
             isReady: true,
