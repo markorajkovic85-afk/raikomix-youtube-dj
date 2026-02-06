@@ -25,6 +25,27 @@ export interface WaveformData {
 
 export type DeckId = 'A' | 'B';
 export type CrossfaderCurve = 'SMOOTH' | 'CUT' | 'DIP';
+
+// Auto DJ Transaction State Machine
+export type AutoDJStage = 
+  | 'preload'      // Track cued on target deck
+  | 'ready'        // Deck reports isReady=true
+  | 'playing'      // Deck confirmed playing
+  | 'crossfading'  // Crossfade in progress
+  | 'complete';    // Transition finished
+
+export interface AutoDJTransaction {
+  id: string;                    // Unique transaction ID (timestamp-based)
+  targetDeck: DeckId;             // 'A' or 'B'
+  sourceDeck: DeckId;             // Deck we're mixing from
+  queueItem: QueueItem;           // Track being loaded
+  stage: AutoDJStage;             // Current stage
+  timestamp: number;              // Transaction start time (ms)
+  videoId: string;                // Expected video ID
+  retryCount: number;             // Failed attempt counter (max 3)
+  stageTimestamps: Partial<Record<AutoDJStage, number>>; // Stage progression tracking
+}
+
 export type EffectType =
   | 'ECHO'
   | 'DELAY'
