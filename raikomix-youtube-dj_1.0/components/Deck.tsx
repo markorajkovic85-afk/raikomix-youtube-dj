@@ -742,6 +742,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
     const canShowVideo = state.sourceType === 'youtube';
     const showVideo = visualMode === 'video' && canShowVideo;
+    const transportHeightPx = 56;
 
     return (
       <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-2 flex flex-col gap-2">
@@ -758,50 +759,114 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
         {/* Visual Stage (Waveform + optional Artistic Video overlay) */}
         <div className="w-full min-w-0 flex-1 min-h-[clamp(56px,10vh,120px)]">
-          <div className="deck-visual-stage">
+          <div className="deck-visual-stage relative">
             <div
               className={`deck-video-shell ${showVideo ? 'deck-video-shell--on' : ''}`}
               style={{ ['--deck-accent' as any]: color } as React.CSSProperties}
               aria-hidden={!showVideo}
             >
-              <div id={containerId} className="deck-yt-host" />
+              {/* IMPORTANT: prevent pointer events from reaching the YouTube iframe */}
+              <div id={containerId} className="deck-yt-host" style={{ pointerEvents: 'none' }} />
+
               <div className="deck-video-overlay deck-video-tint" />
               <div className="deck-video-overlay deck-video-scanlines" />
               <div className="deck-video-overlay deck-video-noise" />
               <div className="deck-video-overlay deck-video-glitch" />
               <div className="deck-video-overlay deck-video-vignette" />
+
+              {/* Interaction shield: catches mouse/touch so YT never receives input (leave transport strip free) */}
+              {showVideo && (
+                <div
+                  className="deck-video-overlay deck-video-interaction-shield"
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: `${transportHeightPx}px`,
+                    zIndex: 50,
+                    pointerEvents: 'auto',
+                    background: 'transparent'
+                  }}
+                  onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onPointerMove={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onPointerUp={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onPointerCancel={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  aria-hidden
+                />
+              )}
             </div>
 
-            <div className={showVideo ? 'opacity-0 pointer-events-none' : 'opacity-100'} style={{ height: '100%' }}>
-              <Waveform
-                isPlaying={state.playing}
-                volume={state.volume * (0.5 + state.eqLow * 0.5)}
-                color={color}
-                playbackRate={state.playbackRate}
-                currentTime={state.currentTime}
-                duration={state.duration}
-                waveform={state.waveform}
-                peaks={state.waveformPeaks}
-                sourceType={state.sourceType}
-                hotCues={state.hotCues}
-                cueColors={CUE_COLORS}
-                eq={{ low: state.eqLow, mid: state.eqMid, high: state.eqHigh }}
-                loop={{
-                  active: state.loopActive,
-                  start: state.loopStart,
-                  end: state.loopEnd
-                }}
-                onSeek={(time) => {
-                  if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
-                  else if (localAudioRef.current) localAudioRef.current.currentTime = time;
-                }}
-                timeLabel={showRemaining
-                  ? `-${formatTime(state.duration - state.currentTime)}`
-                  : formatTime(state.currentTime)}
-                onTimeToggle={() => setShowRemaining(prev => !prev)}
-                minHeightPx={56}
-              />
-            </div>
+            {/* Waveform (full-height in wave mode; bottom transport strip in video mode) */}
+            {showVideo ? (
+              <div
+                className="absolute left-0 right-0 bottom-0 z-50 pointer-events-auto"
+                style={{ height: `${transportHeightPx}px` }}
+              >
+                <div className="h-full bg-black/40 backdrop-blur-sm border-t border-white/10">
+                  <Waveform
+                    isPlaying={state.playing}
+                    volume={state.volume * (0.5 + state.eqLow * 0.5)}
+                    color={color}
+                    playbackRate={state.playbackRate}
+                    currentTime={state.currentTime}
+                    duration={state.duration}
+                    waveform={state.waveform}
+                    peaks={state.waveformPeaks}
+                    sourceType={state.sourceType}
+                    hotCues={state.hotCues}
+                    cueColors={CUE_COLORS}
+                    eq={{ low: state.eqLow, mid: state.eqMid, high: state.eqHigh }}
+                    loop={{
+                      active: state.loopActive,
+                      start: state.loopStart,
+                      end: state.loopEnd
+                    }}
+                    onSeek={(time) => {
+                      if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
+                      else if (localAudioRef.current) localAudioRef.current.currentTime = time;
+                    }}
+                    timeLabel={showRemaining
+                      ? `-${formatTime(state.duration - state.currentTime)}`
+                      : formatTime(state.currentTime)}
+                    onTimeToggle={() => setShowRemaining(prev => !prev)}
+                    minHeightPx={transportHeightPx}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className={'opacity-100'} style={{ height: '100%' }}>
+                <Waveform
+                  isPlaying={state.playing}
+                  volume={state.volume * (0.5 + state.eqLow * 0.5)}
+                  color={color}
+                  playbackRate={state.playbackRate}
+                  currentTime={state.currentTime}
+                  duration={state.duration}
+                  waveform={state.waveform}
+                  peaks={state.waveformPeaks}
+                  sourceType={state.sourceType}
+                  hotCues={state.hotCues}
+                  cueColors={CUE_COLORS}
+                  eq={{ low: state.eqLow, mid: state.eqMid, high: state.eqHigh }}
+                  loop={{
+                    active: state.loopActive,
+                    start: state.loopStart,
+                    end: state.loopEnd
+                  }}
+                  onSeek={(time) => {
+                    if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
+                    else if (localAudioRef.current) localAudioRef.current.currentTime = time;
+                  }}
+                  timeLabel={showRemaining
+                    ? `-${formatTime(state.duration - state.currentTime)}`
+                    : formatTime(state.currentTime)}
+                  onTimeToggle={() => setShowRemaining(prev => !prev)}
+                  minHeightPx={56}
+                />
+              </div>
+            )}
           </div>
         </div>
 
