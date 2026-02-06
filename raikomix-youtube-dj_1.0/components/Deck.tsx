@@ -4,7 +4,8 @@ import React, {
   useRef,
   useCallback,
   useImperativeHandle,
-  forwardRef
+  forwardRef,
+  useMemo
 } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { DeckId, EffectType, PlayerState, TrackSourceType } from '../types';
@@ -43,6 +44,8 @@ const CUE_COLORS = [
   '#76FF03', // Lime Green
 ];
 
+type DeckVisualMode = 'wave' | 'video';
+
 const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, className }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
@@ -75,6 +78,22 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const [isScanning, setIsScanning] = useState(false);
     const [tapHistory, setTapHistory] = useState<number[]>([]);
     const [showRemaining, setShowRemaining] = useState(false);
+
+    const storageKey = useMemo(() => `raikomix.deck.${id}.visual`, [id]);
+    const [visualMode, setVisualMode] = useState<DeckVisualMode>(() => {
+      try {
+        const v = localStorage.getItem(storageKey);
+        return v === 'video' ? 'video' : 'wave';
+      } catch (e) {
+        return 'wave';
+      }
+    });
+
+    useEffect(() => {
+      try {
+        localStorage.setItem(storageKey, visualMode);
+      } catch (e) { }
+    }, [storageKey, visualMode]);
 
     const [state, setState] = useState<PlayerState>({
       playing: false,
@@ -273,6 +292,13 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         filter: eq.filter
       }));
     }, [eq]);
+
+    useEffect(() => {
+      // Only allow "Video" visual mode for YouTube sources.
+      if (state.sourceType !== 'youtube' && visualMode === 'video') {
+        setVisualMode('wave');
+      }
+    }, [state.sourceType, visualMode]);
 
     const updatePlaybackRate = useCallback((rate: number) => {
       const newRate = clamp(rate, 0.5, 1.5);
@@ -714,10 +740,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       return state.loopActive && Math.abs((state.loopEnd - state.loopStart) - beats * beatDuration) < 0.1;
     };
 
+    const canShowVideo = state.sourceType === 'youtube';
+    const showVideo = visualMode === 'video' && canShowVideo;
+
     return (
       <div className="m3-card deck-card bg-[#1D1B20] border-white/5 shadow-2xl transition-all hover:border-[#D0BCFF]/20 relative overflow-hidden w-full min-w-0 max-w-none h-auto max-h-full min-h-0 p-2 flex flex-col gap-2">
-        <div id={containerId} className="h-0 w-0 overflow-hidden" />
-
         <audio
           ref={localAudioRef}
           style={{ display: 'none' }}
@@ -729,36 +756,53 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           }}
         />
 
-        {/* Waveform: primary + flexible (fills spare deck height) */}
+        {/* Visual Stage (Waveform + optional Artistic Video overlay) */}
         <div className="w-full min-w-0 flex-1 min-h-[clamp(56px,10vh,120px)]">
-          <Waveform
-            isPlaying={state.playing}
-            volume={state.volume * (0.5 + state.eqLow * 0.5)}
-            color={color}
-            playbackRate={state.playbackRate}
-            currentTime={state.currentTime}
-            duration={state.duration}
-            waveform={state.waveform}
-            peaks={state.waveformPeaks}
-            sourceType={state.sourceType}
-            hotCues={state.hotCues}
-            cueColors={CUE_COLORS}
-            eq={{ low: state.eqLow, mid: state.eqMid, high: state.eqHigh }}
-            loop={{
-              active: state.loopActive,
-              start: state.loopStart,
-              end: state.loopEnd
-            }}
-            onSeek={(time) => {
-              if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
-              else if (localAudioRef.current) localAudioRef.current.currentTime = time;
-            }}
-            timeLabel={showRemaining
-              ? `-${formatTime(state.duration - state.currentTime)}`
-              : formatTime(state.currentTime)}
-            onTimeToggle={() => setShowRemaining(prev => !prev)}
-            minHeightPx={56}
-          />
+          <div className="deck-visual-stage">
+            <div
+              className={`deck-video-shell ${showVideo ? 'deck-video-shell--on' : ''}`}
+              style={{ ['--deck-accent' as any]: color } as React.CSSProperties}
+              aria-hidden={!showVideo}
+            >
+              <div id={containerId} className="deck-yt-host" />
+              <div className="deck-video-overlay deck-video-tint" />
+              <div className="deck-video-overlay deck-video-scanlines" />
+              <div className="deck-video-overlay deck-video-noise" />
+              <div className="deck-video-overlay deck-video-glitch" />
+              <div className="deck-video-overlay deck-video-vignette" />
+            </div>
+
+            <div className={showVideo ? 'opacity-0 pointer-events-none' : 'opacity-100'} style={{ height: '100%' }}>
+              <Waveform
+                isPlaying={state.playing}
+                volume={state.volume * (0.5 + state.eqLow * 0.5)}
+                color={color}
+                playbackRate={state.playbackRate}
+                currentTime={state.currentTime}
+                duration={state.duration}
+                waveform={state.waveform}
+                peaks={state.waveformPeaks}
+                sourceType={state.sourceType}
+                hotCues={state.hotCues}
+                cueColors={CUE_COLORS}
+                eq={{ low: state.eqLow, mid: state.eqMid, high: state.eqHigh }}
+                loop={{
+                  active: state.loopActive,
+                  start: state.loopStart,
+                  end: state.loopEnd
+                }}
+                onSeek={(time) => {
+                  if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
+                  else if (localAudioRef.current) localAudioRef.current.currentTime = time;
+                }}
+                timeLabel={showRemaining
+                  ? `-${formatTime(state.duration - state.currentTime)}`
+                  : formatTime(state.currentTime)}
+                onTimeToggle={() => setShowRemaining(prev => !prev)}
+                minHeightPx={56}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Row 1: Title + Play */}
@@ -782,7 +826,50 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                   <div className="text-[11px] font-black tracking-tight" style={{ color }}>
                     {id}
                   </div>
+
+                  {/* Small per-deck visual toggle */}
+                  <div className="ml-2 flex items-center gap-1">
+                    <span className="text-[8px] font-black uppercase tracking-widest text-white/30">VIS</span>
+                    <button
+                      type="button"
+                      onClick={() => setVisualMode('wave')}
+                      className={
+                        `h-5 w-6 rounded-md border text-[9px] font-black uppercase tracking-widest transition ` +
+                        (visualMode === 'wave'
+                          ? 'text-black'
+                          : 'text-white/50 hover:text-white hover:border-white/20')
+                      }
+                      style={visualMode === 'wave'
+                        ? { background: color, borderColor: color }
+                        : { borderColor: 'rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.02)' }}
+                      title="Waveform"
+                      aria-label="Waveform"
+                    >
+                      W
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVisualMode('video')}
+                      disabled={!canShowVideo}
+                      className={
+                        `h-5 w-6 rounded-md border text-[9px] font-black uppercase tracking-widest transition ` +
+                        (!canShowVideo
+                          ? 'opacity-40 cursor-not-allowed text-white/30'
+                          : visualMode === 'video'
+                            ? 'text-black'
+                            : 'text-white/50 hover:text-white hover:border-white/20')
+                      }
+                      style={visualMode === 'video'
+                        ? { background: color, borderColor: color }
+                        : { borderColor: 'rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.02)' }}
+                      title={canShowVideo ? 'Video' : 'Video available for YouTube sources only'}
+                      aria-label="Video"
+                    >
+                      V
+                    </button>
+                  </div>
                 </div>
+
                 <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-white/40">
                   <span>{state.sourceType === 'local' ? 'LOCAL' : 'YT'}</span>
                   <span className={`${isScanning ? 'animate-pulse text-gray-300' : 'text-white/60'}`}>
