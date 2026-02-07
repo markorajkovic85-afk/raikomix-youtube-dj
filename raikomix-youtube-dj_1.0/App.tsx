@@ -136,7 +136,16 @@ const App: React.FC = () => {
   const libraryRef = useRef(library);
   const lastAutoDeckRef = useRef<DeckId>('B');
   const autoLoadDeckRef = useRef<DeckId | null>(null);
+  const autoLoadStartedAtRef = useRef<number | null>(null);
   const lastMixVideoRef = useRef<{ A?: string | null; B?: string | null }>({});
+  const deckQueueItemRef = useRef<{ A?: string | null; B?: string | null }>({});
+  const queueEmptyNotifiedRef = useRef(false);
+  const manualPauseTimeoutRef = useRef<{ A?: ReturnType<typeof setTimeout> | null; B?: ReturnType<typeof setTimeout> | null }>({});
+  const canceledTransactionRef = useRef<{ A?: string | null; B?: string | null }>({});
+  const manualLoadOverrideRef = useRef<{
+    A?: { videoId: string; url: string; sourceType: TrackSourceType; title?: string; author?: string; mode: 'load' | 'cue' };
+    B?: { videoId: string; url: string; sourceType: TrackSourceType; title?: string; author?: string; mode: 'load' | 'cue' };
+  }>({});
   
   // REPLACED: preloadedTrackRef, earlyStartedTrackRef → activeTransactionRef
   const activeTransactionRef = useRef<TransitionTransaction | null>(null);
@@ -760,8 +769,15 @@ const App: React.FC = () => {
 
   const handleDeckStateUpdate = useCallback((id: DeckId, state: PlayerState) => {
     id === 'A' ? setDeckAState(state) : setDeckBState(state);
-    if (state.playing && autoLoadDeckRef.current === id) {
-      autoLoadDeckRef.current = null;
+    if (autoLoadDeckRef.current === id) {
+      if (state.playing) {
+        autoLoadDeckRef.current = null;
+        autoLoadStartedAtRef.current = null;
+      } else if (state.isReady && autoLoadStartedAtRef.current && Date.now() - autoLoadStartedAtRef.current > 10000) {
+        console.warn(`[AUTO DJ] Auto-loaded track on ${id} never started - clearing lock`);
+        autoLoadDeckRef.current = null;
+        autoLoadStartedAtRef.current = null;
+      }
     }
     const prevPlaying = prevPlayingRef.current[id];
     if (prevPlaying && !state.playing) {
@@ -771,16 +787,43 @@ const App: React.FC = () => {
         const nearEnd = state.duration > 0 && state.currentTime >= state.duration - 0.5;
         if (!nearEnd) {
           manualPauseRef.current[id] = true;
+          if (manualPauseTimeoutRef.current[id]) {
+            clearTimeout(manualPauseTimeoutRef.current[id]!);
+          }
+          manualPauseTimeoutRef.current[id] = setTimeout(() => {
+            if (manualPauseRef.current[id]) {
+              console.log(`[AUTO DJ] Clearing manual pause lock for deck ${id} after timeout`);
+              manualPauseRef.current[id] = false;
+            }
+          }, 30000);
         }
       }
     }
     if (!prevPlaying && state.playing) {
       manualPauseRef.current[id] = false;
       autoStopRef.current[id] = false;
+      if (manualPauseTimeoutRef.current[id]) {
+        clearTimeout(manualPauseTimeoutRef.current[id]!);
+        manualPauseTimeoutRef.current[id] = null;
+      }
     }
     prevPlayingRef.current[id] = state.playing;
     if (state.isReady && state.title && state.videoId && state.sourceType === 'youtube') {
       setLibrary(prev => updateTrackMetadata(state.videoId, { title: state.title, author: state.author }, prev));
+    }
+
+    if (state.isReady && canceledTransactionRef.current[id] && state.videoId === canceledTransactionRef.current[id]) {
+      const override = manualLoadOverrideRef.current[id];
+      if (override && override.videoId !== state.videoId) {
+        console.warn(`[AUTO DJ] Canceled track loaded on ${id} - restoring manual load`);
+        const targetRef = id === 'A' ? deckARef : deckBRef;
+        if (override.mode === 'cue') {
+          targetRef.current?.cueVideo(override.url, override.sourceType, { title: override.title, author: override.author });
+        } else {
+          targetRef.current?.loadVideo(override.url, override.sourceType, { title: override.title, author: override.author });
+        }
+      }
+      canceledTransactionRef.current[id] = null;
     }
     
     // AUTO DJ TRANSACTION: Advance transaction when deck becomes ready
@@ -804,15 +847,21 @@ const App: React.FC = () => {
     sourceType: TrackSourceType = 'youtube',
     title?: string,
     author?: string,
-    mode: 'load' | 'cue' = 'load'
+    mode: 'load' | 'cue' = 'load',
+    context: 'manual' | 'auto' = 'manual'
   ) => {
     const ref = deck === 'A' ? deckARef : deckBRef;
     if (ref.current) {
-      // AUTO DJ TRANSACTION: Cancel transaction if manual load to that deck
-      const txn = activeTransactionRef.current;
-      if (txn && txn.targetDeck === deck && txn.state !== 'MIXING') {
-        console.log(`[TXN ${txn.id}] Manual load to ${deck} → canceling transaction`);
-        activeTransactionRef.current = null;
+      if (context === 'manual') {
+        // AUTO DJ TRANSACTION: Cancel transaction if manual load to that deck
+        const txn = activeTransactionRef.current;
+        if (txn && txn.targetDeck === deck && txn.state !== 'MIXING') {
+          console.log(`[TXN ${txn.id}] Manual load to ${deck} → canceling transaction`);
+          canceledTransactionRef.current[deck] = txn.queueItem.videoId;
+          activeTransactionRef.current = null;
+        }
+        manualLoadOverrideRef.current[deck] = { videoId, url, sourceType, title, author, mode };
+        deckQueueItemRef.current[deck] = null;
       }
       
       if (mode === 'cue') {
@@ -904,9 +953,10 @@ const App: React.FC = () => {
   const loadNextQueueItem = useCallback((targetDeck: DeckId, mode: 'load' | 'cue' = 'load') => {
     const nextItem = queue[0];
     if (!nextItem) return null;
-    handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author, mode);
+    handleLoadVideo(nextItem.videoId, nextItem.url, targetDeck, nextItem.sourceType || 'youtube', nextItem.title, nextItem.author, mode, 'auto');
     setQueue(prev => prev.filter(item => item.id !== nextItem.id));
     lastAutoDeckRef.current = targetDeck;
+    deckQueueItemRef.current[targetDeck] = nextItem.id;
     return nextItem;
   }, [queue, handleLoadVideo]);
 
@@ -952,8 +1002,10 @@ const App: React.FC = () => {
       nextItem.sourceType || 'youtube',
       nextItem.title,
       nextItem.author,
-      'cue'
+      'cue',
+      'auto'
     );
+    deckQueueItemRef.current[targetDeck] = nextItem.id;
     
     return transaction;
   }, [queue, handleLoadVideo]);
@@ -991,6 +1043,8 @@ const App: React.FC = () => {
     
     console.log(`[TXN ${txnId}] Completing: removing queue item ${txn.queueItem.id}`);
     setQueue(prev => prev.filter(item => item.id !== txn.queueItem.id));
+    activeTransactionRef.current = null;
+    lastAutoDeckRef.current = txn.targetDeck;
   }, []);
 
   const queueAutoMix = useCallback((fromDeck: DeckId) => {
@@ -1066,6 +1120,63 @@ const App: React.FC = () => {
     muteDeck, pitchDeck, resetEq
   });
 
+  // Web Audio API crossfader volume control (replaces 50ms interval)
+  const updateCrossfaderVolumes = useCallback(() => {
+    const t = (crossfader + 1) / 2; // Normalize to 0..1
+    const curveMap: Record<CrossfaderCurve, (t: number) => [number, number]> = {
+      'SMOOTH': (t) => [Math.cos(t * Math.PI * 0.5), Math.sin(t * Math.PI * 0.5)],
+      'CUT': (t) => [t <= 0.5 ? 1 : 0, t >= 0.5 ? 1 : 0],
+      'DIP': (t) => [
+        t <= 0.5 ? 1.0 : 2.0 * (1.0 - t),
+        t >= 0.5 ? 1.0 : 2.0 * t
+      ]
+    };
+
+    const normalizeVolume = (value: number) => (value > 1 ? value / 100 : value);
+    const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+    const master = normalizeVolume(masterVolume);
+    const deckA = normalizeVolume(deckAVolume);
+    const deckB = normalizeVolume(deckBVolume);
+    const [gainA, gainB] = curveMap[xFaderCurve](t);
+
+    // Apply deck volumes and master volume
+    const finalA = gainA * deckA * master;
+    const finalB = gainB * deckB * master;
+
+    // Smooth ramp for audio quality
+    if (deckAState?.sourceType === 'youtube') {
+      ytARef.current?.setVolume(Math.round(clamp01(finalA) * 100));
+    } else if (masterGainA.current) {
+      const now = masterGainA.current.context.currentTime;
+      masterGainA.current.gain.cancelScheduledValues(now);
+      masterGainA.current.gain.setValueAtTime(masterGainA.current.gain.value, now);
+      masterGainA.current.gain.setTargetAtTime(finalA, now, 0.02);
+    }
+
+    if (deckBState?.sourceType === 'youtube') {
+      ytBRef.current?.setVolume(Math.round(clamp01(finalB) * 100));
+    } else if (masterGainB.current) {
+      const now = masterGainB.current.context.currentTime;
+      masterGainB.current.gain.cancelScheduledValues(now);
+      masterGainB.current.gain.setValueAtTime(masterGainB.current.gain.value, now);
+      masterGainB.current.gain.setTargetAtTime(finalB, now, 0.02);
+    }
+  }, [crossfader, xFaderCurve, deckAVolume, deckBVolume, masterVolume, deckAState?.sourceType, deckBState?.sourceType]);
+
+  const handlePlayerReady = useCallback((id: DeckId, controls: DeckPlayerControls) => {
+    if (id === 'A') {
+      ytARef.current = controls;
+    } else {
+      ytBRef.current = controls;
+    }
+    updateCrossfaderVolumes();
+  }, [updateCrossfaderVolumes]);
+
+  // Update on any volume change
+  useEffect(() => {
+    updateCrossfaderVolumes();
+  }, [updateCrossfaderVolumes, masterGainNodes]);
+
   // ========================================
   // AUTO DJ MAIN LOOP (P0-1 REFACTORED)
   // ========================================
@@ -1073,7 +1184,28 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!autoDjEnabled) return;
     const interval = setInterval(() => {
-      if (mixInProgressRef.current || pendingMixRef.current || queue.length === 0) return;
+      if (mixInProgressRef.current || pendingMixRef.current) return;
+      const transactionTimeoutMs = 30000;
+      const txn = activeTransactionRef.current;
+      if (txn && txn.state !== 'MIXING' && Date.now() - txn.startedAt > transactionTimeoutMs) {
+        console.error(`[TXN ${txn.id}] Timeout after ${transactionTimeoutMs / 1000}s - canceling`);
+        showNotification(`Auto DJ: Failed to load "${txn.queueItem.title}"`, 'error');
+        setQueue(prev => prev.filter(item => item.id !== txn.queueItem.id));
+        activeTransactionRef.current = null;
+        autoLoadDeckRef.current = null;
+        autoLoadStartedAtRef.current = null;
+        return;
+      }
+      if (queue.length === 0) {
+        const deckAPlaying = deckAState?.playing || false;
+        const deckBPlaying = deckBState?.playing || false;
+        if (!deckAPlaying && !deckBPlaying && !queueEmptyNotifiedRef.current) {
+          showNotification('Auto DJ: Queue empty', 'info');
+          queueEmptyNotifiedRef.current = true;
+        }
+        return;
+      }
+      queueEmptyNotifiedRef.current = false;
       const deckAPlaying = deckAState?.playing || false;
       const deckBPlaying = deckBState?.playing || false;
 
@@ -1081,16 +1213,45 @@ const App: React.FC = () => {
       if (!deckAPlaying && !deckBPlaying) {
         if (manualPauseRef.current.A || manualPauseRef.current.B) return;
         if (autoLoadDeckRef.current) return;
-        
+        const deckAHasTrack = Boolean(deckAState?.isReady && deckAState?.videoId);
+        const deckBHasTrack = Boolean(deckBState?.isReady && deckBState?.videoId);
+
+        if (deckAHasTrack !== deckBHasTrack) {
+          const deckToStart = deckAHasTrack ? 'A' : 'B';
+          autoLoadDeckRef.current = deckToStart;
+          autoLoadStartedAtRef.current = Date.now();
+          setCrossfader(deckToStart === 'A' ? -1 : 1);
+          // FIX: Apply crossfader volumes immediately before starting playback
+          updateCrossfaderVolumes();
+          const targetRef = deckToStart === 'A' ? deckARef : deckBRef;
+          setTimeout(() => targetRef.current?.togglePlay(), 0);
+          return;
+        }
+
+        if (deckAHasTrack && deckBHasTrack) {
+          const deckToStart = lastAutoDeckRef.current === 'A' ? 'B' : 'A';
+          autoLoadDeckRef.current = deckToStart;
+          autoLoadStartedAtRef.current = Date.now();
+          setCrossfader(deckToStart === 'A' ? -1 : 1);
+          // FIX: Apply crossfader volumes immediately before starting playback
+          updateCrossfaderVolumes();
+          const targetRef = deckToStart === 'A' ? deckARef : deckBRef;
+          setTimeout(() => targetRef.current?.togglePlay(), 0);
+          return;
+        }
+
         const nextDeck = lastAutoDeckRef.current === 'A' ? 'B' : 'A';
-        const txn = activeTransactionRef.current;
+        const readyTxn = activeTransactionRef.current;
         
         // Check if we have a ready transaction for this deck
-        if (txn && txn.targetDeck === nextDeck && txn.state === 'READY') {
-          console.log(`[TXN ${txn.id}] No decks playing → starting ${nextDeck} with ready transaction`);
-          completeTransaction(txn.id);
+        if (readyTxn && readyTxn.targetDeck === nextDeck && readyTxn.state === 'READY') {
+          console.log(`[TXN ${readyTxn.id}] No decks playing → starting ${nextDeck} with ready transaction`);
+          completeTransaction(readyTxn.id);
           autoLoadDeckRef.current = nextDeck;
+          autoLoadStartedAtRef.current = Date.now();
           setCrossfader(nextDeck === 'A' ? -1 : 1);
+          // FIX: Apply crossfader volumes immediately before starting playback
+          updateCrossfaderVolumes();
           const targetRef = nextDeck === 'A' ? deckARef : deckBRef;
           setTimeout(() => targetRef.current?.togglePlay(), 0);
           return;
@@ -1101,10 +1262,14 @@ const App: React.FC = () => {
         const nextItem = loadNextQueueItem(nextDeck, 'load');
         if (!nextItem) {
           autoLoadDeckRef.current = null;
+          autoLoadStartedAtRef.current = null;
           return;
         }
         autoLoadDeckRef.current = nextDeck;
+        autoLoadStartedAtRef.current = Date.now();
         setCrossfader(nextDeck === 'A' ? -1 : 1);
+        // FIX: Apply crossfader volumes immediately before starting playback
+        updateCrossfaderVolumes();
         const targetRef = nextDeck === 'A' ? deckARef : deckBRef;
         setTimeout(() => targetRef.current?.togglePlay(), 0);
         return;
@@ -1115,12 +1280,24 @@ const App: React.FC = () => {
       if (!activeDeck) return;
       const activeState = activeDeck === 'A' ? deckAState : deckBState;
       if (!activeState?.duration || !activeState.isReady) return;
-      if (activeState.videoId && lastMixVideoRef.current[activeDeck] === activeState.videoId) return;
+      const activeMixKey = deckQueueItemRef.current[activeDeck] ?? activeState.videoId;
+      if (activeMixKey && lastMixVideoRef.current[activeDeck] === activeMixKey) return;
 
       const remaining = activeState.duration - activeState.currentTime;
       const leadTime = Math.min(Math.max(1, mixLeadSeconds), activeState.duration);
-      const preloadTime = Math.min(activeState.duration, Math.max(leadTime + 6, leadTime * 2));
-      const playStartTime = leadTime + Math.max(2, mixDurationSeconds);
+      let preloadTime = Math.min(
+        activeState.duration * 0.75,
+        Math.max(leadTime + mixDurationSeconds + 8, leadTime * 2)
+      );
+      let playStartTime = Math.max(
+        leadTime + Math.max(4, mixDurationSeconds),
+        preloadTime - 6
+      );
+      if (playStartTime >= preloadTime - 3) {
+        console.warn(`[AUTO DJ] Track too short for timing (${activeState.duration}s) - adjusting`);
+        playStartTime = leadTime + 2;
+        preloadTime = playStartTime + 8;
+      }
       const targetDeck = activeDeck === 'A' ? 'B' : 'A';
       const targetState = targetDeck === 'A' ? deckAState : deckBState;
 
@@ -1157,7 +1334,7 @@ const App: React.FC = () => {
 
       // STAGE 3: START CROSSFADE (at leadTime seconds remaining)
       if (remaining <= leadTime) {
-        lastMixVideoRef.current[activeDeck] = activeState.videoId;
+        lastMixVideoRef.current[activeDeck] = activeMixKey ?? activeState.videoId;
         
         // Check if target deck is already playing (from early start)
         if (targetState?.playing) {
@@ -1170,18 +1347,29 @@ const App: React.FC = () => {
       }
     }, 250);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction, updateCrossfaderVolumes]);
 
   useEffect(() => {
     if (autoDjEnabled) return;
     pendingMixRef.current = null;
     autoLoadDeckRef.current = null;
+    autoLoadStartedAtRef.current = null;
     setPendingMix(null);
     lastMixVideoRef.current = {};
+    deckQueueItemRef.current = {};
+    queueEmptyNotifiedRef.current = false;
     activeTransactionRef.current = null; // Clear transaction when Auto DJ disabled
     manualPauseRef.current = { A: false, B: false };
     prevPlayingRef.current = { A: false, B: false };
     autoStopRef.current = { A: false, B: false };
+    if (manualPauseTimeoutRef.current.A) {
+      clearTimeout(manualPauseTimeoutRef.current.A);
+      manualPauseTimeoutRef.current.A = null;
+    }
+    if (manualPauseTimeoutRef.current.B) {
+      clearTimeout(manualPauseTimeoutRef.current.B);
+      manualPauseTimeoutRef.current.B = null;
+    }
   }, [autoDjEnabled]);
 
   useEffect(() => {
@@ -1191,12 +1379,22 @@ const App: React.FC = () => {
     const queuedItem = queue[0];
     if (!queuedItem || queuedItem.id !== txn.queueItem.id) {
       console.log(`[TXN ${txn.id}] Queue changed → canceling transaction`);
-      activeTransactionRef.current = null;
+      if (txn.state === 'PRELOADING' || txn.state === 'READY') {
+        activeTransactionRef.current = null;
+      } else {
+        console.log(`[TXN ${txn.id}] Queue changed but mix in progress - allowing completion`);
+      }
     }
   }, [queue]);
 
   useEffect(() => {
     if (!pendingMix) return;
+    if (mixInProgressRef.current) {
+      console.log('[AUTO DJ] Mix already in progress, canceling pendingMix');
+      pendingMixRef.current = null;
+      setPendingMix(null);
+      return;
+    }
     const targetState = pendingMix.deck === 'A' ? deckAState : deckBState;
     const targetRef = pendingMix.deck === 'A' ? deckARef : deckBRef;
 
@@ -1236,6 +1434,18 @@ const App: React.FC = () => {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
+    const resumeContext = async () => {
+      if (ctx.state === 'suspended') {
+        try {
+          await ctx.resume();
+          console.log('[AUDIO] AudioContext resumed');
+        } catch (error) {
+          console.error('[AUDIO] Failed to resume context:', error);
+        }
+      }
+    };
+    document.addEventListener('click', resumeContext, { once: true });
+    document.addEventListener('touchstart', resumeContext, { once: true });
     const gainA = ctx.createGain();
     const gainB = ctx.createGain();
     gainA.gain.value = 1;
@@ -1248,6 +1458,8 @@ const App: React.FC = () => {
     setAudioContext(ctx);
     setMasterGainNodes({ A: gainA, B: gainB });
     return () => {
+      document.removeEventListener('click', resumeContext);
+      document.removeEventListener('touchstart', resumeContext);
       gainA.disconnect();
       gainB.disconnect();
       if (ctx.state !== 'closed') {
@@ -1255,59 +1467,6 @@ const App: React.FC = () => {
       }
     };
   }, []);
-
-  // Web Audio API crossfader volume control (replaces 50ms interval)
-  const updateCrossfaderVolumes = useCallback(() => {
-    const t = (crossfader + 1) / 2; // Normalize to 0..1
-    const curveMap: Record<CrossfaderCurve, (t: number) => [number, number]> = {
-      'SMOOTH': (t) => [Math.cos(t * Math.PI * 0.5), Math.sin(t * Math.PI * 0.5)],
-      'CUT': (t) => [t <= 0.5 ? 1 : 0, t >= 0.5 ? 1 : 0],
-      'DIP': (t) => [
-        t <= 0.5 ? 1.0 : 2.0 * (1.0 - t),
-        t >= 0.5 ? 1.0 : 2.0 * t
-      ]
-    };
-
-    const normalizeVolume = (value: number) => (value > 1 ? value / 100 : value);
-    const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
-    const master = normalizeVolume(masterVolume);
-    const deckA = normalizeVolume(deckAVolume);
-    const deckB = normalizeVolume(deckBVolume);
-    const [gainA, gainB] = curveMap[xFaderCurve](t);
-
-    // Apply deck volumes and master volume
-    const finalA = gainA * deckA * master;
-    const finalB = gainB * deckB * master;
-
-    // Smooth ramp for audio quality
-    if (deckAState?.sourceType === 'youtube') {
-      ytARef.current?.setVolume(Math.round(clamp01(finalA) * 100));
-    } else if (masterGainA.current) {
-      const now = masterGainA.current.context.currentTime;
-      masterGainA.current.gain.setTargetAtTime(finalA, now, 0.02);
-    }
-
-    if (deckBState?.sourceType === 'youtube') {
-      ytBRef.current?.setVolume(Math.round(clamp01(finalB) * 100));
-    } else if (masterGainB.current) {
-      const now = masterGainB.current.context.currentTime;
-      masterGainB.current.gain.setTargetAtTime(finalB, now, 0.02);
-    }
-  }, [crossfader, xFaderCurve, deckAVolume, deckBVolume, masterVolume, deckAState?.sourceType, deckBState?.sourceType]);
-
-  const handlePlayerReady = useCallback((id: DeckId, controls: DeckPlayerControls) => {
-    if (id === 'A') {
-      ytARef.current = controls;
-    } else {
-      ytBRef.current = controls;
-    }
-    updateCrossfaderVolumes();
-  }, [updateCrossfaderVolumes]);
-
-  // Update on any volume change
-  useEffect(() => {
-    updateCrossfaderVolumes();
-  }, [updateCrossfaderVolumes, masterGainNodes]);
 
   return (
     <ErrorBoundary>
@@ -1747,22 +1906,16 @@ const App: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setShowSettings(false)}
-                    className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-4 py-2 rounded-full hover:text-white"
+                    className="text-[10px] font-black uppercase tracking-widest text-white/60 border border-white/10 px-6 py-2 rounded-full hover:text-white hover:bg-white/5"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => setShowSettings(false)}
-                    className="text-[10px] font-black uppercase tracking-widest bg-[#D0BCFF] text-black px-6 py-2 rounded-full hover:bg-white"
-                  >
-                    Save Settings
+                    Close
                   </button>
                 </div>
               </div>
             </div>
           </div>
         )}
-        
+
         {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       </div>
     </ErrorBoundary>
