@@ -903,6 +903,49 @@ const App: React.FC = () => {
     });
   }, []);
 
+  // Web Audio API crossfader volume control (replaces 50ms interval)
+  const updateCrossfaderVolumes = useCallback(() => {
+    const t = (crossfader + 1) / 2; // Normalize to 0..1
+    const curveMap: Record<CrossfaderCurve, (t: number) => [number, number]> = {
+      'SMOOTH': (t) => [Math.cos(t * Math.PI * 0.5), Math.sin(t * Math.PI * 0.5)],
+      'CUT': (t) => [t <= 0.5 ? 1 : 0, t >= 0.5 ? 1 : 0],
+      'DIP': (t) => [
+        t <= 0.5 ? 1.0 : 2.0 * (1.0 - t),
+        t >= 0.5 ? 1.0 : 2.0 * t
+      ]
+    };
+
+    const normalizeVolume = (value: number) => (value > 1 ? value / 100 : value);
+    const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+    const master = normalizeVolume(masterVolume);
+    const deckA = normalizeVolume(deckAVolume);
+    const deckB = normalizeVolume(deckBVolume);
+    const [gainA, gainB] = curveMap[xFaderCurve](t);
+
+    // Apply deck volumes and master volume
+    const finalA = gainA * deckA * master;
+    const finalB = gainB * deckB * master;
+
+    // Smooth ramp for audio quality
+    if (deckAState?.sourceType === 'youtube') {
+      ytARef.current?.setVolume(Math.round(clamp01(finalA) * 100));
+    } else if (masterGainA.current) {
+      const now = masterGainA.current.context.currentTime;
+      masterGainA.current.gain.cancelScheduledValues(now);
+      masterGainA.current.gain.setValueAtTime(masterGainA.current.gain.value, now);
+      masterGainA.current.gain.setTargetAtTime(finalA, now, 0.02);
+    }
+
+    if (deckBState?.sourceType === 'youtube') {
+      ytBRef.current?.setVolume(Math.round(clamp01(finalB) * 100));
+    } else if (masterGainB.current) {
+      const now = masterGainB.current.context.currentTime;
+      masterGainB.current.gain.cancelScheduledValues(now);
+      masterGainB.current.gain.setValueAtTime(masterGainB.current.gain.value, now);
+      masterGainB.current.gain.setTargetAtTime(finalB, now, 0.02);
+    }
+  }, [crossfader, xFaderCurve, deckAVolume, deckBVolume, masterVolume, deckAState?.sourceType, deckBState?.sourceType]);
+
   const stopDeck = useCallback((deckId: DeckId) => {
     const state = deckId === 'A' ? deckAState : deckBState;
     const ref = deckId === 'A' ? deckARef : deckBRef;
@@ -1140,49 +1183,6 @@ const App: React.FC = () => {
   useKeyboardShortcuts(deckARef, deckBRef, crossfader, setCrossfader, () => setShowHelp(p => !p), {
     muteDeck, pitchDeck, resetEq
   });
-
-  // Web Audio API crossfader volume control (replaces 50ms interval)
-  const updateCrossfaderVolumes = useCallback(() => {
-    const t = (crossfader + 1) / 2; // Normalize to 0..1
-    const curveMap: Record<CrossfaderCurve, (t: number) => [number, number]> = {
-      'SMOOTH': (t) => [Math.cos(t * Math.PI * 0.5), Math.sin(t * Math.PI * 0.5)],
-      'CUT': (t) => [t <= 0.5 ? 1 : 0, t >= 0.5 ? 1 : 0],
-      'DIP': (t) => [
-        t <= 0.5 ? 1.0 : 2.0 * (1.0 - t),
-        t >= 0.5 ? 1.0 : 2.0 * t
-      ]
-    };
-
-    const normalizeVolume = (value: number) => (value > 1 ? value / 100 : value);
-    const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
-    const master = normalizeVolume(masterVolume);
-    const deckA = normalizeVolume(deckAVolume);
-    const deckB = normalizeVolume(deckBVolume);
-    const [gainA, gainB] = curveMap[xFaderCurve](t);
-
-    // Apply deck volumes and master volume
-    const finalA = gainA * deckA * master;
-    const finalB = gainB * deckB * master;
-
-    // Smooth ramp for audio quality
-    if (deckAState?.sourceType === 'youtube') {
-      ytARef.current?.setVolume(Math.round(clamp01(finalA) * 100));
-    } else if (masterGainA.current) {
-      const now = masterGainA.current.context.currentTime;
-      masterGainA.current.gain.cancelScheduledValues(now);
-      masterGainA.current.gain.setValueAtTime(masterGainA.current.gain.value, now);
-      masterGainA.current.gain.setTargetAtTime(finalA, now, 0.02);
-    }
-
-    if (deckBState?.sourceType === 'youtube') {
-      ytBRef.current?.setVolume(Math.round(clamp01(finalB) * 100));
-    } else if (masterGainB.current) {
-      const now = masterGainB.current.context.currentTime;
-      masterGainB.current.gain.cancelScheduledValues(now);
-      masterGainB.current.gain.setValueAtTime(masterGainB.current.gain.value, now);
-      masterGainB.current.gain.setTargetAtTime(finalB, now, 0.02);
-    }
-  }, [crossfader, xFaderCurve, deckAVolume, deckBVolume, masterVolume, deckAState?.sourceType, deckBState?.sourceType]);
 
   const handlePlayerReady = useCallback((id: DeckId, controls: DeckPlayerControls) => {
     if (id === 'A') {
