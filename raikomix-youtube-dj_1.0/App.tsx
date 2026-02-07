@@ -295,7 +295,7 @@ const App: React.FC = () => {
     return () => {
       revokeLocalTrackUrls(libraryRef.current);
     };
-  }, []);
+  }, [updateCrossfaderVolumes]);
 
   const showNotification = (msg: string, type: ToastType = 'info') => setToast({ msg, type });
   const effectCycle: EffectType[] = [
@@ -320,12 +320,12 @@ const App: React.FC = () => {
   const handleMixLeadChange = useCallback((value: number) => {
     if (!Number.isFinite(value)) return;
     setMixLeadSeconds(Math.min(30, Math.max(4, value)));
-  }, []);
+  }, [updateCrossfaderVolumes]);
 
   const handleMixDurationChange = useCallback((value: number) => {
     if (!Number.isFinite(value)) return;
     setMixDurationSeconds(Math.min(20, Math.max(2, value)));
-  }, []);
+  }, [updateCrossfaderVolumes]);
 
   const toggleEffect = (deck: 'A' | 'B', effect: EffectType | null) => {
     if (deck === 'A') {
@@ -664,7 +664,7 @@ const App: React.FC = () => {
       return messageType === 0x90 && data1 >= control.start && data1 <= control.end && data2 > 0;
     }
     return false;
-  }, []);
+  }, [updateCrossfaderVolumes]);
 
   const attachMidiInputListeners = useCallback((inputs: MIDIInput[]) => {
     midiInputHandlersRef.current.forEach((handler, id) => {
@@ -838,7 +838,7 @@ const App: React.FC = () => {
       console.log(`[TXN ${txn.id}] Deck ${id} playing → advancing to PLAYING state`);
       txn.state = 'PLAYING';
     }
-  }, []);
+  }, [updateCrossfaderVolumes]);
 
   const handleLoadVideo = useCallback((
     videoId: string,
@@ -911,6 +911,28 @@ const App: React.FC = () => {
       ref.current?.togglePlay();
     }
   }, [deckAState, deckBState]);
+
+  const startDeckPlayback = useCallback((deckId: DeckId, delayMs = 150) => {
+    const ref = deckId === 'A' ? deckARef : deckBRef;
+    const trigger = () => {
+      const ctx = audioContextRef.current;
+      if (ctx?.state === 'suspended') {
+        ctx.resume().catch(error => {
+          console.warn('[AUDIO] Auto DJ resume failed', error);
+        });
+      }
+      updateCrossfaderVolumes();
+      ref.current?.resumeContext?.();
+      setTimeout(() => {
+        ref.current?.togglePlay();
+      }, 100);
+    };
+    if (delayMs > 0) {
+      setTimeout(trigger, delayMs);
+    } else {
+      trigger();
+    }
+  }, [updateCrossfaderVolumes]);
 
   const startAutoMix = useCallback((fromDeck: DeckId, targetDeck: DeckId) => {
     if (mixInProgressRef.current) return;
@@ -1063,8 +1085,7 @@ const App: React.FC = () => {
       
       if (txn.state === 'READY') {
         // Track is ready but not playing yet - start it
-        const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
-        setTimeout(() => targetRef.current?.togglePlay(), 0);
+        startDeckPlayback(targetDeck);
       }
       
       // Complete the transaction (remove from queue)
@@ -1084,7 +1105,7 @@ const App: React.FC = () => {
     const pending = { deck: targetDeck, fromDeck, item: nextItem };
     pendingMixRef.current = pending;
     setPendingMix(pending);
-  }, [deckAState, deckBState, loadNextQueueItem, startAutoMix, completeTransaction]);
+  }, [deckAState, deckBState, loadNextQueueItem, startAutoMix, completeTransaction, startDeckPlayback]);
 
   const handleTrackEnd = useCallback((deckId: DeckId) => {
     if (!autoDjEnabled) return;
@@ -1223,8 +1244,7 @@ const App: React.FC = () => {
           setCrossfader(deckToStart === 'A' ? -1 : 1);
           // FIX: Apply crossfader volumes immediately before starting playback
           updateCrossfaderVolumes();
-          const targetRef = deckToStart === 'A' ? deckARef : deckBRef;
-          setTimeout(() => targetRef.current?.togglePlay(), 0);
+          startDeckPlayback(deckToStart);
           return;
         }
 
@@ -1235,8 +1255,7 @@ const App: React.FC = () => {
           setCrossfader(deckToStart === 'A' ? -1 : 1);
           // FIX: Apply crossfader volumes immediately before starting playback
           updateCrossfaderVolumes();
-          const targetRef = deckToStart === 'A' ? deckARef : deckBRef;
-          setTimeout(() => targetRef.current?.togglePlay(), 0);
+          startDeckPlayback(deckToStart);
           return;
         }
 
@@ -1252,8 +1271,7 @@ const App: React.FC = () => {
           setCrossfader(nextDeck === 'A' ? -1 : 1);
           // FIX: Apply crossfader volumes immediately before starting playback
           updateCrossfaderVolumes();
-          const targetRef = nextDeck === 'A' ? deckARef : deckBRef;
-          setTimeout(() => targetRef.current?.togglePlay(), 0);
+          startDeckPlayback(nextDeck);
           return;
         }
         
@@ -1270,8 +1288,7 @@ const App: React.FC = () => {
         setCrossfader(nextDeck === 'A' ? -1 : 1);
         // FIX: Apply crossfader volumes immediately before starting playback
         updateCrossfaderVolumes();
-        const targetRef = nextDeck === 'A' ? deckARef : deckBRef;
-        setTimeout(() => targetRef.current?.togglePlay(), 0);
+        startDeckPlayback(nextDeck);
         return;
       }
 
@@ -1318,16 +1335,16 @@ const App: React.FC = () => {
         
         if (txn && txn.targetDeck === targetDeck && txn.state === 'READY') {
           console.log(`[TXN ${txn.id}] ${remaining.toFixed(1)}s remaining → starting playback early`);
-          const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
-          setTimeout(() => targetRef.current?.togglePlay(), 150);
+          setCrossfader(targetDeck === 'A' ? -1 : 1);
+          updateCrossfaderVolumes();
+          startDeckPlayback(targetDeck, 150);
         } else if (txn && txn.targetDeck === targetDeck && txn.state === 'PRELOADING') {
           console.log(`[TXN ${txn.id}] Still preloading at ${remaining.toFixed(1)}s - waiting for READY state`);
         } else if (!txn) {
           console.warn(`[AUTO DJ] FAILSAFE: No transaction at ${remaining.toFixed(1)}s - loading directly`);
           const nextItem = loadNextQueueItem(targetDeck, 'load');
           if (nextItem) {
-            const targetRef = targetDeck === 'A' ? deckARef : deckBRef;
-            setTimeout(() => targetRef.current?.togglePlay(), 500);
+            startDeckPlayback(targetDeck, 500);
           }
         }
       }
@@ -1347,7 +1364,7 @@ const App: React.FC = () => {
       }
     }, 250);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction, updateCrossfaderVolumes]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction, updateCrossfaderVolumes, startDeckPlayback]);
 
   useEffect(() => {
     if (autoDjEnabled) return;
@@ -1404,23 +1421,22 @@ const App: React.FC = () => {
 
     // Start playing if not already
     if (!targetState.playing) {
-      targetRef.current?.togglePlay();
+      startDeckPlayback(pendingMix.deck);
     }
 
     // Start crossfade immediately (this is emergency fallback or instant mix mode)
     startAutoMix(pendingMix.fromDeck, pendingMix.deck);
     pendingMixRef.current = null;
     setPendingMix(null);
-  }, [pendingMix, deckAState, deckBState, startAutoMix]);
+  }, [pendingMix, deckAState, deckBState, startAutoMix, startDeckPlayback]);
 
   useEffect(() => {
     if (!autoDjEnabled || !autoLoadDeckRef.current) return;
     const autoDeck = autoLoadDeckRef.current;
     const targetState = autoDeck === 'A' ? deckAState : deckBState;
-    const targetRef = autoDeck === 'A' ? deckARef : deckBRef;
     if (!targetState?.isReady || targetState.playing) return;
-    targetRef.current?.togglePlay();
-  }, [autoDjEnabled, deckAState, deckBState]);
+    startDeckPlayback(autoDeck);
+  }, [autoDjEnabled, deckAState, deckBState, startDeckPlayback]);
   
   useEffect(() => {
     return () => {
