@@ -1120,6 +1120,63 @@ const App: React.FC = () => {
     muteDeck, pitchDeck, resetEq
   });
 
+  // Web Audio API crossfader volume control (replaces 50ms interval)
+  const updateCrossfaderVolumes = useCallback(() => {
+    const t = (crossfader + 1) / 2; // Normalize to 0..1
+    const curveMap: Record<CrossfaderCurve, (t: number) => [number, number]> = {
+      'SMOOTH': (t) => [Math.cos(t * Math.PI * 0.5), Math.sin(t * Math.PI * 0.5)],
+      'CUT': (t) => [t <= 0.5 ? 1 : 0, t >= 0.5 ? 1 : 0],
+      'DIP': (t) => [
+        t <= 0.5 ? 1.0 : 2.0 * (1.0 - t),
+        t >= 0.5 ? 1.0 : 2.0 * t
+      ]
+    };
+
+    const normalizeVolume = (value: number) => (value > 1 ? value / 100 : value);
+    const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+    const master = normalizeVolume(masterVolume);
+    const deckA = normalizeVolume(deckAVolume);
+    const deckB = normalizeVolume(deckBVolume);
+    const [gainA, gainB] = curveMap[xFaderCurve](t);
+
+    // Apply deck volumes and master volume
+    const finalA = gainA * deckA * master;
+    const finalB = gainB * deckB * master;
+
+    // Smooth ramp for audio quality
+    if (deckAState?.sourceType === 'youtube') {
+      ytARef.current?.setVolume(Math.round(clamp01(finalA) * 100));
+    } else if (masterGainA.current) {
+      const now = masterGainA.current.context.currentTime;
+      masterGainA.current.gain.cancelScheduledValues(now);
+      masterGainA.current.gain.setValueAtTime(masterGainA.current.gain.value, now);
+      masterGainA.current.gain.setTargetAtTime(finalA, now, 0.02);
+    }
+
+    if (deckBState?.sourceType === 'youtube') {
+      ytBRef.current?.setVolume(Math.round(clamp01(finalB) * 100));
+    } else if (masterGainB.current) {
+      const now = masterGainB.current.context.currentTime;
+      masterGainB.current.gain.cancelScheduledValues(now);
+      masterGainB.current.gain.setValueAtTime(masterGainB.current.gain.value, now);
+      masterGainB.current.gain.setTargetAtTime(finalB, now, 0.02);
+    }
+  }, [crossfader, xFaderCurve, deckAVolume, deckBVolume, masterVolume, deckAState?.sourceType, deckBState?.sourceType]);
+
+  const handlePlayerReady = useCallback((id: DeckId, controls: DeckPlayerControls) => {
+    if (id === 'A') {
+      ytARef.current = controls;
+    } else {
+      ytBRef.current = controls;
+    }
+    updateCrossfaderVolumes();
+  }, [updateCrossfaderVolumes]);
+
+  // Update on any volume change
+  useEffect(() => {
+    updateCrossfaderVolumes();
+  }, [updateCrossfaderVolumes, masterGainNodes]);
+
   // ========================================
   // AUTO DJ MAIN LOOP (P0-1 REFACTORED)
   // ========================================
@@ -1164,6 +1221,8 @@ const App: React.FC = () => {
           autoLoadDeckRef.current = deckToStart;
           autoLoadStartedAtRef.current = Date.now();
           setCrossfader(deckToStart === 'A' ? -1 : 1);
+          // FIX: Apply crossfader volumes immediately before starting playback
+          updateCrossfaderVolumes();
           const targetRef = deckToStart === 'A' ? deckARef : deckBRef;
           setTimeout(() => targetRef.current?.togglePlay(), 0);
           return;
@@ -1174,6 +1233,8 @@ const App: React.FC = () => {
           autoLoadDeckRef.current = deckToStart;
           autoLoadStartedAtRef.current = Date.now();
           setCrossfader(deckToStart === 'A' ? -1 : 1);
+          // FIX: Apply crossfader volumes immediately before starting playback
+          updateCrossfaderVolumes();
           const targetRef = deckToStart === 'A' ? deckARef : deckBRef;
           setTimeout(() => targetRef.current?.togglePlay(), 0);
           return;
@@ -1189,6 +1250,8 @@ const App: React.FC = () => {
           autoLoadDeckRef.current = nextDeck;
           autoLoadStartedAtRef.current = Date.now();
           setCrossfader(nextDeck === 'A' ? -1 : 1);
+          // FIX: Apply crossfader volumes immediately before starting playback
+          updateCrossfaderVolumes();
           const targetRef = nextDeck === 'A' ? deckARef : deckBRef;
           setTimeout(() => targetRef.current?.togglePlay(), 0);
           return;
@@ -1205,6 +1268,8 @@ const App: React.FC = () => {
         autoLoadDeckRef.current = nextDeck;
         autoLoadStartedAtRef.current = Date.now();
         setCrossfader(nextDeck === 'A' ? -1 : 1);
+        // FIX: Apply crossfader volumes immediately before starting playback
+        updateCrossfaderVolumes();
         const targetRef = nextDeck === 'A' ? deckARef : deckBRef;
         setTimeout(() => targetRef.current?.togglePlay(), 0);
         return;
@@ -1282,7 +1347,7 @@ const App: React.FC = () => {
       }
     }, 250);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction, updateCrossfaderVolumes]);
 
   useEffect(() => {
     if (autoDjEnabled) return;
@@ -1402,63 +1467,6 @@ const App: React.FC = () => {
       }
     };
   }, []);
-
-  // Web Audio API crossfader volume control (replaces 50ms interval)
-  const updateCrossfaderVolumes = useCallback(() => {
-    const t = (crossfader + 1) / 2; // Normalize to 0..1
-    const curveMap: Record<CrossfaderCurve, (t: number) => [number, number]> = {
-      'SMOOTH': (t) => [Math.cos(t * Math.PI * 0.5), Math.sin(t * Math.PI * 0.5)],
-      'CUT': (t) => [t <= 0.5 ? 1 : 0, t >= 0.5 ? 1 : 0],
-      'DIP': (t) => [
-        t <= 0.5 ? 1.0 : 2.0 * (1.0 - t),
-        t >= 0.5 ? 1.0 : 2.0 * t
-      ]
-    };
-
-    const normalizeVolume = (value: number) => (value > 1 ? value / 100 : value);
-    const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
-    const master = normalizeVolume(masterVolume);
-    const deckA = normalizeVolume(deckAVolume);
-    const deckB = normalizeVolume(deckBVolume);
-    const [gainA, gainB] = curveMap[xFaderCurve](t);
-
-    // Apply deck volumes and master volume
-    const finalA = gainA * deckA * master;
-    const finalB = gainB * deckB * master;
-
-    // Smooth ramp for audio quality
-    if (deckAState?.sourceType === 'youtube') {
-      ytARef.current?.setVolume(Math.round(clamp01(finalA) * 100));
-    } else if (masterGainA.current) {
-      const now = masterGainA.current.context.currentTime;
-      masterGainA.current.gain.cancelScheduledValues(now);
-      masterGainA.current.gain.setValueAtTime(masterGainA.current.gain.value, now);
-      masterGainA.current.gain.setTargetAtTime(finalA, now, 0.02);
-    }
-
-    if (deckBState?.sourceType === 'youtube') {
-      ytBRef.current?.setVolume(Math.round(clamp01(finalB) * 100));
-    } else if (masterGainB.current) {
-      const now = masterGainB.current.context.currentTime;
-      masterGainB.current.gain.cancelScheduledValues(now);
-      masterGainB.current.gain.setValueAtTime(masterGainB.current.gain.value, now);
-      masterGainB.current.gain.setTargetAtTime(finalB, now, 0.02);
-    }
-  }, [crossfader, xFaderCurve, deckAVolume, deckBVolume, masterVolume, deckAState?.sourceType, deckBState?.sourceType]);
-
-  const handlePlayerReady = useCallback((id: DeckId, controls: DeckPlayerControls) => {
-    if (id === 'A') {
-      ytARef.current = controls;
-    } else {
-      ytBRef.current = controls;
-    }
-    updateCrossfaderVolumes();
-  }, [updateCrossfaderVolumes]);
-
-  // Update on any volume change
-  useEffect(() => {
-    updateCrossfaderVolumes();
-  }, [updateCrossfaderVolumes, masterGainNodes]);
 
   return (
     <ErrorBoundary>
@@ -1898,22 +1906,16 @@ const App: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setShowSettings(false)}
-                    className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-4 py-2 rounded-full hover:text-white"
+                    className="text-[10px] font-black uppercase tracking-widest text-white/60 border border-white/10 px-6 py-2 rounded-full hover:text-white hover:bg-white/5"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => setShowSettings(false)}
-                    className="text-[10px] font-black uppercase tracking-widest bg-[#D0BCFF] text-black px-6 py-2 rounded-full hover:bg-white"
-                  >
-                    Save Settings
+                    Close
                   </button>
                 </div>
               </div>
             </div>
           </div>
         )}
-        
+
         {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       </div>
     </ErrorBoundary>
