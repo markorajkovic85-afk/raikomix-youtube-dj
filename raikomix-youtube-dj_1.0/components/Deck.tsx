@@ -349,35 +349,39 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     };
 
     const loadSeqRef = useRef(0);
-    const loadTimeoutRef = useRef<number | null>(null);
     const analysisAbortRef = useRef<AbortController | null>(null);
-    const localLoadCleanupRef = useRef<(() => void) | null>(null);
+    const loadTimeoutRef = useRef<number | null>(null);
+    type PendingLocalLoad = {
+      url: string;
+      metadata?: { title?: string; author?: string };
+      loadMode: 'load' | 'cue';
+    };
+    const pendingLocalLoadRef = useRef<PendingLocalLoad | null>(null);
 
-    const analyzeLocalAudio = async (
-      url: string,
-      options?: { signal?: AbortSignal; loadSeq?: number }
-    ) => {
-      const { signal, loadSeq } = options ?? {};
+    const analyzeLocalAudio = async (url: string, seq: number, signal?: AbortSignal) => {
       try {
         setIsScanning(true);
-        const response = await fetch(url, { signal });
+        const response = await fetch(url, signal ? { signal } : undefined);
         const arrayBuffer = await response.arrayBuffer();
-        if (signal?.aborted) return;
         const existingContext = audioEngine.current.getContext();
         const tempContext = existingContext ?? new (window.AudioContext || (window as any).webkitAudioContext)();
         const audioBuffer = await tempContext.decodeAudioData(arrayBuffer.slice(0));
-        if (signal?.aborted) return;
         const bpm = detectBpmFromAudioBuffer(audioBuffer);
         const waveform = buildWaveformData(audioBuffer);
 
-        if (!loadSeq || loadSeq === loadSeqRef.current) {
-          setState(s => ({
-            ...s,
-            bpm: bpm ?? s.bpm,
-            waveform: waveform.levels.length ? waveform : undefined,
-            waveformPeaks: undefined
-          }));
+        if (seq !== loadSeqRef.current) {
+          if (!existingContext) {
+            await tempContext.close();
+          }
+          return;
         }
+
+        setState(s => ({
+          ...s,
+          bpm: bpm ?? s.bpm,
+          waveform: waveform.levels.length ? waveform : undefined,
+          waveformPeaks: undefined
+        }));
 
         if (!existingContext) {
           await tempContext.close();
@@ -387,7 +391,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           console.warn('Local audio analysis failed:', e);
         }
       } finally {
-        if (!loadSeq || loadSeq === loadSeqRef.current) {
+        if (seq === loadSeqRef.current) {
           setIsScanning(false);
         }
       }
@@ -533,170 +537,147 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       });
     }, [containerId, ensureYouTubeVolume, onPlayerReady, onTrackEnd, updateMetadata, state.playbackRate]);
 
-    const loadLocalFile = async (
-      url: string,
-      metadata?: { title?: string, author?: string },
-      loadMode: 'load' | 'cue' = 'load'
-    ) => {
-      console.log(`[Deck ${id}] loadLocalFile called:`, { url, loadMode, metadata });
+    const pumpLocalLoad = useCallback(async () => {
+      if (isLoadingRef.current || isConnectingRef.current) return;
+      const next = pendingLocalLoadRef.current;
+      if (!next) return;
 
-      if (isLoadingRef.current || isConnectingRef.current) {
-        console.warn(`[Deck ${id}] Load already in progress, canceling previous load`);
-      }
+      pendingLocalLoadRef.current = null;
+
       isLoadingRef.current = true;
-      const loadSeq = ++loadSeqRef.current;
+      const seq = ++loadSeqRef.current;
 
-      if (loadTimeoutRef.current !== null) {
-        window.clearTimeout(loadTimeoutRef.current);
-        loadTimeoutRef.current = null;
-      }
+      try { analysisAbortRef.current?.abort(); } catch (e) { }
+      analysisAbortRef.current = null;
+      setIsScanning(false);
 
-      if (analysisAbortRef.current) {
-        analysisAbortRef.current.abort();
-      }
-      const analysisController = new AbortController();
-      analysisAbortRef.current = analysisController;
-
-      if (localLoadCleanupRef.current) {
-        localLoadCleanupRef.current();
-        localLoadCleanupRef.current = null;
-      }
-
-      const finalizeLoad = (seq: number) => {
-        if (seq !== loadSeqRef.current) return;
+      const finalize = () => {
         isLoadingRef.current = false;
         isConnectingRef.current = false;
         setIsLoading(false);
-        if (loadTimeoutRef.current !== null) {
+        if (loadTimeoutRef.current) {
           window.clearTimeout(loadTimeoutRef.current);
           loadTimeoutRef.current = null;
         }
+        if (pendingLocalLoadRef.current) {
+          void pumpLocalLoad();
+        }
       };
-      
-      // CRITICAL: Clean up previous source REGARDLESS of type
-      if (state.sourceType === 'youtube') {
-        try { playerRef.current?.pauseVideo(); } catch (e) {}
-        try { playerRef.current?.stopVideo(); } catch (e) {}
-      }
-      
-      if (localAudioRef.current) {
-        try { localAudioRef.current.pause(); } catch (e) { }
-        try { localAudioRef.current.currentTime = 0; } catch (e) { }
-      }
 
-      // CRITICAL: Cleanup audio engine before switching source
-      await audioEngine.current.cleanup();
-
-      setIsLoading(loadMode !== 'cue');
-      setState(s => ({
-        ...s,
-        isReady: false,
-        playing: false,
-        currentTime: 0,
-        duration: 0,
-        waveform: undefined,
-        waveformPeaks: undefined
-      }));
-      loadTimeoutRef.current = window.setTimeout(() => {
-        console.warn(`[Deck ${id}] Local load timed out, releasing lock`);
-        finalizeLoad(loadSeq);
-      }, 15000);
-
-      if (localAudioRef.current) {
-        // Clear current source
-        localAudioRef.current.pause();
-        localAudioRef.current.currentTime = 0;
-        localAudioRef.current.src = '';
-        localAudioRef.current.load();
-        
-        // Set new source
-        localAudioRef.current.src = url;
-        localAudioRef.current.load();
-        
-        // Initialize audio engine with new source
-        connectAudioEngine();
-
-        const stableVideoId = `local_${url}`;
-        let hasLoaded = false;
-        const onLoaded = () => {
-          if (loadSeq !== loadSeqRef.current) return;
-          if (hasLoaded) return;
-          hasLoaded = true;
-          setState(s => ({
-            ...s,
-            isReady: true,
-            sourceType: 'local',
-            duration: localAudioRef.current?.duration || 0,
-            title: metadata?.title || url.split('/').pop() || 'Local Track',
-            author: metadata?.author || 'Local File',
-            videoId: stableVideoId,
-            playbackRate: 1.0,
-            playing: false,
-            currentTime: 0,
-            loopActive: false,
-            waveform: undefined,
-            waveformPeaks: undefined
-          }));
-
-          if (loadMode !== 'cue') {
-            analyzeLocalAudio(url, { signal: analysisController.signal, loadSeq });
-          }
-
-          onPlayerReady?.({
-            setVolume: (v: number) => { if (localAudioRef.current) localAudioRef.current.volume = v / 100; },
-            playVideo: () => localAudioRef.current?.play(),
-            pauseVideo: () => localAudioRef.current?.pause(),
-            seekTo: (t: number) => { if (localAudioRef.current) localAudioRef.current.currentTime = t; },
-            setPlaybackRate: (r: number) => { if (localAudioRef.current) localAudioRef.current.playbackRate = r; }
-          });
-
-          finalizeLoad(loadSeq);
-          cleanupListeners();
-        };
-
-        const onError = () => {
-          if (loadSeq !== loadSeqRef.current) return;
-          console.error(`[Deck ${id}] Failed to load local audio`);
-          setState(s => ({
-            ...s,
-            isReady: false,
-            playing: false,
-            sourceType: 'local',
-            title: metadata?.title || url.split('/').pop() || 'Local Track',
-            author: metadata?.author || 'Local File',
-            waveform: undefined,
-            waveformPeaks: undefined
-          }));
-          finalizeLoad(loadSeq);
-          cleanupListeners();
-        };
-
-        const onStalled = () => {
-          if (loadSeq !== loadSeqRef.current) return;
-          console.warn(`[Deck ${id}] Local audio stalled during load`);
-          finalizeLoad(loadSeq);
-          cleanupListeners();
-        };
-
-        const cleanupListeners = () => {
-          localAudioRef.current?.removeEventListener('loadedmetadata', onLoaded);
-          localAudioRef.current?.removeEventListener('canplay', onLoaded);
-          localAudioRef.current?.removeEventListener('error', onError);
-          localAudioRef.current?.removeEventListener('stalled', onStalled);
-        };
-
-        localLoadCleanupRef.current = cleanupListeners;
-
-        localAudioRef.current.addEventListener('loadedmetadata', onLoaded);
-        localAudioRef.current.addEventListener('canplay', onLoaded);
-        localAudioRef.current.addEventListener('error', onError);
-        localAudioRef.current.addEventListener('stalled', onStalled);
-      } else {
+      const audio = localAudioRef.current;
+      if (!audio) {
         console.error(`[Deck ${id}] localAudioRef.current is null!`);
-        setIsLoading(false);
-        finalizeLoad(loadSeq);
+        finalize();
+        return;
       }
-    };
+
+      console.log(`[Deck ${id}] loadLocalFile start:`, {
+        url: next.url,
+        loadMode: next.loadMode,
+        metadata: next.metadata,
+        seq
+      });
+
+      loadTimeoutRef.current = window.setTimeout(() => {
+        if (seq !== loadSeqRef.current) return;
+        console.warn(`[Deck ${id}] local load timeout, releasing lock`, { seq });
+        setState(s => ({
+          ...s,
+          isReady: false,
+          playing: false,
+          sourceType: 'local',
+          title: next.metadata?.title || 'Local Track',
+          author: next.metadata?.author || 'Local File'
+        }));
+        finalize();
+      }, 12000);
+
+      if (state.sourceType === 'youtube') {
+        try { playerRef.current?.pauseVideo(); } catch (e) { }
+        try { playerRef.current?.stopVideo(); } catch (e) { }
+      }
+
+      try {
+        await audioEngine.current.cleanup();
+      } catch (e) {
+        console.warn(`[Deck ${id}] audio engine cleanup failed:`, e);
+      }
+
+      setIsLoading(next.loadMode !== 'cue');
+
+      const stableVideoId = `local_${next.url}`;
+
+      const onLoaded = () => {
+        if (seq !== loadSeqRef.current) return;
+
+        setState(s => ({
+          ...s,
+          isReady: true,
+          sourceType: 'local',
+          duration: audio.duration || 0,
+          title: next.metadata?.title || next.url.split('/').pop() || 'Local Track',
+          author: next.metadata?.author || 'Local File',
+          videoId: stableVideoId,
+          playbackRate: 1.0,
+          playing: false,
+          currentTime: 0,
+          loopActive: false,
+          waveform: undefined,
+          waveformPeaks: undefined
+        }));
+
+        if (next.loadMode !== 'cue') {
+          const controller = new AbortController();
+          analysisAbortRef.current = controller;
+          void analyzeLocalAudio(next.url, seq, controller.signal);
+        }
+
+        onPlayerReady?.({
+          setVolume: (v: number) => { audio.volume = v / 100; },
+          playVideo: () => audio.play(),
+          pauseVideo: () => audio.pause(),
+          seekTo: (t: number) => { audio.currentTime = t; },
+          setPlaybackRate: (r: number) => { audio.playbackRate = r; }
+        });
+
+        finalize();
+      };
+
+      const onErrorLike = (ev?: any) => {
+        if (seq !== loadSeqRef.current) return;
+        console.warn(`[Deck ${id}] local audio load failed`, ev);
+        setState(s => ({
+          ...s,
+          isReady: false,
+          playing: false,
+          sourceType: 'local',
+          title: next.metadata?.title || next.url.split('/').pop() || 'Local Track',
+          author: next.metadata?.author || 'Local File'
+        }));
+        finalize();
+      };
+
+      audio.addEventListener('loadedmetadata', onLoaded, { once: true });
+      audio.addEventListener('error', onErrorLike, { once: true });
+      audio.addEventListener('stalled', onErrorLike, { once: true });
+
+      try { audio.pause(); } catch (e) { }
+      audio.src = '';
+      try { audio.load(); } catch (e) { }
+      audio.src = next.url;
+      try { audio.load(); } catch (e) { }
+
+      connectAudioEngine();
+    }, [connectAudioEngine, id, onPlayerReady, state.sourceType]);
+
+    const loadLocalFile = useCallback((
+      url: string,
+      metadata?: { title?: string; author?: string },
+      loadMode: 'load' | 'cue' = 'load'
+    ) => {
+      pendingLocalLoadRef.current = { url, metadata, loadMode };
+      void pumpLocalLoad();
+    }, [pumpLocalLoad]);
 
     const handleTap = useCallback(() => {
       const now = Date.now();
@@ -756,7 +737,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       toggleLoop: handleToggleLoop,
       setPlaybackRate: updatePlaybackRate,
       tapBpm: handleTap
-    }), [handleTap, initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate]);
+    }), [handleTap, initPlayer, loadLocalFile, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate]);
 
     useEffect(() => {
       if (!state.isReady) {
@@ -814,6 +795,12 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     // Cleanup audio engine on unmount
     useEffect(() => {
       return () => {
+        try { analysisAbortRef.current?.abort(); } catch (e) { }
+        analysisAbortRef.current = null;
+        if (loadTimeoutRef.current) {
+          window.clearTimeout(loadTimeoutRef.current);
+          loadTimeoutRef.current = null;
+        }
         void audioEngine.current.cleanup();
       };
     }, []);
