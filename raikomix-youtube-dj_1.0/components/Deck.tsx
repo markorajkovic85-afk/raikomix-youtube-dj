@@ -351,6 +351,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const loadSeqRef = useRef(0);
     const loadTimeoutRef = useRef<number | null>(null);
     const analysisAbortRef = useRef<AbortController | null>(null);
+    const localLoadCleanupRef = useRef<(() => void) | null>(null);
 
     const analyzeLocalAudio = async (
       url: string,
@@ -556,6 +557,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       const analysisController = new AbortController();
       analysisAbortRef.current = analysisController;
 
+      if (localLoadCleanupRef.current) {
+        localLoadCleanupRef.current();
+        localLoadCleanupRef.current = null;
+      }
+
       const finalizeLoad = (seq: number) => {
         if (seq !== loadSeqRef.current) return;
         isLoadingRef.current = false;
@@ -573,10 +579,24 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         try { playerRef.current?.stopVideo(); } catch (e) {}
       }
       
+      if (localAudioRef.current) {
+        try { localAudioRef.current.pause(); } catch (e) { }
+        try { localAudioRef.current.currentTime = 0; } catch (e) { }
+      }
+
       // CRITICAL: Cleanup audio engine before switching source
       await audioEngine.current.cleanup();
-      
+
       setIsLoading(loadMode !== 'cue');
+      setState(s => ({
+        ...s,
+        isReady: false,
+        playing: false,
+        currentTime: 0,
+        duration: 0,
+        waveform: undefined,
+        waveformPeaks: undefined
+      }));
       loadTimeoutRef.current = window.setTimeout(() => {
         console.warn(`[Deck ${id}] Local load timed out, releasing lock`);
         finalizeLoad(loadSeq);
@@ -585,6 +605,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       if (localAudioRef.current) {
         // Clear current source
         localAudioRef.current.pause();
+        localAudioRef.current.currentTime = 0;
         localAudioRef.current.src = '';
         localAudioRef.current.load();
         
@@ -596,8 +617,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         connectAudioEngine();
 
         const stableVideoId = `local_${url}`;
+        let hasLoaded = false;
         const onLoaded = () => {
           if (loadSeq !== loadSeqRef.current) return;
+          if (hasLoaded) return;
+          hasLoaded = true;
           setState(s => ({
             ...s,
             isReady: true,
@@ -656,11 +680,15 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
         const cleanupListeners = () => {
           localAudioRef.current?.removeEventListener('loadedmetadata', onLoaded);
+          localAudioRef.current?.removeEventListener('canplay', onLoaded);
           localAudioRef.current?.removeEventListener('error', onError);
           localAudioRef.current?.removeEventListener('stalled', onStalled);
         };
 
+        localLoadCleanupRef.current = cleanupListeners;
+
         localAudioRef.current.addEventListener('loadedmetadata', onLoaded);
+        localAudioRef.current.addEventListener('canplay', onLoaded);
         localAudioRef.current.addEventListener('error', onError);
         localAudioRef.current.addEventListener('stalled', onStalled);
       } else {
