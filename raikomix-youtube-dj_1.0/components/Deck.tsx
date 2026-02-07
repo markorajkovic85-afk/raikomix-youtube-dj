@@ -869,7 +869,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               {showVideo && (
                 <button
                   type="button"
-                  className="deck-video-overlay absolute top-1 right-2 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors z-10"
+                  className="absolute top-1 right-2 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors z-10 pointer-events-auto"
                   onPointerDown={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
