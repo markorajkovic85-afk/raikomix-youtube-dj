@@ -476,7 +476,16 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       if (state.sourceType === 'youtube') {
         state.playing ? playerRef.current?.pauseVideo() : playerRef.current?.playVideo();
       } else {
-        state.playing ? localAudioRef.current?.pause() : localAudioRef.current?.play();
+        if (state.playing) {
+          localAudioRef.current?.pause();
+        } else {
+          const playPromise = localAudioRef.current?.play();
+          if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch((error: unknown) => {
+              console.warn(`[Deck ${id}] local play blocked`, error);
+            });
+          }
+        }
       }
     }, [state.playing, state.sourceType]);
 

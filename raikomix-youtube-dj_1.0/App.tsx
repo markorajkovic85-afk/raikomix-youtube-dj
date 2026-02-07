@@ -915,6 +915,12 @@ const App: React.FC = () => {
   const startDeckPlayback = useCallback((deckId: DeckId, delayMs = 0) => {
     const ref = deckId === 'A' ? deckARef : deckBRef;
     const trigger = () => {
+      const ctx = audioContextRef.current;
+      if (ctx?.state === 'suspended') {
+        ctx.resume().catch(error => {
+          console.warn('[AUDIO] Auto DJ resume failed', error);
+        });
+      }
       ref.current?.resumeContext?.();
       ref.current?.togglePlay();
     };
