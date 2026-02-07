@@ -164,6 +164,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           context: audioContext ?? undefined,
           destination: masterGainNode ?? undefined
         });
+      } catch (error) {
+        console.error(`[Deck ${id}] audio engine init failed`, error);
       } finally {
         isConnectingRef.current = false;
       }
@@ -597,10 +599,12 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         try { playerRef.current?.stopVideo(); } catch (e) { }
       }
 
-      try {
-        await audioEngine.current.cleanup();
-      } catch (e) {
-        console.warn(`[Deck ${id}] audio engine cleanup failed:`, e);
+      if (state.sourceType === 'youtube') {
+        try {
+          await audioEngine.current.cleanup();
+        } catch (e) {
+          console.warn(`[Deck ${id}] audio engine cleanup failed:`, e);
+        }
       }
 
       setIsLoading(next.loadMode !== 'cue');
@@ -701,8 +705,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             try { localAudioRef.current.pause(); } catch (e) { }
             try { localAudioRef.current.currentTime = 0; } catch (e) { }
           }
-          void audioEngine.current.cleanup();
-
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
             initPlayer(vid, 'load');
@@ -721,8 +723,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             try { localAudioRef.current.pause(); } catch (e) { }
             try { localAudioRef.current.currentTime = 0; } catch (e) { }
           }
-          void audioEngine.current.cleanup();
-
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
             initPlayer(vid, 'cue');
