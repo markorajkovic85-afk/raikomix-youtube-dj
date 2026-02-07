@@ -140,6 +140,7 @@ const App: React.FC = () => {
   const autoStopRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const masterGainA = useRef<GainNode | null>(null);
   const masterGainB = useRef<GainNode | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   
   // Scaling system refs - properly typed for the hook
   const centralStageContainerRef = useRef<HTMLDivElement>(null);
@@ -1225,7 +1226,7 @@ const App: React.FC = () => {
 
   // Initialize shared audio context + master gain nodes once.
   useEffect(() => {
-    if (audioContext) return;
+    if (audioContextRef.current) return;
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
@@ -1237,6 +1238,7 @@ const App: React.FC = () => {
     gainB.connect(ctx.destination);
     masterGainA.current = gainA;
     masterGainB.current = gainB;
+    audioContextRef.current = ctx;
     setAudioContext(ctx);
     setMasterGainNodes({ A: gainA, B: gainB });
     return () => {
@@ -1246,7 +1248,7 @@ const App: React.FC = () => {
         ctx.close();
       }
     };
-  }, [audioContext]);
+  }, []);
 
   // Web Audio API crossfader volume control (replaces 50ms interval)
   const updateCrossfaderVolumes = useCallback(() => {
