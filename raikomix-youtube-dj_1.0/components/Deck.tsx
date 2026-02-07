@@ -662,38 +662,39 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     }), [handleTap, initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate]);
 
     useEffect(() => {
+      if (!state.isReady) {
+        return;
+      }
       if (!state.playing && !state.loopActive) {
         return;
       }
 
       const intervalMs = state.playing ? 100 : 500;
       const interval = setInterval(() => {
-        if (state.isReady) {
-          let t = 0;
-          let nextDuration: number | null = null;
-          if (state.sourceType === 'youtube' && playerRef.current) {
-            try {
-              t = playerRef.current.getCurrentTime();
-              nextDuration = playerRef.current.getDuration?.() || null;
-            } catch (e) { }
-          } else if (state.sourceType === 'local' && localAudioRef.current) {
-            t = localAudioRef.current.currentTime;
-            nextDuration = localAudioRef.current.duration || null;
-          }
-
-          if (state.loopActive && t >= state.loopEnd) {
-            if (state.sourceType === 'youtube') playerRef.current?.seekTo(state.loopStart, true);
-            else if (localAudioRef.current) localAudioRef.current.currentTime = state.loopStart;
-          }
-          setState(s => {
-            const duration = nextDuration && Math.abs(nextDuration - s.duration) > 0.5
-              ? nextDuration
-              : s.duration;
-            const timeChanged = Math.abs(t - s.currentTime) > 0.05;
-            if (!timeChanged && duration === s.duration) return s;
-            return { ...s, currentTime: t, duration };
-          });
+        let t = 0;
+        let nextDuration: number | null = null;
+        if (state.sourceType === 'youtube' && playerRef.current) {
+          try {
+            t = playerRef.current.getCurrentTime();
+            nextDuration = playerRef.current.getDuration?.() || null;
+          } catch (e) { }
+        } else if (state.sourceType === 'local' && localAudioRef.current) {
+          t = localAudioRef.current.currentTime;
+          nextDuration = localAudioRef.current.duration || null;
         }
+
+        if (state.loopActive && t >= state.loopEnd) {
+          if (state.sourceType === 'youtube') playerRef.current?.seekTo(state.loopStart, true);
+          else if (localAudioRef.current) localAudioRef.current.currentTime = state.loopStart;
+        }
+        setState(s => {
+          const duration = nextDuration && Math.abs(nextDuration - s.duration) > 0.5
+            ? nextDuration
+            : s.duration;
+          const timeChanged = Math.abs(t - s.currentTime) > 0.05;
+          if (!timeChanged && duration === s.duration) return s;
+          return { ...s, currentTime: t, duration };
+        });
       }, intervalMs);
       return () => clearInterval(interval);
     }, [state.isReady, state.playing, state.loopActive, state.loopStart, state.loopEnd, state.sourceType]);
