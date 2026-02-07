@@ -20,7 +20,6 @@ interface PerformancePadDialogProps {
   onPreflightYouTube: (pad: PerformancePadConfig) => void;
   onCancelYouTube: (videoId?: string) => void;
   youtubeStates: Record<string, { state: YouTubeLoadingState; message?: string }>;
-  youtubeDurations: Record<string, number>;
   activePreviewVideoId: string | null;
   isKeyConflict: (key: string) => boolean;
 }
@@ -115,7 +114,6 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   onPreflightYouTube,
   onCancelYouTube,
   youtubeStates,
-  youtubeDurations,
   activePreviewVideoId,
   isKeyConflict,
 }) => {
@@ -143,6 +141,10 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const recordingStartTimeRef = React.useRef<number | null>(null);
   const recorderPhaseRef = React.useRef<'idle' | 'starting' | 'recording' | 'stopping'>('idle');
   const recorderSessionRef = React.useRef(0);
+  const previewPlayerRef = React.useRef<any>(null);
+  const previewPlayerVideoIdRef = React.useRef<string | null>(null);
+  const previewPlayerTimeoutRef = React.useRef<number | null>(null);
+  const previewPlayerContainerRef = React.useRef<HTMLDivElement | null>(null);
   const fallbackRecorderRef = React.useRef<{
     ctx: AudioContext;
     source: MediaStreamAudioSourceNode;
@@ -173,6 +175,108 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       canSave: trimValid && draft.sourceType !== 'empty' && youtubeReady,
     };
   }, [draft, isYouTubeBusy]);
+
+  const waitForYouTubeApi = useCallback(
+    () =>
+      new Promise<void>((resolve) => {
+        if (window.YT && window.YT.Player) {
+          resolve();
+          return;
+        }
+        const handler = () => {
+          window.removeEventListener('youtube-api-ready', handler);
+          resolve();
+        };
+        window.addEventListener('youtube-api-ready', handler);
+      }),
+    []
+  );
+
+  const applyDurationToDraft = useCallback((videoId: string, resolvedDuration: number) => {
+    if (!resolvedDuration || resolvedDuration <= 0) return;
+    setDraft((prev) => {
+      if (prev.sourceType !== 'youtube' || prev.sourceId !== videoId) return prev;
+      if (prev.duration && prev.duration > 0 && prev.duration === resolvedDuration) return prev;
+      const currentLength = getTrimLength(prev);
+      if (prev.trimLock) {
+        const nextTrimEnd = Math.min(prev.trimStart + currentLength, resolvedDuration);
+        const nextTrimStart = Math.max(0, nextTrimEnd - currentLength);
+        return {
+          ...prev,
+          duration: resolvedDuration,
+          trimStart: nextTrimStart,
+          trimEnd: nextTrimEnd,
+          trimLength: Math.min(currentLength, resolvedDuration),
+        };
+      }
+      const shouldAutoFit = prev.trimStart === 0 && prev.trimEnd <= 5;
+      return {
+        ...prev,
+        duration: resolvedDuration,
+        trimEnd: shouldAutoFit ? resolvedDuration : Math.min(prev.trimEnd, resolvedDuration),
+      };
+    });
+  }, []);
+
+  const clearPreviewPlayerTimer = useCallback(() => {
+    if (previewPlayerTimeoutRef.current) {
+      window.clearTimeout(previewPlayerTimeoutRef.current);
+      previewPlayerTimeoutRef.current = null;
+    }
+  }, []);
+
+  const pollPreviewPlayerDuration = useCallback(
+    (videoId: string, attempt = 0) => {
+      if (previewPlayerVideoIdRef.current !== videoId) return;
+      const durationValue = previewPlayerRef.current?.getDuration?.() || 0;
+      if (durationValue > 0) {
+        applyDurationToDraft(videoId, durationValue);
+        clearPreviewPlayerTimer();
+        return;
+      }
+      if (attempt >= 10) {
+        clearPreviewPlayerTimer();
+        return;
+      }
+      previewPlayerTimeoutRef.current = window.setTimeout(() => {
+        pollPreviewPlayerDuration(videoId, attempt + 1);
+      }, 250);
+    },
+    [applyDurationToDraft, clearPreviewPlayerTimer]
+  );
+
+  const ensurePreviewPlayer = useCallback(
+    async (videoId: string) => {
+      await waitForYouTubeApi();
+      if (!previewPlayerContainerRef.current) return;
+      previewPlayerVideoIdRef.current = videoId;
+      if (!previewPlayerRef.current) {
+        previewPlayerRef.current = new window.YT.Player(previewPlayerContainerRef.current, {
+          height: '1',
+          width: '1',
+          videoId,
+          playerVars: { autoplay: 0, controls: 0, disablekb: 1, rel: 0, modestbranding: 1 },
+          events: {
+            onReady: (event: any) => {
+              event.target.cueVideoById(videoId);
+              pollPreviewPlayerDuration(videoId);
+            },
+            onStateChange: (event: any) => {
+              if (event?.data !== window.YT?.PlayerState?.CUED) return;
+              pollPreviewPlayerDuration(videoId);
+            },
+            onError: () => {
+              clearPreviewPlayerTimer();
+            },
+          },
+        });
+        return;
+      }
+      previewPlayerRef.current.cueVideoById(videoId);
+      pollPreviewPlayerDuration(videoId);
+    },
+    [clearPreviewPlayerTimer, pollPreviewPlayerDuration, waitForYouTubeApi]
+  );
 
   const saveRecordingFile = useCallback(
     async (file: File) => {
@@ -479,30 +583,8 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   useEffect(() => {
     if (draft.sourceType !== 'youtube' || !draft.sourceId) return;
     if (draft.duration && draft.duration > 0) return;
-    const resolvedDuration = youtubeDurations[draft.sourceId];
-    if (!resolvedDuration || resolvedDuration <= 0) return;
-    setDraft((prev) => {
-      if (prev.duration && prev.duration > 0) return prev;
-      const currentLength = getTrimLength(prev);
-      if (prev.trimLock) {
-        const nextTrimEnd = Math.min(prev.trimStart + currentLength, resolvedDuration);
-        const nextTrimStart = Math.max(0, nextTrimEnd - currentLength);
-        return {
-          ...prev,
-          duration: resolvedDuration,
-          trimStart: nextTrimStart,
-          trimEnd: nextTrimEnd,
-          trimLength: Math.min(currentLength, resolvedDuration),
-        };
-      }
-      const shouldAutoFit = prev.trimStart === 0 && prev.trimEnd <= 5;
-      return {
-        ...prev,
-        duration: resolvedDuration,
-        trimEnd: shouldAutoFit ? resolvedDuration : Math.min(prev.trimEnd, resolvedDuration),
-      };
-    });
-  }, [draft.duration, draft.sourceId, draft.sourceType, youtubeDurations]);
+    void ensurePreviewPlayer(draft.sourceId);
+  }, [draft.duration, draft.sourceId, draft.sourceType, ensurePreviewPlayer]);
 
   useEffect(() => {
     const trimmedQuery = query.trim();
@@ -585,6 +667,11 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       // Only cleanup on actual unmount
       onStopPreview();
       onCancelYouTube();
+      clearPreviewPlayerTimer();
+      if (previewPlayerRef.current) {
+        previewPlayerRef.current.destroy();
+        previewPlayerRef.current = null;
+      }
       if (recorderRef.current?.state === 'recording') {
         console.log('[Recording] Cleanup: stopping recorder');
         recorderRef.current.stop();
@@ -601,7 +688,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       recorderStreamRef.current = null;
       recorderChunksRef.current = [];
     },
-    [onCancelYouTube, onStopPreview]
+    [clearPreviewPlayerTimer, onCancelYouTube, onStopPreview]
   );
 
   const handleTrimChange = (field: 'trimStart' | 'trimEnd', value: number) => {
@@ -712,6 +799,11 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const handleClose = () => {
     onStopPreview();
     onCancelYouTube();
+    clearPreviewPlayerTimer();
+    if (previewPlayerRef.current) {
+      previewPlayerRef.current.destroy();
+      previewPlayerRef.current = null;
+    }
     if (recorderRef.current?.state === 'recording') {
       recorderRef.current.stop();
     }
@@ -751,6 +843,15 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     };
   };
 
+  const selectYouTubeResult = useCallback(
+    (result: YouTubeSearchResult) => {
+      const nextDraft = buildYouTubeDraft(result);
+      setDraft(nextDraft);
+      void ensurePreviewPlayer(result.videoId);
+    },
+    [buildYouTubeDraft, ensurePreviewPlayer]
+  );
+
   const handlePreview = async (nextDraft: PerformancePadConfig, previewId?: string | null) => {
     if (previewId && previewErrors[previewId]) return;
     setGeneralPreviewError(null);
@@ -781,6 +882,9 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       aria-modal="true"
       onClick={handleClose}
     >
+      <div className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none" aria-hidden="true">
+        <div ref={previewPlayerContainerRef} />
+      </div>
       <div
         className="m3-card bg-[#1D1B20] border border-white/10 rounded-3xl w-full max-w-5xl shadow-[0_0_80px_rgba(13,11,19,0.9)] flex flex-col max-h-[90vh] overflow-hidden"
         onClick={(event) => event.stopPropagation()}
@@ -949,7 +1053,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                                     stopPreview();
                                     return;
                                   }
-                                  setDraft(nextDraft);
+                                  selectYouTubeResult(result);
                                   handlePreview(nextDraft, result.videoId);
                                 }}
                                 className="text-[9px] font-black uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-full disabled:opacity-40 disabled:cursor-not-allowed"
@@ -969,7 +1073,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setDraft(nextDraft);
+                                  selectYouTubeResult(result);
                                   onPreflightYouTube(nextDraft);
                                 }}
                                 className="text-[9px] font-black uppercase tracking-widest bg-[#D0BCFF] text-black px-3 py-1.5 rounded-full shadow-[0_0_16px_rgba(208,188,255,0.4)]"
