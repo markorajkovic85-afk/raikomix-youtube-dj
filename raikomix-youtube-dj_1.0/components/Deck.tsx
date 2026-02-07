@@ -662,6 +662,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     }), [handleTap, initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate]);
 
     useEffect(() => {
+      if (!state.playing && !state.loopActive) {
+        return;
+      }
+
+      const intervalMs = state.playing ? 100 : 500;
       const interval = setInterval(() => {
         if (state.isReady) {
           let t = 0;
@@ -689,9 +694,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             return { ...s, currentTime: t, duration };
           });
         }
-      }, 100);
+      }, intervalMs);
       return () => clearInterval(interval);
-    }, [state.isReady, state.loopActive, state.loopStart, state.loopEnd, state.sourceType]);
+    }, [state.isReady, state.playing, state.loopActive, state.loopStart, state.loopEnd, state.sourceType]);
 
     useEffect(() => { onStateUpdate(state); }, [state, onStateUpdate]);
 
