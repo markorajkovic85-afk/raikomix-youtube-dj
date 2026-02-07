@@ -912,7 +912,7 @@ const App: React.FC = () => {
     }
   }, [deckAState, deckBState]);
 
-  const startDeckPlayback = useCallback((deckId: DeckId, delayMs = 0) => {
+  const startDeckPlayback = useCallback((deckId: DeckId, delayMs = 150) => {
     const ref = deckId === 'A' ? deckARef : deckBRef;
     const trigger = () => {
       const ctx = audioContextRef.current;
@@ -921,15 +921,18 @@ const App: React.FC = () => {
           console.warn('[AUDIO] Auto DJ resume failed', error);
         });
       }
-      ref.current?.resumeContext?.();
-      ref.current?.togglePlay();
+      updateCrossfaderVolumes();
+      setTimeout(() => {
+        ref.current?.resumeContext?.();
+        ref.current?.togglePlay();
+      }, 100);
     };
     if (delayMs > 0) {
       setTimeout(trigger, delayMs);
     } else {
       trigger();
     }
-  }, []);
+  }, [updateCrossfaderVolumes]);
 
   const startAutoMix = useCallback((fromDeck: DeckId, targetDeck: DeckId) => {
     if (mixInProgressRef.current) return;
@@ -1241,7 +1244,7 @@ const App: React.FC = () => {
           setCrossfader(deckToStart === 'A' ? -1 : 1);
           // FIX: Apply crossfader volumes immediately before starting playback
           updateCrossfaderVolumes();
-          startDeckPlayback(deckToStart);
+          startDeckPlayback(deckToStart, 150);
           return;
         }
 
@@ -1252,7 +1255,7 @@ const App: React.FC = () => {
           setCrossfader(deckToStart === 'A' ? -1 : 1);
           // FIX: Apply crossfader volumes immediately before starting playback
           updateCrossfaderVolumes();
-          startDeckPlayback(deckToStart);
+          startDeckPlayback(deckToStart, 150);
           return;
         }
 
@@ -1268,7 +1271,7 @@ const App: React.FC = () => {
           setCrossfader(nextDeck === 'A' ? -1 : 1);
           // FIX: Apply crossfader volumes immediately before starting playback
           updateCrossfaderVolumes();
-          startDeckPlayback(nextDeck);
+          startDeckPlayback(nextDeck, 150);
           return;
         }
         
@@ -1285,7 +1288,7 @@ const App: React.FC = () => {
         setCrossfader(nextDeck === 'A' ? -1 : 1);
         // FIX: Apply crossfader volumes immediately before starting playback
         updateCrossfaderVolumes();
-        startDeckPlayback(nextDeck);
+        startDeckPlayback(nextDeck, 150);
         return;
       }
 
@@ -1332,6 +1335,8 @@ const App: React.FC = () => {
         
         if (txn && txn.targetDeck === targetDeck && txn.state === 'READY') {
           console.log(`[TXN ${txn.id}] ${remaining.toFixed(1)}s remaining → starting playback early`);
+          setCrossfader(targetDeck === 'A' ? -1 : 1);
+          updateCrossfaderVolumes();
           startDeckPlayback(targetDeck, 150);
         } else if (txn && txn.targetDeck === targetDeck && txn.state === 'PRELOADING') {
           console.log(`[TXN ${txn.id}] Still preloading at ${remaining.toFixed(1)}s - waiting for READY state`);
@@ -1339,7 +1344,9 @@ const App: React.FC = () => {
           console.warn(`[AUTO DJ] FAILSAFE: No transaction at ${remaining.toFixed(1)}s - loading directly`);
           const nextItem = loadNextQueueItem(targetDeck, 'load');
           if (nextItem) {
-            startDeckPlayback(targetDeck, 500);
+            setCrossfader(targetDeck === 'A' ? -1 : 1);
+            updateCrossfaderVolumes();
+            startDeckPlayback(targetDeck, 150);
           }
         }
       }
