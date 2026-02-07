@@ -17,6 +17,8 @@ export class DeckAudioEngine {
   private id: string;
   private ctx: AudioContext | null = null;
   private sourceNode: MediaElementAudioSourceNode | null = null;
+  private outputNode: AudioNode | null = null;
+  private ownsContext = false;
   private nodes: {
     low: BiquadFilterNode;
     mid: BiquadFilterNode;
@@ -43,12 +45,23 @@ export class DeckAudioEngine {
     return this.ctx;
   }
 
-  initialize(element: HTMLMediaElement) {
+  initialize(element: HTMLMediaElement, options?: { context?: AudioContext; destination?: AudioNode }) {
     if (!element) return;
-    if (!this.ctx || this.ctx.state === 'closed') {
+    if (options?.context) {
+      if (this.ctx !== options.context) {
+        this.ctx = options.context;
+        this.ownsContext = false;
+      }
+    } else if (!this.ctx || this.ctx.state === 'closed') {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      this.ownsContext = true;
     }
-    if (this.sourceNode || !this.ctx) return;
+    if (this.sourceNode || !this.ctx) {
+      if (options?.destination) {
+        this.setOutputNode(options.destination);
+      }
+      return;
+    }
 
     const ctx = this.ctx;
     const source = ctx.createMediaElementSource(element);
@@ -86,14 +99,29 @@ export class DeckAudioEngine {
     effectOutput.connect(wetGain);
     wetGain.connect(mixGain);
     mixGain.connect(gainNode);
-    gainNode.connect(ctx.destination);
+    const destination = options?.destination ?? this.outputNode ?? ctx.destination;
+    gainNode.connect(destination);
 
     this.sourceNode = source;
     this.nodes = { low, mid, hi, filter, gain: gainNode, dryGain, wetGain, mixGain, effectInput, effectOutput };
+    this.outputNode = destination;
 
     this.updateEQ(this.currentEq);
     this.updateWetDryMix(this.currentWet);
     this.applyEffect(this.currentEffect, this.currentIntensity);
+  }
+
+  setOutputNode(node: AudioNode | null) {
+    this.outputNode = node;
+    if (!this.nodes || !this.ctx) return;
+    const { gain } = this.nodes;
+    try {
+      gain.disconnect();
+    } catch (e) { }
+    const destination = node ?? this.ctx.destination;
+    try {
+      gain.connect(destination);
+    } catch (e) { }
   }
 
   private clearEffectChain() {
@@ -191,9 +219,12 @@ export class DeckAudioEngine {
     }
     this.nodes = null;
     this.sourceNode = null;
-    if (this.ctx && this.ctx.state !== 'closed') {
+    this.outputNode = null;
+    if (this.ownsContext && this.ctx && this.ctx.state !== 'closed') {
       this.ctx.close();
     }
-    this.ctx = null;
+    if (this.ownsContext) {
+      this.ctx = null;
+    }
   }
 }

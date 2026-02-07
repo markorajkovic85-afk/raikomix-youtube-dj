@@ -19,12 +19,14 @@ interface DeckProps {
   id: DeckId;
   color: string;
   onStateUpdate: (state: PlayerState) => void;
-  onPlayerReady: (player: any) => void;
+  onPlayerReady?: (player: any) => void;
   onTrackEnd?: () => void;
   eq: { hi: number, mid: number, low: number, filter: number };
   effect: EffectType | null;
   effectWet: number;
   effectIntensity: number;
+  audioContext: AudioContext | null;
+  masterGainNode: GainNode | null;
 }
 
 export interface DeckHandle {
@@ -73,7 +75,7 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 const Deck = forwardRef<DeckHandle, DeckProps>(
-  ({ id, color, onStateUpdate, onPlayerReady, onTrackEnd, eq, effect, effectWet, effectIntensity }, ref) => {
+  ({ id, color, onStateUpdate, onPlayerReady, onTrackEnd, eq, effect, effectWet, effectIntensity, audioContext, masterGainNode }, ref) => {
     const [isLoading, setIsLoading] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     const [tapHistory, setTapHistory] = useState<number[]>([]);
@@ -142,14 +144,27 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }, []);
 
+    const ensureYouTubeVolume = useCallback((player?: any) => {
+      const target = player ?? playerRef.current;
+      try {
+        target?.setVolume?.(100);
+      } catch (e) { }
+    }, []);
+
     // Audio Engine (manages all Web Audio nodes)
     const audioEngine = useRef(new DeckAudioEngine(id));
 
-    // Initialize Audio Engine - Safe version that doesn't re-create source node
-    const initAudioEngine = useCallback(() => {
+    const connectAudioEngine = useCallback(() => {
       if (!localAudioRef.current) return;
-      audioEngine.current.initialize(localAudioRef.current);
-    }, []);
+      audioEngine.current.initialize(localAudioRef.current, {
+        context: audioContext ?? undefined,
+        destination: masterGainNode ?? undefined
+      });
+    }, [audioContext, masterGainNode]);
+
+    useEffect(() => {
+      audioEngine.current.setOutputNode(masterGainNode ?? null);
+    }, [masterGainNode]);
 
     const applyEffectChain = useCallback((effectType: EffectType | null) => {
       audioEngine.current.applyEffect(effectType, effectIntensity);
@@ -464,7 +479,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           onReady: (event: any) => {
             const p = event.target;
             updateMetadata(p);
-            onPlayerReady({
+            ensureYouTubeVolume(p);
+            onPlayerReady?.({
               setVolume: (v: number) => p.setVolume(v),
               playVideo: () => p.playVideo(),
               pauseVideo: () => p.pauseVideo(),
@@ -480,6 +496,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             if (playerState === window.YT.PlayerState.CUED || playerState === window.YT.PlayerState.PLAYING) {
               updateMetadata(event.target);
               event.target.setPlaybackRate(state.playbackRate);
+              ensureYouTubeVolume(event.target);
               setIsLoading(false);
             }
 
@@ -490,7 +507,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           },
         }
       });
-    }, [containerId, onPlayerReady, onTrackEnd, updateMetadata, state.playbackRate]);
+    }, [containerId, ensureYouTubeVolume, onPlayerReady, onTrackEnd, updateMetadata, state.playbackRate]);
 
     const loadLocalFile = (
       url: string,
@@ -521,7 +538,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         localAudioRef.current.load();
         
         // Initialize audio engine with new source
-        audioEngine.current.initialize(localAudioRef.current);
+        connectAudioEngine();
 
         const stableVideoId = `local_${url}`;
         const onLoaded = () => {
@@ -545,7 +562,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             analyzeLocalAudio(url);
           }
 
-          onPlayerReady({
+          onPlayerReady?.({
             setVolume: (v: number) => { if (localAudioRef.current) localAudioRef.current.volume = v / 100; },
             playVideo: () => localAudioRef.current?.play(),
             pauseVideo: () => localAudioRef.current?.pause(),
@@ -585,6 +602,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             try { localAudioRef.current.pause(); } catch (e) { }
             try { localAudioRef.current.currentTime = 0; } catch (e) { }
           }
+          audioEngine.current.cleanup();
 
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
@@ -604,6 +622,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             try { localAudioRef.current.pause(); } catch (e) { }
             try { localAudioRef.current.currentTime = 0; } catch (e) { }
           }
+          audioEngine.current.cleanup();
 
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
@@ -619,7 +638,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       toggleLoop: handleToggleLoop,
       setPlaybackRate: updatePlaybackRate,
       tapBpm: handleTap
-    }), [handleTap, initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate, initAudioEngine]);
+    }), [handleTap, initPlayer, togglePlay, handleHotCue, handleToggleLoop, updatePlaybackRate]);
 
     useEffect(() => {
       const interval = setInterval(() => {
