@@ -84,6 +84,10 @@ interface TransitionTransaction {
   startedAt: number;            // Timestamp for timeout detection
 }
 
+interface DeckPlayerControls {
+  setVolume: (volume: number) => void;
+}
+
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'PERFORM' | 'LIBRARY'>('LIBRARY');
   const [libraryOpen, setLibraryOpen] = useState(true);
@@ -124,6 +128,8 @@ const App: React.FC = () => {
 
   const deckARef = useRef<DeckHandle>(null);
   const deckBRef = useRef<DeckHandle>(null);
+  const ytARef = useRef<DeckPlayerControls | null>(null);
+  const ytBRef = useRef<DeckPlayerControls | null>(null);
   const mixAnimationRef = useRef<number | null>(null);
   const mixInProgressRef = useRef(false);
   const pendingMixRef = useRef<{ deck: DeckId; fromDeck: DeckId; item: QueueItem } | null>(null);
@@ -1252,8 +1258,6 @@ const App: React.FC = () => {
 
   // Web Audio API crossfader volume control (replaces 50ms interval)
   const updateCrossfaderVolumes = useCallback(() => {
-    if (!masterGainA.current || !masterGainB.current) return;
-
     const t = (crossfader + 1) / 2; // Normalize to 0..1
     const curveMap: Record<CrossfaderCurve, (t: number) => [number, number]> = {
       'SMOOTH': (t) => [Math.cos(t * Math.PI * 0.5), Math.sin(t * Math.PI * 0.5)],
@@ -1265,6 +1269,7 @@ const App: React.FC = () => {
     };
 
     const normalizeVolume = (value: number) => (value > 1 ? value / 100 : value);
+    const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
     const master = normalizeVolume(masterVolume);
     const deckA = normalizeVolume(deckAVolume);
     const deckB = normalizeVolume(deckBVolume);
@@ -1275,10 +1280,29 @@ const App: React.FC = () => {
     const finalB = gainB * deckB * master;
 
     // Smooth ramp for audio quality
-    const now = masterGainA.current.context.currentTime;
-    masterGainA.current.gain.setTargetAtTime(finalA, now, 0.02);
-    masterGainB.current.gain.setTargetAtTime(finalB, now, 0.02);
-  }, [crossfader, xFaderCurve, deckAVolume, deckBVolume, masterVolume]);
+    if (deckAState?.sourceType === 'youtube') {
+      ytARef.current?.setVolume(Math.round(clamp01(finalA) * 100));
+    } else if (masterGainA.current) {
+      const now = masterGainA.current.context.currentTime;
+      masterGainA.current.gain.setTargetAtTime(finalA, now, 0.02);
+    }
+
+    if (deckBState?.sourceType === 'youtube') {
+      ytBRef.current?.setVolume(Math.round(clamp01(finalB) * 100));
+    } else if (masterGainB.current) {
+      const now = masterGainB.current.context.currentTime;
+      masterGainB.current.gain.setTargetAtTime(finalB, now, 0.02);
+    }
+  }, [crossfader, xFaderCurve, deckAVolume, deckBVolume, masterVolume, deckAState?.sourceType, deckBState?.sourceType]);
+
+  const handlePlayerReady = useCallback((id: DeckId, controls: DeckPlayerControls) => {
+    if (id === 'A') {
+      ytARef.current = controls;
+    } else {
+      ytBRef.current = controls;
+    }
+    updateCrossfaderVolumes();
+  }, [updateCrossfaderVolumes]);
 
   // Update on any volume change
   useEffect(() => {
@@ -1443,6 +1467,7 @@ const App: React.FC = () => {
                       audioContext={audioContext}
                       masterGainNode={masterGainNodes.A}
                       onStateUpdate={s => handleDeckStateUpdate('A', s)}
+                      onPlayerReady={controls => handlePlayerReady('A', controls)}
                       onTrackEnd={() => handleTrackEnd('A')}
                     />
                   </div>
@@ -1487,6 +1512,7 @@ const App: React.FC = () => {
                       audioContext={audioContext}
                       masterGainNode={masterGainNodes.B}
                       onStateUpdate={s => handleDeckStateUpdate('B', s)}
+                      onPlayerReady={controls => handlePlayerReady('B', controls)}
                       onTrackEnd={() => handleTrackEnd('B')}
                     />
                   </div>

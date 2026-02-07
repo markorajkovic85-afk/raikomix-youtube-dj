@@ -144,13 +144,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }, []);
 
-    const ensureYouTubeVolume = useCallback((player?: any) => {
-      const target = player ?? playerRef.current;
-      try {
-        target?.setVolume?.(100);
-      } catch (e) { }
-    }, []);
-
     // Audio Engine (manages all Web Audio nodes)
     const audioEngine = useRef(new DeckAudioEngine(id));
     const isLoadingRef = useRef(false);
@@ -509,7 +502,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           onReady: (event: any) => {
             const p = event.target;
             updateMetadata(p);
-            ensureYouTubeVolume(p);
             onPlayerReady?.({
               setVolume: (v: number) => p.setVolume(v),
               playVideo: () => p.playVideo(),
@@ -526,7 +518,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             if (playerState === window.YT.PlayerState.CUED || playerState === window.YT.PlayerState.PLAYING) {
               updateMetadata(event.target);
               event.target.setPlaybackRate(state.playbackRate);
-              ensureYouTubeVolume(event.target);
               setIsLoading(false);
             }
 
@@ -537,7 +528,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           },
         }
       });
-    }, [containerId, ensureYouTubeVolume, onPlayerReady, onTrackEnd, updateMetadata, state.playbackRate]);
+    }, [containerId, onPlayerReady, onTrackEnd, updateMetadata, state.playbackRate]);
 
     const pumpLocalLoad = useCallback(async () => {
       if (isLoadingRef.current || isConnectingRef.current) return;
