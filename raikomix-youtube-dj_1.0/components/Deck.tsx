@@ -878,8 +878,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           }}
         />
 
-        {/* Visual Stage (Waveform + optional Artistic Video overlay) */}
-        <div className="w-full min-w-0 flex-1 min-h-[clamp(56px,10vh,120px)]">
+        {/* Visual Stage (Waveform + optional Artistic Video overlay) - ALWAYS VISIBLE */}
+        <div className="w-full min-w-0 flex-1 min-h-[clamp(56px,10vh,120px)]" style={{ position: 'relative', zIndex: 10 }}>
           <div className="deck-visual-stage relative">
             <div
               className={`deck-video-shell ${showVideo ? 'deck-video-shell--on' : ''}`}
@@ -895,6 +895,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               <div className="deck-video-overlay deck-video-glitch" />
               <div className="deck-video-overlay deck-video-vignette" />
 
+              {/* TIME DISPLAY - ALWAYS VISIBLE (z-index 60) */}
               {showVideo && (
                 <button
                   type="button"
@@ -935,7 +936,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               )}
             </div>
 
-            {/* Waveform (full-height in wave mode; thin seek line in video mode) */}
+            {/* WAVEFORM & DURATION LINE - ALWAYS VISIBLE */}
             {showVideo ? (
               <div
                 ref={videoSeekRef}
@@ -1009,7 +1010,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                           border: 'none',
                           padding: 0,
                           margin: 0,
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          zIndex: 55
                         }}
                         onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         onClick={(e) => {
@@ -1049,7 +1051,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                       width: '2px',
                       transform: 'translateX(-1px)',
                       background: color,
-                      boxShadow: `0 0 10px ${color}88`
+                      boxShadow: `0 0 10px ${color}88`,
+                      zIndex: 56
                     }}
                   />
                 </div>
@@ -1087,8 +1090,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
         </div>
 
-        {/* Row 1: Title + Play */}
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-stretch min-w-0">
+        {/* Row 1: Title + Play - ALWAYS VISIBLE */}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 items-stretch min-w-0" style={{ zIndex: 10 }}>
           <div className="bg-black/30 rounded-lg border border-white/5 px-2 py-1.5 min-w-0 overflow-hidden flex items-center">
             <div className="flex items-start justify-between gap-2 min-w-0 w-full">
               <div className="min-w-0">
@@ -1162,6 +1165,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             </div>
           </div>
 
+          {/* PLAY/PAUSE BUTTON - ALWAYS VISIBLE */}
           <div className="flex items-center justify-center">
             <button
               onClick={togglePlay}
@@ -1178,8 +1182,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
         </div>
 
-        {/* Row 2: BPM + Tempo */}
-        <div className="grid grid-cols-[minmax(0,148px)_minmax(0,1fr)] gap-2 items-stretch min-w-0">
+        {/* Row 2: BPM + Tempo - ALWAYS VISIBLE */}
+        <div className="grid grid-cols-[minmax(0,148px)_minmax(0,1fr)] gap-2 items-stretch min-w-0" style={{ zIndex: 10 }}>
           {/* BPM block */}
           <div className="bg-black/30 rounded-lg border border-white/5 px-2 py-1.5 min-w-0 flex flex-col justify-between">
             <div className="flex items-center justify-between gap-2 min-w-0">
@@ -1276,8 +1280,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           </div>
         </div>
 
-        {/* Row 3: Hot Cues + Loops (flexes to fill spare height) */}
-        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 flex-1 min-h-[120px]">
+        {/* Row 3: Hot Cues + Loops - ALWAYS VISIBLE */}
+        <div className="grid grid-cols-2 gap-2 items-stretch min-w-0 flex-1 min-h-[120px]" style={{ zIndex: 10 }}>
           {/* Hot Cues */}
           <div className="bg-black/20 rounded-lg border border-white/5 p-1.5 min-w-0 overflow-hidden flex flex-col h-full">
             <div className="flex items-center justify-between gap-2 min-w-0 h-6">
