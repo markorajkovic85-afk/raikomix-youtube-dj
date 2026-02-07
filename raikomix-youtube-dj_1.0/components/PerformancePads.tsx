@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { EffectType, PerformancePadConfig, YouTubeLoadingState } from '../types';
+import { EffectType, PerformancePadConfig, WaveformData, YouTubeLoadingState } from '../types';
 import PerformancePadDialog from './PerformancePadDialog';
 import {
   loadPerformancePadSample,
@@ -11,6 +11,7 @@ import {
 import { makeId } from '../utils/id';
 import { createEffectChain } from '../utils/effectsChain';
 import { ToastType } from './Toast';
+import { buildWaveformData } from '../utils/waveform';
 
 interface PerformancePadsProps {
   masterVolume: number;
@@ -108,6 +109,8 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
     {}
   );
   const [activePreviewVideoId, setActivePreviewVideoId] = useState<string | null>(null);
+  const [trimWaveforms, setTrimWaveforms] = useState<Record<string, WaveformData | null>>({});
+  const [trimWaveformStatus, setTrimWaveformStatus] = useState<Record<string, 'idle' | 'building' | 'error'>>({});
   const hasLoadedPads = pads.some((pad) => pad.sourceType !== 'empty');
 
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -702,6 +705,18 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
       await removePerformancePadSample(pad.sourceId);
       buffersRef.current[padId] = null;
     }
+    if (pad?.sourceId) {
+      setTrimWaveforms((prev) => {
+        const next = { ...prev };
+        delete next[pad.sourceId];
+        return next;
+      });
+      setTrimWaveformStatus((prev) => {
+        const next = { ...prev };
+        delete next[pad.sourceId];
+        return next;
+      });
+    }
     stopPad(padId);
     setPads((prev) =>
       prev.map((item) =>
@@ -747,6 +762,8 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
         }
       })
     );
+    setTrimWaveforms({});
+    setTrimWaveformStatus({});
     pads.forEach((pad) => stopPad(pad.id));
     cancelYouTubeOperation();
     setPads((prev) => prev.map((pad) => clearPadData(pad)));
@@ -762,6 +779,16 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
     }
     const ctx = ensureAudioContext();
     const buffer = await ctx.decodeAudioData(record.arrayBuffer.slice(0));
+    setTrimWaveformStatus((prev) => ({ ...prev, [record.id]: 'building' }));
+    try {
+      const waveform = buildWaveformData(buffer);
+      setTrimWaveforms((prev) => ({ ...prev, [record.id]: waveform.levels.length ? waveform : null }));
+      setTrimWaveformStatus((prev) => ({ ...prev, [record.id]: waveform.levels.length ? 'idle' : 'error' }));
+    } catch (error) {
+      console.warn('Waveform build failed:', error);
+      setTrimWaveforms((prev) => ({ ...prev, [record.id]: null }));
+      setTrimWaveformStatus((prev) => ({ ...prev, [record.id]: 'error' }));
+    }
     if (activePadId !== null) {
       buffersRef.current[activePadId] = buffer;
     }
@@ -886,6 +913,8 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
           youtubeStates={youtubeStates}
           activePreviewVideoId={activePreviewVideoId}
           isKeyConflict={isKeyConflict}
+          trimWaveforms={trimWaveforms}
+          trimWaveformStatus={trimWaveformStatus}
         />
       )}
     </div>

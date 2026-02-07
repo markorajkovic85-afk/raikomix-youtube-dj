@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { PerformancePadConfig, PerformancePadMode, YouTubeLoadingState, YouTubeSearchResult } from '../types';
+import { PerformancePadConfig, PerformancePadMode, WaveformData, YouTubeLoadingState, YouTubeSearchResult } from '../types';
 import { searchYouTube } from '../utils/youtubeApi';
+import TrimWaveform from './TrimWaveform';
 
 interface LocalSampleMeta {
   sourceId: string;
@@ -22,6 +23,8 @@ interface PerformancePadDialogProps {
   youtubeStates: Record<string, { state: YouTubeLoadingState; message?: string }>;
   activePreviewVideoId: string | null;
   isKeyConflict: (key: string) => boolean;
+  trimWaveforms: Record<string, WaveformData | null>;
+  trimWaveformStatus: Record<string, 'idle' | 'building' | 'error'>;
 }
 
 const formatTime = (time: number) => {
@@ -116,6 +119,8 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   youtubeStates,
   activePreviewVideoId,
   isKeyConflict,
+  trimWaveforms,
+  trimWaveformStatus,
 }) => {
   const [draft, setDraft] = useState<PerformancePadConfig>(pad);
   const [query, setQuery] = useState('');
@@ -154,6 +159,11 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   const maxTrim = duration > 0 ? duration : Math.max(draft.trimEnd, 5);
   const trimLength = getTrimLength(draft);
   const recordingTime = formatTime(recordingMs / 1000);
+  const currentWaveform = draft.sourceId ? trimWaveforms[draft.sourceId] : null;
+  const currentWaveformStatus = draft.sourceId ? trimWaveformStatus[draft.sourceId] : undefined;
+  const showTrimWaveform = draft.sourceType !== 'empty' && duration > 0 && Boolean(currentWaveform);
+  const showWaveformStatus =
+    draft.sourceType !== 'empty' && duration > 0 && !currentWaveform && currentWaveformStatus === 'building';
 
   const selectedYouTubeState =
     draft.sourceType === 'youtube' && draft.sourceId ? youtubeStates[draft.sourceId]?.state : null;
@@ -1051,6 +1061,28 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                 <p className="text-[10px] text-[#F2B8B5]">{generalPreviewError}</p>
               )}
 
+              {showTrimWaveform && currentWaveform && (
+                <TrimWaveform
+                  duration={duration}
+                  waveform={currentWaveform}
+                  trimStart={draft.trimStart}
+                  trimEnd={draft.trimEnd}
+                  trimLock={draft.trimLock ?? false}
+                  trimLength={trimLength}
+                  onChangeStart={(time) => handleTrimChange('trimStart', time)}
+                  onChangeEnd={(time) => handleTrimChange('trimEnd', time)}
+                  onMoveWindow={(start, end) => {
+                    handleTrimChange('trimStart', start);
+                    handleTrimChange('trimEnd', end);
+                  }}
+                />
+              )}
+              {showWaveformStatus && (
+                <div className="rounded-2xl border border-white/10 bg-[#0D0C11] px-4 py-3 text-[10px] text-white/60">
+                  Building waveform...
+                </div>
+              )}
+
               <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/60">
                 <button
                   type="button"
@@ -1079,17 +1111,6 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                   <span>Start</span>
                 </div>
                 <input
-                  type="range"
-                  min={0}
-                  max={maxTrim}
-                  step={0.1}
-                  value={draft.trimStart}
-                  onChange={(event) => handleTrimChange('trimStart', parseFloat(event.target.value))}
-                  onWheel={handleTrimWheel('trimStart')}
-                  className="w-full accent-[#D0BCFF]"
-                  disabled={draft.sourceType === 'empty'}
-                />
-                <input
                   type="text"
                   value={startInput}
                   onChange={(event) => {
@@ -1112,17 +1133,6 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                   <span>End</span>
                 </div>
                 <input
-                  type="range"
-                  min={0}
-                  max={maxTrim}
-                  step={0.1}
-                  value={draft.trimEnd}
-                  onChange={(event) => handleTrimChange('trimEnd', parseFloat(event.target.value))}
-                  onWheel={handleTrimWheel('trimEnd')}
-                  className="w-full accent-[#D0BCFF]"
-                  disabled={draft.sourceType === 'empty'}
-                />
-                <input
                   type="text"
                   value={endInput}
                   onChange={(event) => {
@@ -1142,6 +1152,46 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
                   <p className="text-[10px] text-[#F2B8B5]">End time must be greater than start.</p>
                 )}
               </div>
+
+              <details className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3">
+                <summary className="text-[10px] font-black uppercase tracking-widest text-gray-500 cursor-pointer">
+                  Advanced Trim Sliders
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[10px] text-white/60">
+                      <span>Start Range</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={maxTrim}
+                      step={0.1}
+                      value={draft.trimStart}
+                      onChange={(event) => handleTrimChange('trimStart', parseFloat(event.target.value))}
+                      onWheel={handleTrimWheel('trimStart')}
+                      className="w-full accent-[#D0BCFF]"
+                      disabled={draft.sourceType === 'empty'}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[10px] text-white/60">
+                      <span>End Range</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={maxTrim}
+                      step={0.1}
+                      value={draft.trimEnd}
+                      onChange={(event) => handleTrimChange('trimEnd', parseFloat(event.target.value))}
+                      onWheel={handleTrimWheel('trimEnd')}
+                      className="w-full accent-[#D0BCFF]"
+                      disabled={draft.sourceType === 'empty'}
+                    />
+                  </div>
+                </div>
+              </details>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-[10px] text-white/60">
