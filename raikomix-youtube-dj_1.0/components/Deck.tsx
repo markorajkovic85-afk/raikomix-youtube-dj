@@ -33,6 +33,7 @@ export interface DeckHandle {
   loadVideo: (url: string, sourceType?: TrackSourceType, metadata?: { title?: string, author?: string }) => void;
   cueVideo: (url: string, sourceType?: TrackSourceType, metadata?: { title?: string, author?: string }) => void;
   togglePlay: () => void;
+  resumeContext: () => void;
   triggerHotCue: (index: number, clear?: boolean) => void;
   toggleLoop: (beats?: number) => void;
   setPlaybackRate: (rate: number) => void;
@@ -153,6 +154,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       if (!localAudioRef.current || isConnectingRef.current) return;
       isConnectingRef.current = true;
       try {
+        console.debug(`[Deck ${id}] connectAudioEngine`, {
+          contextState: audioContext?.state,
+          hasMasterGain: Boolean(masterGainNode)
+        });
         audioEngine.current.initialize(localAudioRef.current, {
           context: audioContext ?? undefined,
           destination: masterGainNode ?? undefined
@@ -166,7 +171,21 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
     useEffect(() => {
       audioEngine.current.setOutputNode(masterGainNode ?? null);
+      if (masterGainNode) {
+        console.debug(`[Deck ${id}] master gain node connected`);
+      }
     }, [masterGainNode]);
+
+    useEffect(() => {
+      if (!audioContext) return;
+      const handleStateChange = () => {
+        console.debug(`[Deck ${id}] AudioContext state: ${audioContext.state}`);
+      };
+      audioContext.addEventListener('statechange', handleStateChange);
+      return () => {
+        audioContext.removeEventListener('statechange', handleStateChange);
+      };
+    }, [audioContext, id]);
 
     const applyEffectChain = useCallback((effectType: EffectType | null) => {
       audioEngine.current.applyEffect(effectType, effectIntensity);
@@ -392,7 +411,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       }
     };
 
-    const updateMetadata = useCallback((player: any) => {
+    const updateMetadata = useCallback((player: any, markReady: boolean = true) => {
       if (!player) return;
       const data = player.getVideoData ? player.getVideoData() : {};
       const { title, author } = parseYouTubeTitle(data.title || 'Unknown Track', data.author || 'YouTube Stream');
@@ -400,7 +419,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
       setState(s => ({
         ...s,
-        isReady: true,
+        isReady: markReady ? true : s.isReady,
         duration: player.getDuration() || 0,
         title,
         author,
@@ -470,11 +489,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       if (playerRef.current) {
         try {
           // Reset state for existing player to avoid GUI freeze/glitch
-          // IMPORTANT: Keep isReady=true for cue mode so Auto DJ can trigger playback
+          // Mark not-ready for cue mode until the player reports CUED/PLAYING.
           setState(s => ({
             ...s,
             videoId,
-            isReady: loadMode === 'cue' ? true : false,
+            isReady: loadMode !== 'cue',
             sourceType: 'youtube',
             playbackRate: 1.0,
             playing: false,
@@ -501,7 +520,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         events: {
           onReady: (event: any) => {
             const p = event.target;
-            updateMetadata(p);
+            updateMetadata(p, loadMode !== 'cue');
             onPlayerReady?.({
               setVolume: (v: number) => p.setVolume(v),
               playVideo: () => p.playVideo(),
@@ -516,7 +535,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             setState(s => ({ ...s, playing: playerState === window.YT.PlayerState.PLAYING }));
 
             if (playerState === window.YT.PlayerState.CUED || playerState === window.YT.PlayerState.PLAYING) {
-              updateMetadata(event.target);
+              updateMetadata(event.target, true);
               event.target.setPlaybackRate(state.playbackRate);
               setIsLoading(false);
             }
@@ -724,6 +743,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         }
       },
       togglePlay,
+      resumeContext: () => audioEngine.current.resumeContext(),
       triggerHotCue: handleHotCue,
       toggleLoop: handleToggleLoop,
       setPlaybackRate: updatePlaybackRate,
