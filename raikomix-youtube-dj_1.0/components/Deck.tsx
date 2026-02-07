@@ -866,6 +866,25 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               <div className="deck-video-overlay deck-video-glitch" />
               <div className="deck-video-overlay deck-video-vignette" />
 
+              {showVideo && (
+                <button
+                  type="button"
+                  className="deck-video-overlay absolute top-1 right-2 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors z-10"
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setShowRemaining(prev => !prev);
+                  }}
+                  title="Toggle time display"
+                >
+                  {timeLabel}
+                </button>
+              )}
+
               {/* Interaction shield: catches mouse/touch so YT never receives input (leave thin seek line free) */}
               {showVideo && (
                 <div
@@ -914,22 +933,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                       borderTop: '1px solid rgba(255,255,255,0.08)'
                     }}
                   >
-                    <button
-                      type="button"
-                      className="absolute top-1 right-2 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors z-10"
-                      onPointerDown={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setShowRemaining(prev => !prev);
-                      }}
-                      title="Toggle time display"
-                    >
-                      {timeLabel}
-                    </button>
                   {/* Loop region */}
                   {state.loopActive && loopLeftPct !== null && loopRightPct !== null && (
                     <>
