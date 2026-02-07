@@ -811,6 +811,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
     const canShowVideo = state.sourceType === 'youtube';
     const showVideo = visualMode === 'video' && canShowVideo;
+    const timeLabel = showRemaining
+      ? `-${formatTime(Math.max(0, state.duration - state.currentTime))}`
+      : formatTime(state.currentTime);
     const transportHeightPx = 12;
 
     const playheadPct = state.duration > 0
@@ -863,6 +866,22 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               <div className="deck-video-overlay deck-video-glitch" />
               <div className="deck-video-overlay deck-video-vignette" />
 
+              {showVideo && (
+                <button
+                  type="button"
+                  className="absolute top-1 right-2 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors"
+                  style={{ zIndex: 60 }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowRemaining(prev => !prev);
+                  }}
+                  title="Toggle time display"
+                >
+                  {timeLabel}
+                </button>
+              )}
+
               {/* Interaction shield: catches mouse/touch so YT never receives input (leave thin seek line free) */}
               {showVideo && (
                 <div
@@ -904,13 +923,13 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                 aria-valuemax={state.duration || 0}
                 aria-valuenow={state.currentTime || 0}
               >
-                <div
-                  className="relative w-full h-full"
-                  style={{
-                    background: 'rgba(0,0,0,0.15)',
-                    borderTop: '1px solid rgba(255,255,255,0.08)'
-                  }}
-                >
+                  <div
+                    className="relative w-full h-full"
+                    style={{
+                      background: 'rgba(0,0,0,0.15)',
+                      borderTop: '1px solid rgba(255,255,255,0.08)'
+                    }}
+                  >
                   {/* Loop region */}
                   {state.loopActive && loopLeftPct !== null && loopRightPct !== null && (
                     <>
@@ -1030,9 +1049,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                     if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
                     else if (localAudioRef.current) localAudioRef.current.currentTime = time;
                   }}
-                  timeLabel={showRemaining
-                    ? `-${formatTime(state.duration - state.currentTime)}`
-                    : formatTime(state.currentTime)}
+                  timeLabel={timeLabel}
                   onTimeToggle={() => setShowRemaining(prev => !prev)}
                   minHeightPx={56}
                 />
