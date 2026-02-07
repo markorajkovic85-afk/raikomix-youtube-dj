@@ -259,7 +259,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
               recorder.removeEventListener('dataavailable', onData);
               resolve();
             }
-          }, 250);
+          }, 500);
         });
         console.log('[Recording] Requested final data chunk');
         recorderRef.current.stop();
@@ -410,7 +410,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
         setIsRecording(false);
         recorderPhaseRef.current = 'idle';
 
-        await new Promise((resolve) => window.setTimeout(resolve, 50));
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
 
         const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         const chunks = recorderChunksRef.current.length;
@@ -418,7 +418,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
 
         cleanupRecorderStream();
 
-        if (!blob.size || chunks === 0 || dataReceivedCount === 0) {
+        if (!blob.size || chunks === 0) {
           console.error('[Recording] No audio data captured');
           setRecordingError(
             'No audio captured. Please record for at least 1 second and ensure your microphone is working.'
@@ -447,7 +447,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
       recordingStartTimeRef.current = performance.now();
       recorderPhaseRef.current = 'recording';
 
-      recorder.start();
+      recorder.start(1000);
       console.log('[Recording] MediaRecorder started');
     } catch (error) {
       console.error('[Recording] Failed to start:', error);
