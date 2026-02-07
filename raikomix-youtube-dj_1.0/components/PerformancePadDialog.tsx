@@ -20,6 +20,7 @@ interface PerformancePadDialogProps {
   onPreflightYouTube: (pad: PerformancePadConfig) => void;
   onCancelYouTube: (videoId?: string) => void;
   youtubeStates: Record<string, { state: YouTubeLoadingState; message?: string }>;
+  youtubeDurations: Record<string, number>;
   activePreviewVideoId: string | null;
   isKeyConflict: (key: string) => boolean;
 }
@@ -114,6 +115,7 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
   onPreflightYouTube,
   onCancelYouTube,
   youtubeStates,
+  youtubeDurations,
   activePreviewVideoId,
   isKeyConflict,
 }) => {
@@ -473,6 +475,34 @@ const PerformancePadDialog: React.FC<PerformancePadDialogProps> = ({
     setStartInput(formatTime(draft.trimStart));
     setEndInput(formatTime(draft.trimEnd));
   }, [draft.trimStart, draft.trimEnd]);
+
+  useEffect(() => {
+    if (draft.sourceType !== 'youtube' || !draft.sourceId) return;
+    if (draft.duration && draft.duration > 0) return;
+    const resolvedDuration = youtubeDurations[draft.sourceId];
+    if (!resolvedDuration || resolvedDuration <= 0) return;
+    setDraft((prev) => {
+      if (prev.duration && prev.duration > 0) return prev;
+      const currentLength = getTrimLength(prev);
+      if (prev.trimLock) {
+        const nextTrimEnd = Math.min(prev.trimStart + currentLength, resolvedDuration);
+        const nextTrimStart = Math.max(0, nextTrimEnd - currentLength);
+        return {
+          ...prev,
+          duration: resolvedDuration,
+          trimStart: nextTrimStart,
+          trimEnd: nextTrimEnd,
+          trimLength: Math.min(currentLength, resolvedDuration),
+        };
+      }
+      const shouldAutoFit = prev.trimStart === 0 && prev.trimEnd <= 5;
+      return {
+        ...prev,
+        duration: resolvedDuration,
+        trimEnd: shouldAutoFit ? resolvedDuration : Math.min(prev.trimEnd, resolvedDuration),
+      };
+    });
+  }, [draft.duration, draft.sourceId, draft.sourceType, youtubeDurations]);
 
   useEffect(() => {
     const trimmedQuery = query.trim();

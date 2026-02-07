@@ -107,6 +107,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
   const [youtubeStates, setYoutubeStates] = useState<Record<string, { state: YouTubeLoadingState; message?: string }>>(
     {}
   );
+  const [youtubeDurations, setYoutubeDurations] = useState<Record<string, number>>({});
   const [activePreviewVideoId, setActivePreviewVideoId] = useState<string | null>(null);
   const hasLoadedPads = pads.some((pad) => pad.sourceType !== 'empty');
 
@@ -296,6 +297,11 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
               logDevTiming('resolve audio source', performance.now() - timing.resolveStart);
             }
             const duration = event.target.getDuration?.() || pad.duration || 0;
+            if (duration && pad.sourceId) {
+              setYoutubeDurations((prev) =>
+                prev[pad.sourceId] === duration ? prev : { ...prev, [pad.sourceId]: duration }
+              );
+            }
             if (duration && duration !== pad.duration) {
               setPads((prev) =>
                 prev.map((item) =>
@@ -884,6 +890,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
           onPreflightYouTube={preflightYouTube}
           onCancelYouTube={cancelYouTubeOperation}
           youtubeStates={youtubeStates}
+          youtubeDurations={youtubeDurations}
           activePreviewVideoId={activePreviewVideoId}
           isKeyConflict={isKeyConflict}
         />
