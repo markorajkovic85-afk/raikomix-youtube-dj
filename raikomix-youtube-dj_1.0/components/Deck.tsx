@@ -811,6 +811,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
     const canShowVideo = state.sourceType === 'youtube';
     const showVideo = visualMode === 'video' && canShowVideo;
+    const timeLabel = showRemaining
+      ? `-${formatTime(state.duration - state.currentTime)}`
+      : formatTime(state.currentTime);
     const transportHeightPx = 12;
 
     const playheadPct = state.duration > 0
@@ -904,13 +907,29 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                 aria-valuemax={state.duration || 0}
                 aria-valuenow={state.currentTime || 0}
               >
-                <div
-                  className="relative w-full h-full"
-                  style={{
-                    background: 'rgba(0,0,0,0.15)',
-                    borderTop: '1px solid rgba(255,255,255,0.08)'
-                  }}
-                >
+                  <div
+                    className="relative w-full h-full"
+                    style={{
+                      background: 'rgba(0,0,0,0.15)',
+                      borderTop: '1px solid rgba(255,255,255,0.08)'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="absolute top-1 right-2 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors z-10"
+                      onPointerDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setShowRemaining(prev => !prev);
+                      }}
+                      title="Toggle time display"
+                    >
+                      {timeLabel}
+                    </button>
                   {/* Loop region */}
                   {state.loopActive && loopLeftPct !== null && loopRightPct !== null && (
                     <>
@@ -1030,9 +1049,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                     if (state.sourceType === 'youtube') playerRef.current?.seekTo(time, true);
                     else if (localAudioRef.current) localAudioRef.current.currentTime = time;
                   }}
-                  timeLabel={showRemaining
-                    ? `-${formatTime(state.duration - state.currentTime)}`
-                    : formatTime(state.currentTime)}
+                  timeLabel={timeLabel}
                   onTimeToggle={() => setShowRemaining(prev => !prev)}
                   minHeightPx={56}
                 />
