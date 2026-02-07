@@ -5,7 +5,7 @@ import LibraryPanel from './components/LibraryPanel';
 import QueuePanel from './components/QueuePanel';
 import SearchPanel from './components/SearchPanel';
 import Toast, { ToastType } from './components/Toast';
-import { PlayerState, DeckId, CrossfaderCurve, QueueItem, LibraryTrack, YouTubeSearchResult, TrackSourceType, EffectType } from './types';
+import { PlayerState, DeckId, CrossfaderCurve, QueueItem, LibraryTrack, YouTubeSearchResult, TrackSourceType, EffectType, PlayerControl } from './types';
 import {
   loadLibrary,
   saveLibrary,
@@ -91,8 +91,8 @@ const App: React.FC = () => {
   const [library, setLibrary] = useState<LibraryTrack[]>(() => loadLibrary());
   const [deckAState, setDeckAState] = useState<PlayerState | null>(null);
   const [deckBState, setDeckBState] = useState<PlayerState | null>(null);
-  const [masterPlayerA, setMasterPlayerA] = useState<any>(null);
-  const [masterPlayerB, setMasterPlayerB] = useState<any>(null);
+  const [masterPlayerA, setMasterPlayerA] = useState<PlayerControl | null>(null);
+  const [masterPlayerB, setMasterPlayerB] = useState<PlayerControl | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [crossfader, setCrossfader] = useState(0);
   const [xFaderCurve, setXFaderCurve] = useState<CrossfaderCurve>('SMOOTH');
@@ -137,6 +137,7 @@ const App: React.FC = () => {
   const autoStopRef = useRef<{ A: boolean; B: boolean }>({ A: false, B: false });
   const masterGainA = useRef<GainNode | null>(null);
   const masterGainB = useRef<GainNode | null>(null);
+  const sharedAudioContextRef = useRef<AudioContext | null>(null);
   
   // Scaling system refs - properly typed for the hook
   const centralStageContainerRef = useRef<HTMLDivElement>(null);
@@ -1222,16 +1223,19 @@ const App: React.FC = () => {
 
   // Initialize master gain nodes on mount
   useEffect(() => {
-    if (!masterGainA.current && masterPlayerA) {
+    if (!sharedAudioContextRef.current) {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      sharedAudioContextRef.current = ctx;
+
       const gainA = ctx.createGain();
       const gainB = ctx.createGain();
       gainA.connect(ctx.destination);
       gainB.connect(ctx.destination);
+
       masterGainA.current = gainA;
       masterGainB.current = gainB;
     }
-  }, [masterPlayerA, masterPlayerB]);
+  }, []);
 
   // Web Audio API crossfader volume control (replaces 50ms interval)
   const updateCrossfaderVolumes = useCallback(() => {
@@ -1250,8 +1254,8 @@ const App: React.FC = () => {
     const [gainA, gainB] = curveMap[xFaderCurve](t);
 
     // Apply deck volumes and master volume
-    const finalA = gainA * (deckAVolume / 100) * (masterVolume / 100);
-    const finalB = gainB * (deckBVolume / 100) * (masterVolume / 100);
+    const finalA = gainA * deckAVolume * masterVolume;
+    const finalB = gainB * deckBVolume * masterVolume;
 
     // Smooth ramp for audio quality
     const now = masterGainA.current.context.currentTime;
@@ -1411,7 +1415,20 @@ const App: React.FC = () => {
               >
                 <div className="central-stage__panel" ref={centralStagePanelRef}>
                   <div className="perform-stage__deck central-stage__deck">
-                    <Deck ref={deckARef} id="A" color="#D0BCFF" eq={deckAEq} effect={deckAEffect} effectWet={deckAEffectWet} effectIntensity={deckAEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('A', s)} onPlayerReady={p => setMasterPlayerA(p)} onTrackEnd={() => handleTrackEnd('A')} />
+                    <Deck
+                      ref={deckARef}
+                      id="A"
+                      color="#D0BCFF"
+                      eq={deckAEq}
+                      effect={deckAEffect}
+                      effectWet={deckAEffectWet}
+                      effectIntensity={deckAEffectIntensity}
+                      sharedAudioContext={sharedAudioContextRef.current}
+                      masterGainNode={masterGainA.current}
+                      onStateUpdate={s => handleDeckStateUpdate('A', s)}
+                      onPlayerReady={p => setMasterPlayerA(p)}
+                      onTrackEnd={() => handleTrackEnd('A')}
+                    />
                   </div>
                   <Mixer
                     crossfader={crossfader}
@@ -1443,7 +1460,20 @@ const App: React.FC = () => {
                     onDeckBEqChange={(k, v) => setDeckBEq(p => ({...p, [k]: v}))}
                   />
                   <div className="perform-stage__deck central-stage__deck">
-                    <Deck ref={deckBRef} id="B" color="#F2B8B5" eq={deckBEq} effect={deckBEffect} effectWet={deckBEffectWet} effectIntensity={deckBEffectIntensity} onStateUpdate={s => handleDeckStateUpdate('B', s)} onPlayerReady={p => setMasterPlayerB(p)} onTrackEnd={() => handleTrackEnd('B')} />
+                    <Deck
+                      ref={deckBRef}
+                      id="B"
+                      color="#F2B8B5"
+                      eq={deckBEq}
+                      effect={deckBEffect}
+                      effectWet={deckBEffectWet}
+                      effectIntensity={deckBEffectIntensity}
+                      sharedAudioContext={sharedAudioContextRef.current}
+                      masterGainNode={masterGainB.current}
+                      onStateUpdate={s => handleDeckStateUpdate('B', s)}
+                      onPlayerReady={p => setMasterPlayerB(p)}
+                      onTrackEnd={() => handleTrackEnd('B')}
+                    />
                   </div>
                 </div>
               </div>

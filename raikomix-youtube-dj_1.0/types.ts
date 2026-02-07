@@ -64,6 +64,34 @@ export type EffectType =
   | 'FILTER_SWEEP'
   | 'GATE';
 export type TrackSourceType = 'youtube' | 'local';
+
+// PlayerControl Interface (P2)
+export interface PlayerControl {
+  setVolume: (volume: number) => void;
+  playVideo: () => void;
+  pauseVideo: () => void;
+  stopVideo?: () => void;
+  seekTo: (time: number, allowSeekAhead?: boolean) => void;
+  setPlaybackRate: (rate: number) => void;
+  getCurrentTime?: () => number;
+  getDuration?: () => number;
+  getVideoData?: () => { title: string; author: string };
+}
+
+// Auto DJ Error Types (P2)
+export type AutoDJError =
+  | { code: 'DECK_NOT_READY'; deck: DeckId; message: string }
+  | { code: 'QUEUE_EMPTY'; message: string }
+  | { code: 'PRELOAD_FAILED'; videoId: string; reason: string; message: string }
+  | { code: 'STALE_TRANSACTION'; transactionId: string; message: string }
+  | { code: 'INVALID_STATE'; expected: string; actual: string; message: string };
+
+// YouTube API Error Types (P2)
+export type YouTubeAPIError =
+  | { code: 'VIDEO_NOT_FOUND'; videoId: string; message: string }
+  | { code: 'EMBED_NOT_ALLOWED'; videoId: string; message: string }
+  | { code: 'NETWORK_ERROR'; message: string }
+  | { code: 'QUOTA_EXCEEDED'; message: string };
 export type PerformancePadMode = 'ONE_SHOT' | 'HOLD';
 export type PerformancePadSourceType = 'youtube' | 'local' | 'empty';
 export type YouTubeLoadingState =

@@ -34,6 +34,7 @@ export class DeckAudioEngine {
   private currentIntensity = 0.5;
   private currentWet = 0.5;
   private currentEq: EQSettings = { low: 1, mid: 1, hi: 1, filter: 0 };
+  private ownsContext = false;
 
   constructor(id: string) {
     this.id = id;
@@ -43,10 +44,24 @@ export class DeckAudioEngine {
     return this.ctx;
   }
 
-  initialize(element: HTMLMediaElement) {
+  initialize(
+    element: HTMLMediaElement,
+    sharedContext?: AudioContext | null,
+    destination?: GainNode | null
+  ) {
     if (!element) return;
+    if (sharedContext && this.ctx && this.ctx !== sharedContext) {
+      this.ctx = sharedContext;
+      this.ownsContext = false;
+    }
     if (!this.ctx || this.ctx.state === 'closed') {
-      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (sharedContext) {
+        this.ctx = sharedContext;
+        this.ownsContext = false;
+      } else {
+        this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        this.ownsContext = true;
+      }
     }
     if (this.sourceNode || !this.ctx) return;
 
@@ -85,8 +100,9 @@ export class DeckAudioEngine {
     dryGain.connect(mixGain);
     effectOutput.connect(wetGain);
     wetGain.connect(mixGain);
+    const finalDestination = destination ?? ctx.destination;
     mixGain.connect(gainNode);
-    gainNode.connect(ctx.destination);
+    gainNode.connect(finalDestination);
 
     this.sourceNode = source;
     this.nodes = { low, mid, hi, filter, gain: gainNode, dryGain, wetGain, mixGain, effectInput, effectOutput };
@@ -191,9 +207,11 @@ export class DeckAudioEngine {
     }
     this.nodes = null;
     this.sourceNode = null;
-    if (this.ctx && this.ctx.state !== 'closed') {
+    if (this.ctx && this.ctx.state !== 'closed' && this.ownsContext) {
       this.ctx.close();
     }
-    this.ctx = null;
+    if (this.ownsContext) {
+      this.ctx = null;
+    }
   }
 }
