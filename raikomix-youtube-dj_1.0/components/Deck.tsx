@@ -812,7 +812,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const canShowVideo = state.sourceType === 'youtube';
     const showVideo = visualMode === 'video' && canShowVideo;
     const timeLabel = showRemaining
-      ? `-${formatTime(state.duration - state.currentTime)}`
+      ? `-${formatTime(Math.max(0, state.duration - state.currentTime))}`
       : formatTime(state.currentTime);
     const transportHeightPx = 12;
 
@@ -869,14 +869,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               {showVideo && (
                 <button
                   type="button"
-                  className="absolute top-1 right-2 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors z-10 pointer-events-auto"
-                  onPointerDown={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
+                  className="absolute top-1 right-2 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors"
+                  style={{ zIndex: 60 }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setShowRemaining(prev => !prev);
                   }}
                   title="Toggle time display"
