@@ -348,31 +348,47 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       }
     };
 
-    const analyzeLocalAudio = async (url: string) => {
+    const loadSeqRef = useRef(0);
+    const loadTimeoutRef = useRef<number | null>(null);
+    const analysisAbortRef = useRef<AbortController | null>(null);
+
+    const analyzeLocalAudio = async (
+      url: string,
+      options?: { signal?: AbortSignal; loadSeq?: number }
+    ) => {
+      const { signal, loadSeq } = options ?? {};
       try {
         setIsScanning(true);
-        const response = await fetch(url);
+        const response = await fetch(url, { signal });
         const arrayBuffer = await response.arrayBuffer();
+        if (signal?.aborted) return;
         const existingContext = audioEngine.current.getContext();
         const tempContext = existingContext ?? new (window.AudioContext || (window as any).webkitAudioContext)();
         const audioBuffer = await tempContext.decodeAudioData(arrayBuffer.slice(0));
+        if (signal?.aborted) return;
         const bpm = detectBpmFromAudioBuffer(audioBuffer);
         const waveform = buildWaveformData(audioBuffer);
 
-        setState(s => ({
-          ...s,
-          bpm: bpm ?? s.bpm,
-          waveform: waveform.levels.length ? waveform : undefined,
-          waveformPeaks: undefined
-        }));
+        if (!loadSeq || loadSeq === loadSeqRef.current) {
+          setState(s => ({
+            ...s,
+            bpm: bpm ?? s.bpm,
+            waveform: waveform.levels.length ? waveform : undefined,
+            waveformPeaks: undefined
+          }));
+        }
 
         if (!existingContext) {
           await tempContext.close();
         }
       } catch (e) {
-        console.warn('Local audio analysis failed:', e);
+        if ((e as Error).name !== 'AbortError') {
+          console.warn('Local audio analysis failed:', e);
+        }
       } finally {
-        setIsScanning(false);
+        if (!loadSeq || loadSeq === loadSeqRef.current) {
+          setIsScanning(false);
+        }
       }
     };
 
@@ -524,14 +540,31 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       console.log(`[Deck ${id}] loadLocalFile called:`, { url, loadMode, metadata });
 
       if (isLoadingRef.current || isConnectingRef.current) {
-        console.warn(`[Deck ${id}] Load already in progress, aborting`);
-        return;
+        console.warn(`[Deck ${id}] Load already in progress, canceling previous load`);
       }
       isLoadingRef.current = true;
+      const loadSeq = ++loadSeqRef.current;
 
-      const finalizeLoad = () => {
+      if (loadTimeoutRef.current !== null) {
+        window.clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
+
+      if (analysisAbortRef.current) {
+        analysisAbortRef.current.abort();
+      }
+      const analysisController = new AbortController();
+      analysisAbortRef.current = analysisController;
+
+      const finalizeLoad = (seq: number) => {
+        if (seq !== loadSeqRef.current) return;
         isLoadingRef.current = false;
         isConnectingRef.current = false;
+        setIsLoading(false);
+        if (loadTimeoutRef.current !== null) {
+          window.clearTimeout(loadTimeoutRef.current);
+          loadTimeoutRef.current = null;
+        }
       };
       
       // CRITICAL: Clean up previous source REGARDLESS of type
@@ -544,6 +577,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       await audioEngine.current.cleanup();
       
       setIsLoading(loadMode !== 'cue');
+      loadTimeoutRef.current = window.setTimeout(() => {
+        console.warn(`[Deck ${id}] Local load timed out, releasing lock`);
+        finalizeLoad(loadSeq);
+      }, 15000);
 
       if (localAudioRef.current) {
         // Clear current source
@@ -560,6 +597,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
         const stableVideoId = `local_${url}`;
         const onLoaded = () => {
+          if (loadSeq !== loadSeqRef.current) return;
           setState(s => ({
             ...s,
             isReady: true,
@@ -577,7 +615,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           }));
 
           if (loadMode !== 'cue') {
-            analyzeLocalAudio(url);
+            analyzeLocalAudio(url, { signal: analysisController.signal, loadSeq });
           }
 
           onPlayerReady?.({
@@ -588,16 +626,47 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             setPlaybackRate: (r: number) => { if (localAudioRef.current) localAudioRef.current.playbackRate = r; }
           });
 
-          setIsLoading(false);
-          finalizeLoad();
+          finalizeLoad(loadSeq);
+          cleanupListeners();
+        };
+
+        const onError = () => {
+          if (loadSeq !== loadSeqRef.current) return;
+          console.error(`[Deck ${id}] Failed to load local audio`);
+          setState(s => ({
+            ...s,
+            isReady: false,
+            playing: false,
+            sourceType: 'local',
+            title: metadata?.title || url.split('/').pop() || 'Local Track',
+            author: metadata?.author || 'Local File',
+            waveform: undefined,
+            waveformPeaks: undefined
+          }));
+          finalizeLoad(loadSeq);
+          cleanupListeners();
+        };
+
+        const onStalled = () => {
+          if (loadSeq !== loadSeqRef.current) return;
+          console.warn(`[Deck ${id}] Local audio stalled during load`);
+          finalizeLoad(loadSeq);
+          cleanupListeners();
+        };
+
+        const cleanupListeners = () => {
           localAudioRef.current?.removeEventListener('loadedmetadata', onLoaded);
+          localAudioRef.current?.removeEventListener('error', onError);
+          localAudioRef.current?.removeEventListener('stalled', onStalled);
         };
 
         localAudioRef.current.addEventListener('loadedmetadata', onLoaded);
+        localAudioRef.current.addEventListener('error', onError);
+        localAudioRef.current.addEventListener('stalled', onStalled);
       } else {
         console.error(`[Deck ${id}] localAudioRef.current is null!`);
         setIsLoading(false);
-        finalizeLoad();
+        finalizeLoad(loadSeq);
       }
     };
 
