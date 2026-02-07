@@ -202,7 +202,7 @@ export class DeckAudioEngine {
     }
   }
 
-  cleanup() {
+  async cleanup() {
     this.clearEffectChain();
     if (this.nodes) {
       const { low, mid, hi, filter, gain, dryGain, wetGain, mixGain, effectInput, effectOutput } = this.nodes;
@@ -221,7 +221,9 @@ export class DeckAudioEngine {
     this.sourceNode = null;
     this.outputNode = null;
     if (this.ownsContext && this.ctx && this.ctx.state !== 'closed') {
-      this.ctx.close();
+      try {
+        await this.ctx.close();
+      } catch (e) { }
     }
     if (this.ownsContext) {
       this.ctx = null;

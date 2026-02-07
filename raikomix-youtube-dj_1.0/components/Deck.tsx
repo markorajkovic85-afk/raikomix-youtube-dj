@@ -153,13 +153,20 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
     // Audio Engine (manages all Web Audio nodes)
     const audioEngine = useRef(new DeckAudioEngine(id));
+    const isLoadingRef = useRef(false);
+    const isConnectingRef = useRef(false);
 
     const connectAudioEngine = useCallback(() => {
-      if (!localAudioRef.current) return;
-      audioEngine.current.initialize(localAudioRef.current, {
-        context: audioContext ?? undefined,
-        destination: masterGainNode ?? undefined
-      });
+      if (!localAudioRef.current || isConnectingRef.current) return;
+      isConnectingRef.current = true;
+      try {
+        audioEngine.current.initialize(localAudioRef.current, {
+          context: audioContext ?? undefined,
+          destination: masterGainNode ?? undefined
+        });
+      } finally {
+        isConnectingRef.current = false;
+      }
     }, [audioContext, masterGainNode]);
 
     useEffect(() => {
@@ -509,12 +516,23 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       });
     }, [containerId, ensureYouTubeVolume, onPlayerReady, onTrackEnd, updateMetadata, state.playbackRate]);
 
-    const loadLocalFile = (
+    const loadLocalFile = async (
       url: string,
       metadata?: { title?: string, author?: string },
       loadMode: 'load' | 'cue' = 'load'
     ) => {
       console.log(`[Deck ${id}] loadLocalFile called:`, { url, loadMode, metadata });
+
+      if (isLoadingRef.current || isConnectingRef.current) {
+        console.warn(`[Deck ${id}] Load already in progress, aborting`);
+        return;
+      }
+      isLoadingRef.current = true;
+
+      const finalizeLoad = () => {
+        isLoadingRef.current = false;
+        isConnectingRef.current = false;
+      };
       
       // CRITICAL: Clean up previous source REGARDLESS of type
       if (state.sourceType === 'youtube') {
@@ -523,7 +541,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       }
       
       // CRITICAL: Cleanup audio engine before switching source
-      audioEngine.current.cleanup();
+      await audioEngine.current.cleanup();
       
       setIsLoading(loadMode !== 'cue');
 
@@ -571,12 +589,15 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           });
 
           setIsLoading(false);
+          finalizeLoad();
           localAudioRef.current?.removeEventListener('loadedmetadata', onLoaded);
         };
 
         localAudioRef.current.addEventListener('loadedmetadata', onLoaded);
       } else {
         console.error(`[Deck ${id}] localAudioRef.current is null!`);
+        setIsLoading(false);
+        finalizeLoad();
       }
     };
 
@@ -602,7 +623,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             try { localAudioRef.current.pause(); } catch (e) { }
             try { localAudioRef.current.currentTime = 0; } catch (e) { }
           }
-          audioEngine.current.cleanup();
+          void audioEngine.current.cleanup();
 
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
@@ -622,7 +643,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             try { localAudioRef.current.pause(); } catch (e) { }
             try { localAudioRef.current.currentTime = 0; } catch (e) { }
           }
-          audioEngine.current.cleanup();
+          void audioEngine.current.cleanup();
 
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
@@ -690,7 +711,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     // Cleanup audio engine on unmount
     useEffect(() => {
       return () => {
-        audioEngine.current.cleanup();
+        void audioEngine.current.cleanup();
       };
     }, []);
 
