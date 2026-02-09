@@ -82,6 +82,7 @@ interface TransitionTransaction {
   sourceDeck: DeckId;           // Deck currently playing
   queueItem: QueueItem;         // Track being loaded
   startedAt: number;            // Timestamp for timeout detection
+  expectedVideoId: string;      // Expected video ID for validation
 }
 
 interface DeckPlayerControls {
@@ -830,14 +831,22 @@ const App: React.FC = () => {
     // AUTO DJ TRANSACTION: Advance transaction when deck becomes ready
     const txn = activeTransactionRef.current;
     if (txn && txn.targetDeck === id && txn.state === 'PRELOADING' && state.isReady && !state.playing) {
-      console.log(`[TXN ${txn.id}] Deck ${id} ready → advancing to READY state`);
-      txn.state = 'READY';
+      if (state.videoId === txn.expectedVideoId) {
+        console.log(`[TXN ${txn.id}] Deck ${id} ready → advancing to READY state`);
+        txn.state = 'READY';
+      } else {
+        console.warn(`[TXN ${txn.id}] Deck ${id} ready but wrong track: expected ${txn.expectedVideoId}, got ${state.videoId}`);
+      }
     }
     
     // AUTO DJ TRANSACTION: Advance transaction when deck starts playing
     if (txn && txn.targetDeck === id && txn.state === 'READY' && state.playing) {
-      console.log(`[TXN ${txn.id}] Deck ${id} playing → advancing to PLAYING state`);
-      txn.state = 'PLAYING';
+      if (state.videoId === txn.expectedVideoId) {
+        console.log(`[TXN ${txn.id}] Deck ${id} playing → advancing to PLAYING state`);
+        txn.state = 'PLAYING';
+      } else {
+        console.warn(`[TXN ${txn.id}] Deck ${id} playing wrong track: expected ${txn.expectedVideoId}, got ${state.videoId}`);
+      }
     }
   }, []);
 
@@ -937,9 +946,11 @@ const App: React.FC = () => {
     
     // AUTO DJ TRANSACTION: Advance to MIXING state
     const txn = activeTransactionRef.current;
-    if (txn && txn.targetDeck === targetDeck && txn.state === 'PLAYING') {
+    if (txn && txn.targetDeck === targetDeck && (txn.state === 'PLAYING' || txn.state === 'READY')) {
       console.log(`[TXN ${txn.id}] Starting crossfade → advancing to MIXING state`);
       txn.state = 'MIXING';
+      setQueue(prev => prev.filter(item => item.id !== txn.queueItem.id));
+      lastAutoDeckRef.current = txn.targetDeck;
     }
     
     mixInProgressRef.current = true;
@@ -1008,7 +1019,8 @@ const App: React.FC = () => {
       targetDeck,
       sourceDeck,
       queueItem: nextItem,
-      startedAt: Date.now()
+      startedAt: Date.now(),
+      expectedVideoId: nextItem.videoId
     };
     
     activeTransactionRef.current = transaction;
@@ -1086,9 +1098,6 @@ const App: React.FC = () => {
         startDeckPlayback(targetDeck);
       }
       
-      // Complete the transaction (remove from queue)
-      completeTransaction(txn.id);
-      
       // Set pending mix to trigger crossfade when ready
       const pending = { deck: targetDeck, fromDeck, item: txn.queueItem };
       pendingMixRef.current = pending;
@@ -1105,13 +1114,43 @@ const App: React.FC = () => {
     pendingMixRef.current = pending;
     pendingMixStartedAtRef.current = Date.now();
     setPendingMix(pending);
-  }, [deckAState, deckBState, loadNextQueueItem, startAutoMix, completeTransaction, startDeckPlayback]);
+  }, [deckAState, deckBState, loadNextQueueItem, startAutoMix, startDeckPlayback]);
 
   const handleTrackEnd = useCallback((deckId: DeckId) => {
     if (!autoDjEnabled) return;
     lastMixVideoRef.current[deckId] = null;
     queueAutoMix(deckId);
   }, [autoDjEnabled, queueAutoMix]);
+
+  const calculateTransitionTiming = useCallback((duration: number, leadSeconds: number, mixSeconds: number) => {
+    const minTrackLength = 30;
+    if (duration < minTrackLength) {
+      return {
+        preloadTime: Math.max(duration * 0.5, leadSeconds + 2),
+        playStartTime: Math.max(duration * 0.3, leadSeconds + 1),
+        isShortTrack: true
+      };
+    }
+
+    const safeLeadTime = Math.min(Math.max(1, leadSeconds), duration * 0.4);
+    const safeMixDuration = Math.min(mixSeconds, safeLeadTime * 0.8);
+    const preloadTime = Math.min(
+      duration * 0.75,
+      Math.max(safeLeadTime + safeMixDuration + 10, safeLeadTime * 2.5)
+    );
+    const playStartTime = Math.max(
+      safeLeadTime + Math.max(4, safeMixDuration),
+      preloadTime - 8
+    );
+    if (playStartTime >= preloadTime - 2) {
+      return {
+        preloadTime: safeLeadTime + 12,
+        playStartTime: safeLeadTime + 4,
+        isShortTrack: true
+      };
+    }
+    return { preloadTime, playStartTime, isShortTrack: false };
+  }, []);
 
   const muteDeck = (id: 'A' | 'B') => {
     if (id === 'A') setDeckAVolume(prev => prev > 0 ? 0 : 0.8);
@@ -1206,12 +1245,12 @@ const App: React.FC = () => {
     if (!autoDjEnabled) return;
     const interval = setInterval(() => {
       if (mixInProgressRef.current || pendingMixRef.current) return;
+      if (activeTransactionRef.current?.state === 'MIXING') return;
       const transactionTimeoutMs = 30000;
       const txn = activeTransactionRef.current;
       if (txn && txn.state !== 'MIXING' && Date.now() - txn.startedAt > transactionTimeoutMs) {
         console.error(`[TXN ${txn.id}] Timeout after ${transactionTimeoutMs / 1000}s - canceling`);
         showNotification(`Auto DJ: Failed to load "${txn.queueItem.title}"`, 'error');
-        setQueue(prev => prev.filter(item => item.id !== txn.queueItem.id));
         activeTransactionRef.current = null;
         autoLoadDeckRef.current = null;
         autoLoadStartedAtRef.current = null;
@@ -1302,18 +1341,13 @@ const App: React.FC = () => {
 
       const remaining = activeState.duration - activeState.currentTime;
       const leadTime = Math.min(Math.max(1, mixLeadSeconds), activeState.duration);
-      let preloadTime = Math.min(
-        activeState.duration * 0.75,
-        Math.max(leadTime + mixDurationSeconds + 8, leadTime * 2)
+      const { preloadTime, playStartTime, isShortTrack } = calculateTransitionTiming(
+        activeState.duration,
+        leadTime,
+        mixDurationSeconds
       );
-      let playStartTime = Math.max(
-        leadTime + Math.max(4, mixDurationSeconds),
-        preloadTime - 6
-      );
-      if (playStartTime >= preloadTime - 3) {
+      if (isShortTrack) {
         console.warn(`[AUTO DJ] Track too short for timing (${activeState.duration}s) - adjusting`);
-        playStartTime = leadTime + 2;
-        preloadTime = playStartTime + 8;
       }
       const targetDeck = activeDeck === 'A' ? 'B' : 'A';
       const targetState = targetDeck === 'A' ? deckAState : deckBState;
@@ -1342,12 +1376,14 @@ const App: React.FC = () => {
           console.log(`[TXN ${txn.id}] ${remaining.toFixed(1)}s remaining → starting playback early`);
           startDeckPlayback(targetDeck, 150);
         } else if (txn && txn.targetDeck === targetDeck && txn.state === 'PRELOADING') {
-          console.log(`[TXN ${txn.id}] Still preloading at ${remaining.toFixed(1)}s - waiting for READY state`);
-        } else if (!txn) {
-          console.warn(`[AUTO DJ] FAILSAFE: No transaction at ${remaining.toFixed(1)}s - loading directly`);
+          if (remaining <= leadTime + 2) {
+            console.warn(`[TXN ${txn.id}] Still preloading at ${remaining.toFixed(1)}s - may miss transition`);
+          }
+        } else if (!txn && remaining <= playStartTime - 2) {
+          console.warn(`[AUTO DJ] FAILSAFE: No transaction at ${remaining.toFixed(1)}s - emergency load`);
           const nextItem = loadNextQueueItem(targetDeck, 'load');
           if (nextItem) {
-            startDeckPlayback(targetDeck, 500);
+            setTimeout(() => startDeckPlayback(targetDeck), 800);
           }
         }
       }
@@ -1375,7 +1411,7 @@ const App: React.FC = () => {
       }
     }, 250);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction, updateCrossfaderVolumes, startDeckPlayback, validateTransaction]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, calculateTransitionTiming, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction, updateCrossfaderVolumes, startDeckPlayback, validateTransaction]);
 
   useEffect(() => {
     if (autoDjEnabled) return;
@@ -1415,14 +1451,10 @@ const App: React.FC = () => {
     // AUTO DJ TRANSACTION: Invalidate transaction if queue changes
     const txn = activeTransactionRef.current;
     if (!txn) return;
-    const queuedItem = queue[0];
-    if (!queuedItem || queuedItem.id !== txn.queueItem.id) {
-      console.log(`[TXN ${txn.id}] Queue changed → canceling transaction`);
-      if (txn.state === 'PRELOADING' || txn.state === 'READY') {
-        activeTransactionRef.current = null;
-      } else {
-        console.log(`[TXN ${txn.id}] Queue changed but mix in progress - allowing completion`);
-      }
+    const itemStillInQueue = queue.some(item => item.id === txn.queueItem.id);
+    if (!itemStillInQueue && txn.state !== 'MIXING') {
+      console.log(`[TXN ${txn.id}] Queue item removed → canceling transaction`);
+      activeTransactionRef.current = null;
     }
   }, [queue]);
 
@@ -1448,6 +1480,23 @@ const App: React.FC = () => {
       return;
     }
 
+    const txn = activeTransactionRef.current;
+    if (txn && txn.targetDeck === pendingMix.deck) {
+      if (targetState.videoId !== txn.expectedVideoId) {
+        console.warn(`[AUTO DJ] Pending mix target mismatch on ${pendingMix.deck} - aborting`);
+        pendingMixRef.current = null;
+        pendingMixStartedAtRef.current = null;
+        setPendingMix(null);
+        return;
+      }
+    } else if (pendingMix.item.videoId && targetState.videoId !== pendingMix.item.videoId) {
+      console.warn(`[AUTO DJ] Pending mix target mismatch on ${pendingMix.deck} - aborting`);
+      pendingMixRef.current = null;
+      pendingMixStartedAtRef.current = null;
+      setPendingMix(null);
+      return;
+    }
+
     console.log(`Auto DJ: pendingMix executing for deck ${pendingMix.deck}, isPlaying=${targetState.playing}`);
 
     // Start playing if not already
@@ -1461,6 +1510,19 @@ const App: React.FC = () => {
     pendingMixStartedAtRef.current = null;
     setPendingMix(null);
   }, [pendingMix, deckAState, deckBState, startAutoMix, startDeckPlayback]);
+
+  useEffect(() => {
+    if (deckAState?.videoId && canceledTransactionRef.current.A) {
+      if (deckAState.videoId !== canceledTransactionRef.current.A) {
+        canceledTransactionRef.current.A = null;
+      }
+    }
+    if (deckBState?.videoId && canceledTransactionRef.current.B) {
+      if (deckBState.videoId !== canceledTransactionRef.current.B) {
+        canceledTransactionRef.current.B = null;
+      }
+    }
+  }, [deckAState?.videoId, deckBState?.videoId]);
 
   useEffect(() => {
     if (!autoDjEnabled || !autoLoadDeckRef.current) return;
