@@ -1331,10 +1331,11 @@ const App: React.FC = () => {
 
       // STAGE 2: START PLAYING (at playStartTime seconds remaining)
       if (remaining <= playStartTime && remaining > leadTime && !targetState?.playing) {
-        const txn = activeTransactionRef.current;
+        let txn = activeTransactionRef.current;
         
         if (txn && !validateTransaction(targetDeck)) {
           activeTransactionRef.current = null;
+          txn = null;
         }
 
         if (txn && txn.targetDeck === targetDeck && txn.state === 'READY') {
@@ -1354,9 +1355,10 @@ const App: React.FC = () => {
       // STAGE 3: START CROSSFADE (at leadTime seconds remaining)
       if (remaining <= leadTime) {
         lastMixVideoRef.current[activeDeck] = activeMixKey ?? activeState.videoId;
-        const txn = activeTransactionRef.current;
+        let txn = activeTransactionRef.current;
         if (txn && !validateTransaction(targetDeck)) {
           activeTransactionRef.current = null;
+          txn = null;
         }
         
         // Check if target deck is already playing (from early start)
@@ -1389,6 +1391,11 @@ const App: React.FC = () => {
     manualPauseRef.current = { A: false, B: false };
     prevPlayingRef.current = { A: false, B: false };
     autoStopRef.current = { A: false, B: false };
+    if (mixAnimationRef.current) {
+      cancelAnimationFrame(mixAnimationRef.current);
+      mixAnimationRef.current = null;
+    }
+    mixInProgressRef.current = false;
     if (manualPauseTimeoutRef.current.A) {
       clearTimeout(manualPauseTimeoutRef.current.A);
       manualPauseTimeoutRef.current.A = null;
@@ -1397,7 +1404,12 @@ const App: React.FC = () => {
       clearTimeout(manualPauseTimeoutRef.current.B);
       manualPauseTimeoutRef.current.B = null;
     }
-  }, [autoDjEnabled]);
+    const deckAPlaying = deckAState?.playing || false;
+    const deckBPlaying = deckBState?.playing || false;
+    if (deckAPlaying !== deckBPlaying) {
+      setCrossfader(deckAPlaying ? -1 : 1);
+    }
+  }, [autoDjEnabled, deckAState?.playing, deckBState?.playing]);
 
   useEffect(() => {
     // AUTO DJ TRANSACTION: Invalidate transaction if queue changes
