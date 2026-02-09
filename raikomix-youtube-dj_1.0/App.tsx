@@ -1440,12 +1440,8 @@ const App: React.FC = () => {
       clearTimeout(manualPauseTimeoutRef.current.B);
       manualPauseTimeoutRef.current.B = null;
     }
-    const deckAPlaying = deckAState?.playing || false;
-    const deckBPlaying = deckBState?.playing || false;
-    if (deckAPlaying !== deckBPlaying) {
-      setCrossfader(deckAPlaying ? -1 : 1);
-    }
-  }, [autoDjEnabled, deckAState?.playing, deckBState?.playing]);
+    setCrossfader(0);
+  }, [autoDjEnabled]);
 
   useEffect(() => {
     // AUTO DJ TRANSACTION: Invalidate transaction if queue changes
