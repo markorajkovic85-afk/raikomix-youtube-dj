@@ -497,8 +497,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
       if (playerRef.current) {
         try {
-          // Reset state for existing player to avoid GUI freeze/glitch
-          // Mark not-ready for cue mode until the player reports CUED/PLAYING.
+          // Reset state for existing player to avoid GUI freeze/glitch.
+          // Keep cue mode ready so Auto DJ can mix as soon as metadata arrives.
           setState(s => ({
             ...s,
             videoId,
@@ -529,7 +529,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         events: {
           onReady: (event: any) => {
             const p = event.target;
-            updateMetadata(p, loadMode !== 'cue');
+            updateMetadata(p, true);
             onPlayerReady?.({
               setVolume: (v: number) => p.setVolume(v),
               playVideo: () => p.playVideo(),
