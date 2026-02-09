@@ -133,6 +133,7 @@ const App: React.FC = () => {
   const mixAnimationRef = useRef<number | null>(null);
   const mixInProgressRef = useRef(false);
   const pendingMixRef = useRef<{ deck: DeckId; fromDeck: DeckId; item: QueueItem } | null>(null);
+  const pendingMixStartedAtRef = useRef<number | null>(null);
   const libraryRef = useRef(library);
   const lastAutoDeckRef = useRef<DeckId>('B');
   const autoLoadDeckRef = useRef<DeckId | null>(null);
@@ -1091,6 +1092,7 @@ const App: React.FC = () => {
       // Set pending mix to trigger crossfade when ready
       const pending = { deck: targetDeck, fromDeck, item: txn.queueItem };
       pendingMixRef.current = pending;
+      pendingMixStartedAtRef.current = Date.now();
       setPendingMix(pending);
       return;
     }
@@ -1101,6 +1103,7 @@ const App: React.FC = () => {
     if (!nextItem) return;
     const pending = { deck: targetDeck, fromDeck, item: nextItem };
     pendingMixRef.current = pending;
+    pendingMixStartedAtRef.current = Date.now();
     setPendingMix(pending);
   }, [deckAState, deckBState, loadNextQueueItem, startAutoMix, completeTransaction, startDeckPlayback]);
 
@@ -1330,6 +1333,10 @@ const App: React.FC = () => {
       if (remaining <= playStartTime && remaining > leadTime && !targetState?.playing) {
         const txn = activeTransactionRef.current;
         
+        if (txn && !validateTransaction(targetDeck)) {
+          activeTransactionRef.current = null;
+        }
+
         if (txn && txn.targetDeck === targetDeck && txn.state === 'READY') {
           console.log(`[TXN ${txn.id}] ${remaining.toFixed(1)}s remaining → starting playback early`);
           startDeckPlayback(targetDeck, 150);
@@ -1347,9 +1354,16 @@ const App: React.FC = () => {
       // STAGE 3: START CROSSFADE (at leadTime seconds remaining)
       if (remaining <= leadTime) {
         lastMixVideoRef.current[activeDeck] = activeMixKey ?? activeState.videoId;
+        const txn = activeTransactionRef.current;
+        if (txn && !validateTransaction(targetDeck)) {
+          activeTransactionRef.current = null;
+        }
         
         // Check if target deck is already playing (from early start)
         if (targetState?.playing) {
+          if (txn && txn.targetDeck === targetDeck && (txn.state === 'READY' || txn.state === 'PLAYING')) {
+            completeTransaction(txn.id);
+          }
           console.log(`[AUTO DJ] ${remaining.toFixed(1)}s remaining → starting crossfade (target already playing)`);
           startAutoMix(activeDeck, targetDeck);
         } else {
@@ -1359,11 +1373,12 @@ const App: React.FC = () => {
       }
     }, 250);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction, updateCrossfaderVolumes, startDeckPlayback]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction, updateCrossfaderVolumes, startDeckPlayback, validateTransaction]);
 
   useEffect(() => {
     if (autoDjEnabled) return;
     pendingMixRef.current = null;
+    pendingMixStartedAtRef.current = null;
     autoLoadDeckRef.current = null;
     autoLoadStartedAtRef.current = null;
     setPendingMix(null);
@@ -1404,13 +1419,22 @@ const App: React.FC = () => {
     if (mixInProgressRef.current) {
       console.log('[AUTO DJ] Mix already in progress, canceling pendingMix');
       pendingMixRef.current = null;
+      pendingMixStartedAtRef.current = null;
       setPendingMix(null);
       return;
     }
     const targetState = pendingMix.deck === 'A' ? deckAState : deckBState;
     const targetRef = pendingMix.deck === 'A' ? deckARef : deckBRef;
 
-    if (!targetState?.isReady) return;
+    if (!targetState?.isReady) {
+      if (pendingMixStartedAtRef.current && Date.now() - pendingMixStartedAtRef.current > 12000) {
+        console.warn(`[AUTO DJ] pendingMix timed out for deck ${pendingMix.deck} - clearing`);
+        pendingMixRef.current = null;
+        pendingMixStartedAtRef.current = null;
+        setPendingMix(null);
+      }
+      return;
+    }
 
     console.log(`Auto DJ: pendingMix executing for deck ${pendingMix.deck}, isPlaying=${targetState.playing}`);
 
@@ -1422,6 +1446,7 @@ const App: React.FC = () => {
     // Start crossfade immediately (this is emergency fallback or instant mix mode)
     startAutoMix(pendingMix.fromDeck, pendingMix.deck);
     pendingMixRef.current = null;
+    pendingMixStartedAtRef.current = null;
     setPendingMix(null);
   }, [pendingMix, deckAState, deckBState, startAutoMix, startDeckPlayback]);
 
