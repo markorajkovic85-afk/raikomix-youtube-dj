@@ -1203,7 +1203,7 @@ const App: React.FC = () => {
     if (!autoDjEnabled) return;
     const interval = setInterval(() => {
       if (mixInProgressRef.current || pendingMixRef.current) return;
-      const transactionTimeoutMs = 30000;
+      const transactionTimeoutMs = 60000;
       const txn = activeTransactionRef.current;
       if (txn && txn.state !== 'MIXING' && Date.now() - txn.startedAt > transactionTimeoutMs) {
         console.error(`[TXN ${txn.id}] Timeout after ${transactionTimeoutMs / 1000}s - canceling`);
