@@ -1166,24 +1166,22 @@ const App: React.FC = () => {
     const finalB = gainB * deckB * master;
 
     // Smooth ramp for audio quality
-    if (deckAState?.sourceType === 'youtube') {
-      ytARef.current?.setVolume(Math.round(clamp01(finalA) * 100));
-    } else if (masterGainA.current) {
+    ytARef.current?.setVolume(Math.round(clamp01(finalA) * 100));
+    if (masterGainA.current) {
       const now = masterGainA.current.context.currentTime;
       masterGainA.current.gain.cancelScheduledValues(now);
       masterGainA.current.gain.setValueAtTime(masterGainA.current.gain.value, now);
       masterGainA.current.gain.setTargetAtTime(finalA, now, 0.02);
     }
 
-    if (deckBState?.sourceType === 'youtube') {
-      ytBRef.current?.setVolume(Math.round(clamp01(finalB) * 100));
-    } else if (masterGainB.current) {
+    ytBRef.current?.setVolume(Math.round(clamp01(finalB) * 100));
+    if (masterGainB.current) {
       const now = masterGainB.current.context.currentTime;
       masterGainB.current.gain.cancelScheduledValues(now);
       masterGainB.current.gain.setValueAtTime(masterGainB.current.gain.value, now);
       masterGainB.current.gain.setTargetAtTime(finalB, now, 0.02);
     }
-  }, [crossfader, xFaderCurve, deckAVolume, deckBVolume, masterVolume, deckAState?.sourceType, deckBState?.sourceType]);
+  }, [crossfader, xFaderCurve, deckAVolume, deckBVolume, masterVolume]);
 
   const handlePlayerReady = useCallback((id: DeckId, controls: DeckPlayerControls) => {
     if (id === 'A') {
