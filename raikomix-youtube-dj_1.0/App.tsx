@@ -915,9 +915,8 @@ const App: React.FC = () => {
   const startDeckPlayback = useCallback((deckId: DeckId, delayMs = 0) => {
     const ref = deckId === 'A' ? deckARef : deckBRef;
     const trigger = () => {
-      const ctx = audioContextRef.current;
-      if (ctx?.state === 'suspended') {
-        ctx.resume().catch(error => {
+      if (audioContext?.state === 'suspended') {
+        audioContext.resume().catch(error => {
           console.warn('[AUDIO] Auto DJ resume failed', error);
         });
       }
@@ -929,7 +928,7 @@ const App: React.FC = () => {
     } else {
       trigger();
     }
-  }, []);
+  }, [audioContext]);
 
   const startAutoMix = useCallback((fromDeck: DeckId, targetDeck: DeckId) => {
     if (mixInProgressRef.current) return;
@@ -1057,6 +1056,11 @@ const App: React.FC = () => {
     const txn = activeTransactionRef.current;
     if (!txn || txn.id !== txnId) {
       console.warn(`[TXN] Cannot complete: transaction ${txnId} not active`);
+      return;
+    }
+    if (canceledTransactionRef.current[txn.targetDeck] === txn.queueItem.videoId) {
+      console.warn(`[TXN ${txnId}] Cannot complete: transaction was canceled`);
+      activeTransactionRef.current = null;
       return;
     }
     
@@ -1203,7 +1207,7 @@ const App: React.FC = () => {
     if (!autoDjEnabled) return;
     const interval = setInterval(() => {
       if (mixInProgressRef.current || pendingMixRef.current) return;
-      const transactionTimeoutMs = 30000;
+      const transactionTimeoutMs = 60000;
       const txn = activeTransactionRef.current;
       if (txn && txn.state !== 'MIXING' && Date.now() - txn.startedAt > transactionTimeoutMs) {
         console.error(`[TXN ${txn.id}] Timeout after ${transactionTimeoutMs / 1000}s - canceling`);
@@ -1294,8 +1298,7 @@ const App: React.FC = () => {
       if (!activeDeck) return;
       const activeState = activeDeck === 'A' ? deckAState : deckBState;
       if (!activeState?.duration || !activeState.isReady) return;
-      const activeMixKey = deckQueueItemRef.current[activeDeck] ?? activeState.videoId;
-      if (activeMixKey && lastMixVideoRef.current[activeDeck] === activeMixKey) return;
+      if (activeState.videoId && lastMixVideoRef.current[activeDeck] === activeState.videoId) return;
 
       const remaining = activeState.duration - activeState.currentTime;
       const leadTime = Math.min(Math.max(1, mixLeadSeconds), activeState.duration);
@@ -1346,7 +1349,7 @@ const App: React.FC = () => {
 
       // STAGE 3: START CROSSFADE (at leadTime seconds remaining)
       if (remaining <= leadTime) {
-        lastMixVideoRef.current[activeDeck] = activeMixKey ?? activeState.videoId;
+        lastMixVideoRef.current[activeDeck] = activeState.videoId;
         
         // Check if target deck is already playing (from early start)
         if (targetState?.playing) {
@@ -1359,7 +1362,7 @@ const App: React.FC = () => {
       }
     }, 250);
     return () => clearInterval(interval);
-  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction, updateCrossfaderVolumes, startDeckPlayback]);
+  }, [autoDjEnabled, queue, deckAState, deckBState, mixLeadSeconds, mixDurationSeconds, getActiveDeck, loadNextQueueItem, queueAutoMix, startAutoMix, startTransition, completeTransaction, startDeckPlayback]);
 
   useEffect(() => {
     if (autoDjEnabled) return;

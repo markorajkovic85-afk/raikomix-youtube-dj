@@ -502,7 +502,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           setState(s => ({
             ...s,
             videoId,
-            isReady: loadMode !== 'cue',
+            isReady: loadMode === 'cue' ? true : false,
             sourceType: 'youtube',
             playbackRate: 1.0,
             playing: false,
