@@ -618,14 +618,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         try { playerRef.current?.stopVideo(); } catch (e) { }
       }
 
-      if (state.sourceType === 'youtube') {
-        try {
-          await audioEngine.current.cleanup();
-        } catch (e) {
-          console.warn(`[Deck ${id}] audio engine cleanup failed:`, e);
-        }
-      }
-
       setIsLoading(next.loadMode !== 'cue');
 
       const stableVideoId = `local_${next.url}`;
@@ -812,7 +804,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [state.playing, state.sourceType]);
 
-    // Cleanup audio engine on unmount
     useEffect(() => {
       return () => {
         try { analysisAbortRef.current?.abort(); } catch (e) { }
@@ -821,7 +812,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           window.clearTimeout(loadTimeoutRef.current);
           loadTimeoutRef.current = null;
         }
-        void audioEngine.current.cleanup();
       };
     }, []);
 
