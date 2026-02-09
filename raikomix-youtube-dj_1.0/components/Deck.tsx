@@ -495,22 +495,22 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         return;
       }
 
-      if (playerRef.current) {
-        try {
-          // Reset state for existing player to avoid GUI freeze/glitch
-          // Mark not-ready for cue mode until the player reports CUED/PLAYING.
-          setState(s => ({
-            ...s,
-            videoId,
-            isReady: loadMode !== 'cue',
-            sourceType: 'youtube',
-            playbackRate: 1.0,
-            playing: false,
-            currentTime: 0,
-            loopActive: false,
-            waveform: undefined,
-            waveformPeaks: undefined
-          }));
+    if (playerRef.current) {
+      try {
+    // Reset state for existing player to avoid GUI freeze/glitch
+    // IMPORTANT: Keep isReady=true for cue mode so Auto DJ can trigger playback
+    setState(s => ({
+      ...s,
+      videoId,
+      isReady: loadMode === 'cue' ? true : false,  // ✅ FIXED - Auto DJ compatible
+      sourceType: 'youtube',
+      playbackRate: 1.0,
+      playing: false,
+      currentTime: 0,
+      loopActive: false,
+      waveform: undefined,
+      waveformPeaks: undefined
+    }));
           if (loadMode === 'cue') {
             playerRef.current.cueVideoById(videoId);
           } else {
