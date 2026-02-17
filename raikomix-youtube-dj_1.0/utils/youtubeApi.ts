@@ -1,4 +1,5 @@
 import { LibraryTrack, YouTubeSearchResult } from '../types';
+import { TIMEOUTS } from './constants';
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
@@ -109,7 +110,7 @@ const fetchFromInvidious = async (
   for (const baseUrl of INVIDIOUS_INSTANCES) {
     // Per-request 5s timeout so a slow instance doesn't block trying the next one
     const perRequestController = new AbortController();
-    const timeoutId = setTimeout(() => perRequestController.abort(), 5000);
+    const timeoutId = setTimeout(() => perRequestController.abort(), TIMEOUTS.INVIDIOUS_REQUEST_MS);
     const combinedSignal = signal ?? perRequestController.signal;
 
     try {

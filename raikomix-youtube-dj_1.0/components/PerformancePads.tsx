@@ -434,10 +434,13 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
       } else {
         try {
           ytPlayersRef.current[pad.id]?.player?.cueVideoById?.(pad.sourceId);
-        } catch (error) {}
+        } catch (error) {
+          console.error('[PerformancePads] cueVideoById failed:', error);
+          onNotify('Failed to cue pad video. Please try reloading.', 'error');
+        }
       }
     },
-    [ensureYouTubePlayer, getYouTubeCacheKey, updateYouTubeState]
+    [ensureYouTubePlayer, getYouTubeCacheKey, onNotify, updateYouTubeState]
   );
 
   const cancelYouTubeOperation = useCallback(
@@ -553,7 +556,10 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
           videoId: pad.sourceId,
           startSeconds: pad.trimStart,
         });
-      } catch (error) {}
+      } catch (error) {
+        console.error('[PerformancePads] loadVideoById failed:', error);
+        onNotify('Failed to load pad video. Please try again.', 'error');
+      }
       player.unMute?.();
       player.setVolume?.(Math.round(pad.volume * masterVolume * 100));
       player.playVideo?.();
@@ -572,6 +578,7 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
       ensureYouTubePlayer,
       getYouTubeCacheKey,
       masterVolume,
+      onNotify,
       stopPad,
       touchYoutubeCache,
       updateYouTubeState,
