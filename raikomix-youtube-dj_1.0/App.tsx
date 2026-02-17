@@ -1645,6 +1645,7 @@ const App: React.FC = () => {
                       onStateUpdate={s => handleDeckStateUpdate('A', s)}
                       onPlayerReady={controls => handlePlayerReady('A', controls)}
                       onTrackEnd={() => handleTrackEnd('A')}
+                      onLoadError={msg => showNotification(`Deck A: ${msg}`, 'error')}
                     />
                   </div>
                   <Mixer
@@ -1690,6 +1691,7 @@ const App: React.FC = () => {
                       onStateUpdate={s => handleDeckStateUpdate('B', s)}
                       onPlayerReady={controls => handlePlayerReady('B', controls)}
                       onTrackEnd={() => handleTrackEnd('B')}
+                      onLoadError={msg => showNotification(`Deck B: ${msg}`, 'error')}
                     />
                   </div>
                 </div>

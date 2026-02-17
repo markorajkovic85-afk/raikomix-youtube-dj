@@ -107,12 +107,18 @@ const fetchFromInvidious = async (
   signal?: AbortSignal
 ): Promise<YouTubeSearchResult[]> => {
   for (const baseUrl of INVIDIOUS_INSTANCES) {
+    // Per-request 5s timeout so a slow instance doesn't block trying the next one
+    const perRequestController = new AbortController();
+    const timeoutId = setTimeout(() => perRequestController.abort(), 5000);
+    const combinedSignal = signal ?? perRequestController.signal;
+
     try {
       const params = new URLSearchParams({
         q: query,
         type: 'video',
       });
-      const response = await fetch(`${baseUrl}/api/v1/search?${params.toString()}`, { signal });
+      const response = await fetch(`${baseUrl}/api/v1/search?${params.toString()}`, { signal: combinedSignal });
+      clearTimeout(timeoutId);
       if (!response.ok) continue;
       const data = await response.json();
       if (!Array.isArray(data)) continue;
@@ -126,11 +132,18 @@ const fetchFromInvidious = async (
           thumbnailUrl: `https://img.youtube.com/vi/${item.videoId}/mqdefault.jpg`,
         }));
     } catch (error) {
+      clearTimeout(timeoutId);
       if ((error as Error)?.name === 'AbortError') {
-        return [];
+        // If the caller's signal aborted, stop trying all instances
+        if (signal?.aborted) return [];
+        // Otherwise it was our per-request timeout — log and try next instance
+        console.warn(`[Invidious] ${baseUrl} timed out, trying next instance`);
+        continue;
       }
+      console.warn(`[Invidious] ${baseUrl} failed:`, (error as Error)?.message);
     }
   }
+  console.warn('[Invidious] All instances failed or timed out');
   return [];
 };
 
