@@ -5,7 +5,7 @@
 **Last Updated:** 2026-02-17
 **North Star:** Consumer web DJ app — polished, easy-to-use browser-based mixer for casual users
 **Deployment:** Vercel (web-only)
-**Status:** Phase 1 Complete — Phase 2 (Critical Bug Fixes) is next
+**Status:** Phase 2 Complete — Phase 3 (Reliability) is next
 
 ## Session Log
 
@@ -15,6 +15,8 @@
 | 2026-02-17 | TASK-002: Build verified (zero TS errors, 670KB bundle) | `d59f264` |
 | 2026-02-17 | TASK-001: Vitest infra + 21 smoke tests — all green | `d59f264` |
 | 2026-02-17 | chore: .gitignore + package-lock.json committed | `14ef043` |
+| 2026-02-17 | TASK-003: Auto DJ transaction state machine completed | `bd605fe` |
+| 2026-02-17 | TASK-004: YouTube playback failure handling hardened | `93ddc53` |
 
 ---
 
@@ -232,9 +234,19 @@ npm run test:ui     # browser UI
 
 ---
 
-### TASK-003: Fix BUG-001 — Auto DJ Race Conditions
-**Priority:** P0 | **Blocked by:** TASK-001, TASK-002
+### ✅ TASK-003: Fix BUG-001 — Auto DJ Race Conditions — COMPLETE
+**Priority:** P0 | **Completed:** 2026-02-17 | **Commit:** `bd605fe`
 **Scope:** Complete the P0-1 Transaction State Machine (Phase 2-4 from `IMPLEMENTATION_P0-1.md`).
+
+**Delivered:**
+- `utils/autoDjTransaction.ts` (NEW): 4 pure testable transaction helpers extracted from App.tsx:
+  - `shouldAdvanceToReady()` — validates videoId match (closes Scenario 1 preload invalidation race)
+  - `shouldCancelOnQueueChange()` — protects PLAYING/MIXING from spurious cancellation
+  - `isTransactionTimedOut()` — never times out MIXING state (prevents dead air in Scenario 2)
+  - `shouldCancelOnManualLoad()` — allows MIXING to complete even if user loads manual track
+- `App.tsx`: All 4 helpers replace raw inline conditions; play count bug fixed (cue ≠ play)
+- `__tests__/autoDj.test.ts` (NEW): 27 tests covering all 4 failure scenarios — green
+- `IMPLEMENTATION_P0-1.md`: All phases marked complete
 **Details:**
 - Audit current `activeTransactionRef` implementation in `App.tsx` (lines 70-85, 982+)
 - Complete Phase 2: Replace remaining old refs, add validation gates
@@ -250,9 +262,14 @@ npm run test:ui     # browser UI
 
 ---
 
-### TASK-004: Fix BUG-002 — YouTube Playback Failures
-**Priority:** P1 | **Blocked by:** TASK-002
+### ✅ TASK-004: Fix BUG-002 — YouTube Playback Failures — COMPLETE
+**Priority:** P1 | **Completed:** 2026-02-17 | **Commit:** `93ddc53`
 **Scope:** Diagnose and fix YouTube video load failures and stuck states.
+
+**Delivered:**
+- `Deck.tsx`: Added `onLoadError` prop; `ytLoadSeqRef` prevents stale callbacks from prior loads; `onError` callback handles all YouTube error codes (2/5/100/101/150) with readable messages; 20s load watchdog + 15s BUFFERING watchdog; BUFFERING state handled; clear timeouts on unmount
+- `App.tsx`: `onLoadError` wired to `showNotification` on both decks — errors now surface as toasts
+- `utils/youtubeApi.ts`: 5s per-request timeout on Invidious fallback — slow instances no longer block trying the next; warnings logged per failed instance
 **Details:**
 - Investigate YouTube IFrame API error handling in `Deck.tsx`
 - Audit `onError`, `onStateChange` callbacks for unhandled states
@@ -494,11 +511,11 @@ RESPONSIVE / VISUAL
   ├── ✅ TASK-002: Build verified, .gitignore added         d59f264 / 14ef043
   └── ✅ TASK-001: Vitest configured, 21 tests green        d59f264
 
-🔜 Phase 2 — Critical Bug Fixes (NEXT)
-  ├── TASK-003: Fix Auto DJ race conditions (P0)
-  └── TASK-004: Fix YouTube playback failures (P1)  [can run parallel]
+✅ Phase 2 — Critical Bug Fixes (COMPLETE)
+  ├── ✅ TASK-003: Auto DJ race conditions fixed          bd605fe
+  └── ✅ TASK-004: YouTube playback failures hardened     93ddc53
 
-⬜ Phase 3 — Reliability
+🔜 Phase 3 — Reliability (NEXT)
   ├── TASK-005: Fix silent error swallowing
   └── TASK-006: Add env validation
 
