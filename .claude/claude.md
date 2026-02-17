@@ -70,8 +70,17 @@
 5. **YouTube fallback:** If `VITE_YOUTUBE_API_KEY` missing, search falls back to Invidious instances
 
 ## Active Bugs
-- **BUG-001 (P0):** Auto DJ race conditions — preload invalidation & early-start failures cause dead air. See `IMPLEMENTATION_P0-1.md`. Transaction state machine partially implemented (Phase 2 in progress).
-- **BUG-002 (P1):** YouTube playback failures — videos fail to load, playback state gets stuck, search can fail silently.
+- ✅ **BUG-001 (P0) — RESOLVED:** Fixed in TASK-003 (`bd605fe`) with Auto DJ transaction-state-machine hardening.
+- ✅ **BUG-002 (P1) — RESOLVED:** Fixed in TASK-004 (`93ddc53`) with YouTube playback failure handling hardening.
+- Current status: no active P0/P1 bug tickets open.
+
+## Next Steps Status (Audited 2026-02-17)
+- **TASK-005:** Not started (empty `catch {}` blocks still present).
+- **TASK-006:** Not started (no dedicated startup env validation module yet).
+- **TASK-007:** Not started (`App.tsx` monolith still in place).
+- **TASK-008:** Not started (`@google/genai` still present in dependencies).
+- **TASK-009:** Not started (ESLint/Prettier config not added).
+- **TASK-010:** Pending (depends on TASK-005 through TASK-009).
 
 ## Test Infrastructure (TASK-001 — COMPLETE 2026-02-17)
 - **Framework:** Vitest ^4.0.18 + jsdom + @testing-library/react

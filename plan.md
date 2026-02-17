@@ -5,7 +5,7 @@
 **Last Updated:** 2026-02-17
 **North Star:** Consumer web DJ app — polished, easy-to-use browser-based mixer for casual users
 **Deployment:** Vercel (web-only)
-**Status:** Phase 2 Complete — Phase 3 (Reliability) is next
+**Status:** Phase 2 Complete — Phase 3 (Reliability) scoped, not started
 
 ## Session Log
 
@@ -17,6 +17,7 @@
 | 2026-02-17 | chore: .gitignore + package-lock.json committed | `14ef043` |
 | 2026-02-17 | TASK-003: Auto DJ transaction state machine completed | `bd605fe` |
 | 2026-02-17 | TASK-004: YouTube playback failure handling hardened | `93ddc53` |
+| 2026-02-17 | Status audit: next-step tasks inspected (TASK-005 to TASK-010) | `TBD` |
 
 ---
 
@@ -55,8 +56,8 @@
 
 | ID | Severity | Area | Description |
 |----|----------|------|-------------|
-| **BUG-001** | P0 | Auto DJ | Race conditions in transition state machine — preload invalidation & early-start failures cause dead air |
-| **BUG-002** | P1 | YouTube | Videos failing to load, playback state getting stuck, search failures |
+| ~~**BUG-001**~~ | P0 | Auto DJ | ✅ **RESOLVED (TASK-003, `bd605fe`)** — transition race conditions fixed via transaction state machine hardening |
+| ~~**BUG-002**~~ | P1 | YouTube | ✅ **RESOLVED (TASK-004, `93ddc53`)** — playback/load/search failure handling hardened |
 
 ### Architectural Risks
 
@@ -115,8 +116,20 @@ The `claude.md` file eliminates redundant file reads across sessions. It will co
 - Storage: localStorage for library/playlists/settings, IndexedDB for audio samples
 
 ## Active Bugs
-- BUG-001 (P0): Auto DJ race conditions — see IMPLEMENTATION_P0-1.md
-- BUG-002 (P1): YouTube playback failures — stuck states, load errors
+- ✅ BUG-001 (P0) — **RESOLVED** in TASK-003 (`bd605fe`): Auto DJ race conditions fixed.
+- ✅ BUG-002 (P1) — **RESOLVED** in TASK-004 (`93ddc53`): YouTube playback failures hardened.
+- No active P0/P1 bug tickets currently open.
+
+## Next-Step Implementation Audit (2026-02-17)
+
+Verification pass across repository state confirms these upcoming tasks are **not yet implemented**:
+
+- **TASK-005 (Silent error swallowing):** still pending — empty `catch {}` blocks remain in `utils/audioEngine.ts`, `components/Deck.tsx`, and `components/PerformancePads.tsx`.
+- **TASK-006 (Environment validation):** pending — no dedicated startup env validation module has been added.
+- **TASK-007 (Refactor App.tsx):** pending — `App.tsx` remains monolithic.
+- **TASK-008 (Gemini dependency cleanup):** pending — `@google/genai` still present in `package.json`.
+- **TASK-009 (ESLint + Prettier):** pending — no ESLint/Prettier config introduced.
+- **TASK-010 (Final QA + deploy):** pending — gated on earlier tasks.
 
 ## Conventions
 - No test framework yet — manual testing only
