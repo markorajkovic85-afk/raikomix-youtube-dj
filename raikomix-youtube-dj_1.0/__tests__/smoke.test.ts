@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { makeId } from '../utils/id';
+import { hasYouTubeApiKey } from '../utils/youtubeApi';
 import {
   extractVideoId,
   addTrackToLibrary,
@@ -220,5 +221,14 @@ describe('incrementPlayCount()', () => {
     };
     const result = incrementPlayCount('xyz', [track]);
     expect(result[0].lastPlayed).toBeGreaterThanOrEqual(before);
+  });
+});
+
+// ─── hasYouTubeApiKey (env validation) ───────────────────────────────────────
+
+describe('hasYouTubeApiKey()', () => {
+  it('returns a boolean without throwing', () => {
+    // In test env no real API key is set, but the function must not throw
+    expect(typeof hasYouTubeApiKey()).toBe('boolean');
   });
 });
