@@ -16,6 +16,7 @@ import {
   revokeLocalTrackUrls
 } from './utils/libraryStorage';
 import { makeId } from './utils/id';
+import { shouldAdvanceToReady, shouldCancelOnQueueChange, isTransactionTimedOut, shouldCancelOnManualLoad } from './utils/autoDjTransaction';
 import EffectsPanel from './components/EffectsPanel';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTheme } from './hooks/useTheme';
@@ -828,11 +829,16 @@ const App: React.FC = () => {
     
     // AUTO DJ TRANSACTION: Advance transaction when deck becomes ready
     const txn = activeTransactionRef.current;
-    if (txn && txn.targetDeck === id && txn.state === 'PRELOADING' && state.isReady && !state.playing) {
-      console.log(`[TXN ${txn.id}] Deck ${id} ready → advancing to READY state`);
-      txn.state = 'READY';
+    if (shouldAdvanceToReady(txn, id, state)) {
+      // Validated: txn exists, targets this deck, is PRELOADING, deck is ready, videoId matches
+      console.log(`[TXN ${txn!.id}] Deck ${id} ready (videoId: ${state.videoId}) → advancing to READY state`);
+      txn!.state = 'READY';
+    } else if (txn && txn.targetDeck === id && txn.state === 'PRELOADING' && state.isReady && !state.playing && state.videoId && state.videoId !== txn.queueItem.videoId) {
+      // Deck became ready but with a different video — cancel the stale transaction
+      console.warn(`[TXN ${txn.id}] Deck ${id} ready with wrong videoId (expected ${txn.queueItem.videoId}, got ${state.videoId}) → canceling transaction`);
+      activeTransactionRef.current = null;
     }
-    
+
     // AUTO DJ TRANSACTION: Advance transaction when deck starts playing
     if (txn && txn.targetDeck === id && txn.state === 'READY' && state.playing) {
       console.log(`[TXN ${txn.id}] Deck ${id} playing → advancing to PLAYING state`);
@@ -855,9 +861,9 @@ const App: React.FC = () => {
       if (context === 'manual') {
         // AUTO DJ TRANSACTION: Cancel transaction if manual load to that deck
         const txn = activeTransactionRef.current;
-        if (txn && txn.targetDeck === deck && txn.state !== 'MIXING') {
-          console.log(`[TXN ${txn.id}] Manual load to ${deck} → canceling transaction`);
-          canceledTransactionRef.current[deck] = txn.queueItem.videoId;
+        if (shouldCancelOnManualLoad(txn, deck)) {
+          console.log(`[TXN ${txn!.id}] Manual load to ${deck} → canceling transaction`);
+          canceledTransactionRef.current[deck] = txn!.queueItem.videoId;
           activeTransactionRef.current = null;
         }
         manualLoadOverrideRef.current[deck] = { videoId, url, sourceType, title, author, mode };
@@ -868,8 +874,9 @@ const App: React.FC = () => {
         ref.current.cueVideo(url, sourceType, { title, author });
       } else {
         ref.current.loadVideo(url, sourceType, { title, author });
+        // Only increment play count when actually loading (not cueing) — cue is just preview
+        setLibrary(prev => incrementPlayCount(videoId, prev));
       }
-      setLibrary(prev => incrementPlayCount(videoId, prev));
       showNotification(`${sourceType === 'local' ? 'File' : 'Stream'} ${mode === 'cue' ? 'Queued' : 'Loaded'} to Deck ${deck}`, 'success');
     }
   }, []);
@@ -1207,8 +1214,8 @@ const App: React.FC = () => {
       if (mixInProgressRef.current || pendingMixRef.current) return;
       const transactionTimeoutMs = 60000;
       const txn = activeTransactionRef.current;
-      if (txn && txn.state !== 'MIXING' && Date.now() - txn.startedAt > transactionTimeoutMs) {
-        console.error(`[TXN ${txn.id}] Timeout after ${transactionTimeoutMs / 1000}s - canceling`);
+      if (isTransactionTimedOut(txn, transactionTimeoutMs)) {
+        console.error(`[TXN ${txn!.id}] Timeout after ${transactionTimeoutMs / 1000}s - canceling`);
         showNotification(`Auto DJ: Failed to load "${txn.queueItem.title}"`, 'error');
         setQueue(prev => prev.filter(item => item.id !== txn.queueItem.id));
         activeTransactionRef.current = null;
@@ -1389,14 +1396,12 @@ const App: React.FC = () => {
     // AUTO DJ TRANSACTION: Invalidate transaction if queue changes
     const txn = activeTransactionRef.current;
     if (!txn) return;
-    const queuedItem = queue[0];
-    if (!queuedItem || queuedItem.id !== txn.queueItem.id) {
-      console.log(`[TXN ${txn.id}] Queue changed → canceling transaction`);
-      if (txn.state === 'PRELOADING' || txn.state === 'READY') {
-        activeTransactionRef.current = null;
-      } else {
-        console.log(`[TXN ${txn.id}] Queue changed but mix in progress - allowing completion`);
-      }
+    const queueFrontId = queue[0]?.id;
+    if (shouldCancelOnQueueChange(txn, queueFrontId)) {
+      console.log(`[TXN ${txn.id}] Queue changed → canceling transaction (state: ${txn.state})`);
+      activeTransactionRef.current = null;
+    } else if (txn && (txn.state === 'PLAYING' || txn.state === 'MIXING') && queueFrontId !== txn.queueItem.id) {
+      console.log(`[TXN ${txn.id}] Queue changed but mix in progress (state: ${txn.state}) - allowing completion`);
     }
   }, [queue]);
 
