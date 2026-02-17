@@ -8,18 +8,19 @@ import React, {
   useMemo
 } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
-import { DeckId, EffectType, PlayerState, TrackSourceType } from '../types';
+import { DeckId, EffectType, PlayerState, TrackSourceType, YTPlayerInstance, YTPlayerEvent } from '../types';
 import Waveform from './Waveform';
 import { detectBpmFromAudioBuffer, extractBPMFromTitle } from '../utils/bpmDetection';
 import { parseYouTubeTitle } from '../utils/youtubeApi';
 import { buildWaveformData } from '../utils/waveform';
 import { DeckAudioEngine } from '../utils/audioEngine';
+import { TIMEOUTS, PLAYBACK_RATE } from '../utils/constants';
 
 interface DeckProps {
   id: DeckId;
   color: string;
   onStateUpdate: (state: PlayerState) => void;
-  onPlayerReady?: (player: any) => void;
+  onPlayerReady?: (player: YTPlayerInstance) => void;
   onTrackEnd?: () => void;
   onLoadError?: (message: string) => void;
   eq: { hi: number, mid: number, low: number, filter: number };
@@ -124,7 +125,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       waveformPeaks: undefined
     } as any);
 
-    const playerRef = useRef<any>(null);
+    const playerRef = useRef<YTPlayerInstance | null>(null);
     const localAudioRef = useRef<HTMLAudioElement>(null);
 
     // Tempo (horizontal) pointer handling
@@ -415,16 +416,18 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       }
     };
 
-    const updateMetadata = useCallback((player: any, markReady: boolean = true) => {
+    const updateMetadata = useCallback((player: YTPlayerInstance, markReady: boolean = true) => {
       if (!player) return;
-      const data = player.getVideoData ? player.getVideoData() : {};
+      const rawData = typeof player.getVideoData === 'function' ? player.getVideoData() : null;
+      const data = (rawData && typeof rawData === 'object') ? rawData : {};
       const { title, author } = parseYouTubeTitle(data.title || 'Unknown Track', data.author || 'YouTube Stream');
       const initialBpm = extractBPMFromTitle(data.title || '') || 120;
+      const duration = typeof player.getDuration === 'function' ? (player.getDuration() ?? 0) : 0;
 
       setState(s => ({
         ...s,
         isReady: markReady ? true : s.isReady,
-        duration: player.getDuration() || 0,
+        duration,
         title,
         author,
         bpm: initialBpm
@@ -515,7 +518,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
 
     const initPlayer = useCallback((videoId: string, loadMode: 'load' | 'cue' = 'load') => {
       if (!window.YT || !window.YT.Player) {
-        setTimeout(() => initPlayer(videoId, loadMode), 500);
+        setTimeout(() => initPlayer(videoId, loadMode), TIMEOUTS.PLAYER_INIT_RETRY_MS);
         return;
       }
 
@@ -531,7 +534,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           setState(s => ({ ...s, isReady: false }));
           setIsLoading(false);
           onLoadError?.(`Video timed out loading. It may be unavailable.`);
-        }, 20000);
+        }, TIMEOUTS.YOUTUBE_LOAD_MS);
       }
 
       if (playerRef.current) {
@@ -570,7 +573,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         height: '1', width: '1', videoId,
         playerVars: { autoplay: 0, controls: 0, disablekb: 1, origin: window.location.origin, enablejsapi: 1, rel: 0, modestbranding: 1 },
         events: {
-          onReady: (event: any) => {
+          onReady: (event: YTPlayerEvent) => {
             // Ignore stale onReady from a previous load
             if (ytSeq !== ytLoadSeqRef.current) return;
             clearYtLoadTimeout();
@@ -585,7 +588,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             });
             setIsLoading(false);
           },
-          onStateChange: (event: any) => {
+          onStateChange: (event: YTPlayerEvent) => {
             // Ignore stale state changes from a previous load sequence
             if (ytSeq !== ytLoadSeqRef.current) return;
             const playerState = event.data;
@@ -612,13 +615,13 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                 setState(s => ({ ...s, isReady: false, playing: false }));
                 setIsLoading(false);
                 onLoadError?.('Video is taking too long to buffer. It may be unavailable in your region.');
-              }, 15000);
+              }, TIMEOUTS.YOUTUBE_BUFFERING_MS);
             } else {
               // Any non-BUFFERING state clears the buffering watchdog
               clearYtLoadTimeout();
             }
           },
-          onError: (event: any) => {
+          onError: (event: YTPlayerEvent) => {
             // Ignore stale errors from previous load
             if (ytSeq !== ytLoadSeqRef.current) return;
             clearYtLoadTimeout();
@@ -667,12 +670,14 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         return;
       }
 
-      console.log(`[Deck ${id}] loadLocalFile start:`, {
-        url: next.url,
-        loadMode: next.loadMode,
-        metadata: next.metadata,
-        seq
-      });
+      if (import.meta.env.DEV) {
+        console.log(`[Deck ${id}] loadLocalFile start:`, {
+          url: next.url,
+          loadMode: next.loadMode,
+          metadata: next.metadata,
+          seq
+        });
+      }
 
       loadTimeoutRef.current = window.setTimeout(() => {
         if (seq !== loadSeqRef.current) return;
@@ -686,7 +691,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           author: next.metadata?.author || 'Local File'
         }));
         finalize();
-      }, 12000);
+      }, TIMEOUTS.LOCAL_AUDIO_MS);
 
       if (state.sourceType === 'youtube') {
         try { playerRef.current?.pauseVideo(); } catch (e) { }

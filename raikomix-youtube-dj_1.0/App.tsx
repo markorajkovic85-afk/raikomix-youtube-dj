@@ -22,6 +22,9 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useTheme } from './hooks/useTheme';
 import { useFitCentralStage } from './hooks/useFitCentralStage';
 
+// Dev-only logging — no-ops in production builds
+const devLog = import.meta.env.DEV ? console.log : () => {};
+
 interface ErrorBoundaryProps {
   children?: ReactNode;
 }
@@ -793,7 +796,7 @@ const App: React.FC = () => {
           }
           manualPauseTimeoutRef.current[id] = setTimeout(() => {
             if (manualPauseRef.current[id]) {
-              console.log(`[AUTO DJ] Clearing manual pause lock for deck ${id} after timeout`);
+              devLog(`[AUTO DJ] Clearing manual pause lock for deck ${id} after timeout`);
               manualPauseRef.current[id] = false;
             }
           }, 30000);
@@ -831,7 +834,7 @@ const App: React.FC = () => {
     const txn = activeTransactionRef.current;
     if (shouldAdvanceToReady(txn, id, state)) {
       // Validated: txn exists, targets this deck, is PRELOADING, deck is ready, videoId matches
-      console.log(`[TXN ${txn!.id}] Deck ${id} ready (videoId: ${state.videoId}) → advancing to READY state`);
+      devLog(`[TXN ${txn!.id}] Deck ${id} ready (videoId: ${state.videoId}) → advancing to READY state`);
       txn!.state = 'READY';
     } else if (txn && txn.targetDeck === id && txn.state === 'PRELOADING' && state.isReady && !state.playing && state.videoId && state.videoId !== txn.queueItem.videoId) {
       // Deck became ready but with a different video — cancel the stale transaction
@@ -841,7 +844,7 @@ const App: React.FC = () => {
 
     // AUTO DJ TRANSACTION: Advance transaction when deck starts playing
     if (txn && txn.targetDeck === id && txn.state === 'READY' && state.playing) {
-      console.log(`[TXN ${txn.id}] Deck ${id} playing → advancing to PLAYING state`);
+      devLog(`[TXN ${txn.id}] Deck ${id} playing → advancing to PLAYING state`);
       txn.state = 'PLAYING';
     }
   }, []);
@@ -862,7 +865,7 @@ const App: React.FC = () => {
         // AUTO DJ TRANSACTION: Cancel transaction if manual load to that deck
         const txn = activeTransactionRef.current;
         if (shouldCancelOnManualLoad(txn, deck)) {
-          console.log(`[TXN ${txn!.id}] Manual load to ${deck} → canceling transaction`);
+          devLog(`[TXN ${txn!.id}] Manual load to ${deck} → canceling transaction`);
           canceledTransactionRef.current[deck] = txn!.queueItem.videoId;
           activeTransactionRef.current = null;
         }
@@ -943,7 +946,7 @@ const App: React.FC = () => {
     // AUTO DJ TRANSACTION: Advance to MIXING state
     const txn = activeTransactionRef.current;
     if (txn && txn.targetDeck === targetDeck && txn.state === 'PLAYING') {
-      console.log(`[TXN ${txn.id}] Starting crossfade → advancing to MIXING state`);
+      devLog(`[TXN ${txn.id}] Starting crossfade → advancing to MIXING state`);
       txn.state = 'MIXING';
     }
     
@@ -967,7 +970,7 @@ const App: React.FC = () => {
         // AUTO DJ TRANSACTION: Complete transaction after crossfade
         const completedTxn = activeTransactionRef.current;
         if (completedTxn && completedTxn.targetDeck === targetDeck && completedTxn.state === 'MIXING') {
-          console.log(`[TXN ${completedTxn.id}] Crossfade complete → transaction finished`);
+          devLog(`[TXN ${completedTxn.id}] Crossfade complete → transaction finished`);
           activeTransactionRef.current = null;
         }
       }
@@ -1017,7 +1020,7 @@ const App: React.FC = () => {
     };
     
     activeTransactionRef.current = transaction;
-    console.log(`[TXN ${txnId}] Started: ${nextItem.title} → ${targetDeck} (from ${sourceDeck})`);
+    devLog(`[TXN ${txnId}] Started: ${nextItem.title} → ${targetDeck} (from ${sourceDeck})`);
     
     // Load track to target deck in CUE mode
     handleLoadVideo(
@@ -1071,7 +1074,7 @@ const App: React.FC = () => {
       return;
     }
     
-    console.log(`[TXN ${txnId}] Completing: removing queue item ${txn.queueItem.id}`);
+    devLog(`[TXN ${txnId}] Completing: removing queue item ${txn.queueItem.id}`);
     setQueue(prev => prev.filter(item => item.id !== txn.queueItem.id));
     activeTransactionRef.current = null;
     lastAutoDeckRef.current = txn.targetDeck;
@@ -1089,7 +1092,7 @@ const App: React.FC = () => {
     // AUTO DJ TRANSACTION: Use transaction if it's in READY or PLAYING state
     const txn = activeTransactionRef.current;
     if (txn && txn.targetDeck === targetDeck && (txn.state === 'READY' || txn.state === 'PLAYING')) {
-      console.log(`[TXN ${txn.id}] Queue mix: transaction in ${txn.state} state`);
+      devLog(`[TXN ${txn.id}] Queue mix: transaction in ${txn.state} state`);
       
       if (txn.state === 'READY') {
         // Track is ready but not playing yet - start it
@@ -1107,7 +1110,7 @@ const App: React.FC = () => {
     }
     
     // Fallback: no valid transaction, load directly
-    console.log('[AUTO DJ] No valid transaction, loading directly');
+    devLog('[AUTO DJ] No valid transaction, loading directly');
     const nextItem = loadNextQueueItem(targetDeck, 'load');
     if (!nextItem) return;
     const pending = { deck: targetDeck, fromDeck, item: nextItem };
@@ -1270,7 +1273,7 @@ const App: React.FC = () => {
         
         // Check if we have a ready transaction for this deck
         if (readyTxn && readyTxn.targetDeck === nextDeck && readyTxn.state === 'READY') {
-          console.log(`[TXN ${readyTxn.id}] No decks playing → starting ${nextDeck} with ready transaction`);
+          devLog(`[TXN ${readyTxn.id}] No decks playing → starting ${nextDeck} with ready transaction`);
           completeTransaction(readyTxn.id);
           autoLoadDeckRef.current = nextDeck;
           autoLoadStartedAtRef.current = Date.now();
@@ -1282,7 +1285,7 @@ const App: React.FC = () => {
         }
         
         // No transaction - load directly
-        console.log('[AUTO DJ] No decks playing → loading next track');
+        devLog('[AUTO DJ] No decks playing → loading next track');
         const nextItem = loadNextQueueItem(nextDeck, 'load');
         if (!nextItem) {
           autoLoadDeckRef.current = null;
@@ -1329,7 +1332,7 @@ const App: React.FC = () => {
         
         // Only start new transaction if no transaction exists
         if (!txn) {
-          console.log(`[AUTO DJ] ${remaining.toFixed(1)}s remaining → starting preload to ${targetDeck}`);
+          devLog(`[AUTO DJ] ${remaining.toFixed(1)}s remaining → starting preload to ${targetDeck}`);
           startTransition(targetDeck, activeDeck);
         }
       }
@@ -1339,10 +1342,10 @@ const App: React.FC = () => {
         const txn = activeTransactionRef.current;
         
         if (txn && txn.targetDeck === targetDeck && txn.state === 'READY') {
-          console.log(`[TXN ${txn.id}] ${remaining.toFixed(1)}s remaining → starting playback early`);
+          devLog(`[TXN ${txn.id}] ${remaining.toFixed(1)}s remaining → starting playback early`);
           startDeckPlayback(targetDeck, 150);
         } else if (txn && txn.targetDeck === targetDeck && txn.state === 'PRELOADING') {
-          console.log(`[TXN ${txn.id}] Still preloading at ${remaining.toFixed(1)}s - waiting for READY state`);
+          devLog(`[TXN ${txn.id}] Still preloading at ${remaining.toFixed(1)}s - waiting for READY state`);
         } else if (!txn) {
           console.warn(`[AUTO DJ] FAILSAFE: No transaction at ${remaining.toFixed(1)}s - loading directly`);
           const nextItem = loadNextQueueItem(targetDeck, 'load');
@@ -1358,10 +1361,10 @@ const App: React.FC = () => {
         
         // Check if target deck is already playing (from early start)
         if (targetState?.playing) {
-          console.log(`[AUTO DJ] ${remaining.toFixed(1)}s remaining → starting crossfade (target already playing)`);
+          devLog(`[AUTO DJ] ${remaining.toFixed(1)}s remaining → starting crossfade (target already playing)`);
           startAutoMix(activeDeck, targetDeck);
         } else {
-          console.log(`[AUTO DJ] ${remaining.toFixed(1)}s remaining → queueing mix`);
+          devLog(`[AUTO DJ] ${remaining.toFixed(1)}s remaining → queueing mix`);
           queueAutoMix(activeDeck);
         }
       }
@@ -1398,17 +1401,17 @@ const App: React.FC = () => {
     if (!txn) return;
     const queueFrontId = queue[0]?.id;
     if (shouldCancelOnQueueChange(txn, queueFrontId)) {
-      console.log(`[TXN ${txn.id}] Queue changed → canceling transaction (state: ${txn.state})`);
+      devLog(`[TXN ${txn.id}] Queue changed → canceling transaction (state: ${txn.state})`);
       activeTransactionRef.current = null;
     } else if (txn && (txn.state === 'PLAYING' || txn.state === 'MIXING') && queueFrontId !== txn.queueItem.id) {
-      console.log(`[TXN ${txn.id}] Queue changed but mix in progress (state: ${txn.state}) - allowing completion`);
+      devLog(`[TXN ${txn.id}] Queue changed but mix in progress (state: ${txn.state}) - allowing completion`);
     }
   }, [queue]);
 
   useEffect(() => {
     if (!pendingMix) return;
     if (mixInProgressRef.current) {
-      console.log('[AUTO DJ] Mix already in progress, canceling pendingMix');
+      devLog('[AUTO DJ] Mix already in progress, canceling pendingMix');
       pendingMixRef.current = null;
       setPendingMix(null);
       return;
@@ -1418,7 +1421,7 @@ const App: React.FC = () => {
 
     if (!targetState?.isReady) return;
 
-    console.log(`Auto DJ: pendingMix executing for deck ${pendingMix.deck}, isPlaying=${targetState.playing}`);
+    devLog(`Auto DJ: pendingMix executing for deck ${pendingMix.deck}, isPlaying=${targetState.playing}`);
 
     // Start playing if not already
     if (!targetState.playing) {
@@ -1455,7 +1458,7 @@ const App: React.FC = () => {
       if (ctx.state === 'suspended') {
         try {
           await ctx.resume();
-          console.log('[AUDIO] AudioContext resumed');
+          devLog('[AUDIO] AudioContext resumed');
         } catch (error) {
           console.error('[AUDIO] Failed to resume context:', error);
         }

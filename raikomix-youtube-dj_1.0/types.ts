@@ -161,10 +161,60 @@ export interface Playlist {
   color?: string;
 }
 
+/** Minimal typed interface for a YouTube IFrame player instance. */
+export interface YTPlayerInstance {
+  loadVideoById(opts: string | { videoId: string; startSeconds?: number }): void;
+  cueVideoById(videoId: string): void;
+  playVideo(): void;
+  pauseVideo(): void;
+  stopVideo(): void;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
+  getPlayerState(): number;
+  getCurrentTime(): number;
+  getDuration(): number;
+  getVideoData(): { title?: string; author?: string; video_id?: string } | null | undefined;
+  setVolume(volume: number): void;
+  unMute(): void;
+  mute(): void;
+  setPlaybackRate(rate: number): void;
+  getPlaybackRate(): number;
+  destroy(): void;
+}
+
+/** Event objects emitted by the YouTube IFrame API. */
+export interface YTPlayerEvent {
+  target: YTPlayerInstance;
+  data?: number;
+}
+
+/** Minimal typed interface for the YT namespace exposed by the IFrame API script. */
+export interface YTNamespace {
+  Player: new (
+    elementId: string | HTMLElement,
+    config: {
+      videoId?: string;
+      playerVars?: Record<string, string | number>;
+      events?: {
+        onReady?: (event: YTPlayerEvent) => void;
+        onStateChange?: (event: YTPlayerEvent) => void;
+        onError?: (event: YTPlayerEvent) => void;
+      };
+    }
+  ) => YTPlayerInstance;
+  PlayerState: {
+    UNSTARTED: -1;
+    ENDED: 0;
+    PLAYING: 1;
+    PAUSED: 2;
+    BUFFERING: 3;
+    CUED: 5;
+  };
+}
+
 declare global {
   interface Window {
     onYouTubeIframeAPIReady: () => void;
-    YT: any;
-    gtag?: (...args: any[]) => void;
+    YT: YTNamespace;
+    gtag?: (...args: unknown[]) => void;
   }
 }
