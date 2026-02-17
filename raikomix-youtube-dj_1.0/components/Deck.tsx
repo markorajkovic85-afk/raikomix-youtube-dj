@@ -297,7 +297,26 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       else if (localAudioRef.current) localAudioRef.current.currentTime = t;
       // Optimistic update so the playhead feels responsive
       setState(s => ({ ...s, currentTime: t }));
-    }, [state.duration, state.sourceType]);
+
+      // When paused there is no active polling loop, so confirm the seek landed.
+      if (!state.playing) {
+        window.setTimeout(() => {
+          let confirmedTime = t;
+
+          if (state.sourceType === 'youtube' && playerRef.current) {
+            try {
+              confirmedTime = playerRef.current.getCurrentTime() ?? t;
+            } catch (error) {
+              logRecoverableError('seek readback (youtube)', error);
+            }
+          } else if (localAudioRef.current) {
+            confirmedTime = localAudioRef.current.currentTime ?? t;
+          }
+
+          setState(s => ({ ...s, currentTime: confirmedTime }));
+        }, 150);
+      }
+    }, [logRecoverableError, state.duration, state.playing, state.sourceType]);
 
     const getSeekTimeFromPointer = useCallback((clientX: number) => {
       if (!videoSeekRef.current || !state.duration) return null;

@@ -175,11 +175,11 @@ const Waveform: React.FC<WaveformProps> = ({
     }
 
     ctx.save();
-    ctx.globalAlpha = mode === 'soft' ? 0.45 : 0.6;
-    ctx.shadowBlur = mode === 'soft' ? 10 : 8;
+    ctx.globalAlpha = mode === 'soft' ? 0.65 : 0.6;
+    ctx.shadowBlur = mode === 'soft' ? 14 : 8;
     ctx.shadowColor = color;
     ctx.strokeStyle = color;
-    ctx.lineWidth = mode === 'soft' ? 1.4 : 1.2;
+    ctx.lineWidth = mode === 'soft' ? 2 : 1.2;
     ctx.beginPath();
     ctx.moveTo(x, height * 0.12);
     ctx.lineTo(x, height * 0.88);
@@ -540,7 +540,7 @@ const Waveform: React.FC<WaveformProps> = ({
     }
 
     const p = duration > 0 ? currentTime / duration : 0;
-    drawPlayhead(ctx, width, height, p, 'soft');
+    drawPlayhead(ctx, width, height, p, 'strong');
 
     if (!runningRef.current) return;
     requestRef.current = requestAnimationFrame(draw);
