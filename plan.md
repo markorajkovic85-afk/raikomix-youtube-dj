@@ -1,10 +1,22 @@
 # RaikoMix YouTube DJ — Master Implementation Plan
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2026-02-17
+**Last Updated:** 2026-02-17
 **North Star:** Consumer web DJ app — polished, easy-to-use browser-based mixer for casual users
 **Deployment:** Vercel (web-only)
-**Status:** Pre-execution review
+**Status:** Phase 2 Complete — Phase 3 (Reliability) is next
+
+## Session Log
+
+| Date | Tasks Completed | Commits |
+|------|----------------|---------|
+| 2026-02-17 | Phase 0: plan.md + .claude/claude.md created | `07d9851` |
+| 2026-02-17 | TASK-002: Build verified (zero TS errors, 670KB bundle) | `d59f264` |
+| 2026-02-17 | TASK-001: Vitest infra + 21 smoke tests — all green | `d59f264` |
+| 2026-02-17 | chore: .gitignore + package-lock.json committed | `14ef043` |
+| 2026-02-17 | TASK-003: Auto DJ transaction state machine completed | `bd605fe` |
+| 2026-02-17 | TASK-004: YouTube playback failure handling hardened | `93ddc53` |
 
 ---
 
@@ -51,7 +63,7 @@
 | Risk | Impact | Location |
 |------|--------|----------|
 | **R1: App.tsx monolith** | All state, Auto DJ logic, MIDI, effects routing in one 1,937-line file. Any bug fix risks regressions. | `App.tsx` |
-| **R2: No test infrastructure** | Zero tests. No Vitest/Jest configured. No CI. Changes cannot be verified automatically. | `package.json` |
+| ~~**R2: No test infrastructure**~~ | ✅ **RESOLVED (2026-02-17)** — Vitest configured, 21 smoke tests passing. `npm run test` green. | — |
 | **R3: No linting/formatting** | No ESLint or Prettier configured. Code style inconsistencies across files. | `package.json` |
 | **R4: 25+ empty catch blocks** | Silent error swallowing across the codebase — makes debugging nearly impossible. | Various |
 | **R5: No env validation** | `VITE_YOUTUBE_API_KEY` not validated at startup. Failures surface deep in runtime. | `youtubeApi.ts` |
@@ -181,36 +193,60 @@ TASK-006 (Env validation) ─── TASK-007 (App.tsx refactor) ──┤
 
 ---
 
-### TASK-001: Set Up Vitest Test Infrastructure
+### ✅ TASK-001: Set Up Vitest Test Infrastructure — COMPLETE
 **Priority:** P0 | **Blocks:** TASK-003, TASK-004, TASK-005, TASK-010
-**Scope:** Add Vitest + testing-library. Create first smoke tests.
-**Details:**
-- Install `vitest`, `@testing-library/react`, `jsdom`
-- Configure `vite.config.ts` with test settings
-- Add `test` script to `package.json`
-- Write smoke tests: App renders, library loads, queue operations work
-- **Why first:** Every subsequent fix needs verification. Without tests we're flying blind.
+**Completed:** 2026-02-17 | **Commit:** `d59f264`
 
-**Sub-agent candidate:** Yes — isolated setup, no business logic dependency.
+**Delivered:**
+- Installed: `vitest ^4.0.18`, `@vitest/ui ^4.0.18`, `jsdom ^28.1.0`, `@testing-library/react ^16.3.2`, `@testing-library/user-event ^14.6.1`, `@testing-library/jest-dom ^6.9.1`
+- `vite.config.ts`: added `/// <reference types="vitest" />` + `test` config block (globals, jsdom, setupFiles)
+- `tsconfig.json`: added `"vitest/globals"` to types array
+- `package.json`: added `test`, `test:watch`, `test:ui` scripts
+- `setupTests.ts`: jest-dom matchers + `localStorage.clear()` beforeEach
+- `__tests__/smoke.test.ts`: **21 tests across 7 utility functions — all green**
+  - `makeId()` — unique ID generation
+  - `extractVideoId()` — YouTube URL parsing (5 cases)
+  - `addTrackToLibrary()` — valid URL, invalid URL, duplicate detection
+  - `removeFromLibrary()` — by ID, not found, single item
+  - `saveLibrary/loadLibrary` — round-trip, local track exclusion, empty state
+  - `updateTrackMetadata()` — field update, non-target unchanged
+  - `incrementPlayCount()` — counter increment, lastPlayed timestamp
+
+**Commands:**
+```bash
+npm run test        # one-shot run (CI-safe)
+npm run test:watch  # interactive watch (dev)
+npm run test:ui     # browser UI
+```
 
 ---
 
-### TASK-002: Verify & Fix Current Build
+### ✅ TASK-002: Verify & Fix Current Build — COMPLETE
 **Priority:** P0 | **Blocks:** TASK-003, TASK-004
-**Scope:** Ensure `npm run build` passes cleanly.
-**Details:**
-- Run `npm install` and `npm run build`
-- Fix any TypeScript compilation errors
-- Fix any Vite build warnings
-- Establish baseline: "main branch builds clean"
+**Completed:** 2026-02-17 | **Commit:** `d59f264`
 
-**Sub-agent candidate:** Yes — isolated build verification.
+**Delivered:**
+- `npm install` → 147 packages, 0 vulnerabilities
+- `npm run build` → **clean production build, zero TypeScript errors**
+- Bundle baseline: `670KB JS` (171KB gzip) · `5.75KB CSS` (1.68KB gzip)
+- Note: 670KB chunk-size warning is expected for this app — not an error. Addressed in TASK-007 (code splitting).
+- Also committed `.gitignore` (`14ef043`) — excludes `node_modules/`, `dist/`, `.env*`
 
 ---
 
-### TASK-003: Fix BUG-001 — Auto DJ Race Conditions
-**Priority:** P0 | **Blocked by:** TASK-001, TASK-002
+### ✅ TASK-003: Fix BUG-001 — Auto DJ Race Conditions — COMPLETE
+**Priority:** P0 | **Completed:** 2026-02-17 | **Commit:** `bd605fe`
 **Scope:** Complete the P0-1 Transaction State Machine (Phase 2-4 from `IMPLEMENTATION_P0-1.md`).
+
+**Delivered:**
+- `utils/autoDjTransaction.ts` (NEW): 4 pure testable transaction helpers extracted from App.tsx:
+  - `shouldAdvanceToReady()` — validates videoId match (closes Scenario 1 preload invalidation race)
+  - `shouldCancelOnQueueChange()` — protects PLAYING/MIXING from spurious cancellation
+  - `isTransactionTimedOut()` — never times out MIXING state (prevents dead air in Scenario 2)
+  - `shouldCancelOnManualLoad()` — allows MIXING to complete even if user loads manual track
+- `App.tsx`: All 4 helpers replace raw inline conditions; play count bug fixed (cue ≠ play)
+- `__tests__/autoDj.test.ts` (NEW): 27 tests covering all 4 failure scenarios — green
+- `IMPLEMENTATION_P0-1.md`: All phases marked complete
 **Details:**
 - Audit current `activeTransactionRef` implementation in `App.tsx` (lines 70-85, 982+)
 - Complete Phase 2: Replace remaining old refs, add validation gates
@@ -226,9 +262,14 @@ TASK-006 (Env validation) ─── TASK-007 (App.tsx refactor) ──┤
 
 ---
 
-### TASK-004: Fix BUG-002 — YouTube Playback Failures
-**Priority:** P1 | **Blocked by:** TASK-002
+### ✅ TASK-004: Fix BUG-002 — YouTube Playback Failures — COMPLETE
+**Priority:** P1 | **Completed:** 2026-02-17 | **Commit:** `93ddc53`
 **Scope:** Diagnose and fix YouTube video load failures and stuck states.
+
+**Delivered:**
+- `Deck.tsx`: Added `onLoadError` prop; `ytLoadSeqRef` prevents stale callbacks from prior loads; `onError` callback handles all YouTube error codes (2/5/100/101/150) with readable messages; 20s load watchdog + 15s BUFFERING watchdog; BUFFERING state handled; clear timeouts on unmount
+- `App.tsx`: `onLoadError` wired to `showNotification` on both decks — errors now surface as toasts
+- `utils/youtubeApi.ts`: 5s per-request timeout on Invidious fallback — slow instances no longer block trying the next; warnings logged per failed instance
 **Details:**
 - Investigate YouTube IFrame API error handling in `Deck.tsx`
 - Audit `onError`, `onStateChange` callbacks for unhandled states
@@ -462,28 +503,28 @@ RESPONSIVE / VISUAL
 ## Execution Order Summary
 
 ```
-Phase 0 — Foundation (this session)
-  ├── Create .claude/claude.md (project memory)
-  └── Create plan.md (this document) ✅
+✅ Phase 0 — Foundation (COMPLETE)
+  ├── ✅ Create .claude/claude.md (project memory)         07d9851
+  └── ✅ Create plan.md (this document)                    07d9851
 
-Phase 1 — Build Stability
-  ├── TASK-002: Verify build passes
-  └── TASK-001: Set up Vitest
+✅ Phase 1 — Build Stability (COMPLETE)
+  ├── ✅ TASK-002: Build verified, .gitignore added         d59f264 / 14ef043
+  └── ✅ TASK-001: Vitest configured, 21 tests green        d59f264
 
-Phase 2 — Critical Bug Fixes
-  ├── TASK-003: Fix Auto DJ race conditions (P0)
-  └── TASK-004: Fix YouTube playback failures (P1)  [parallel with TASK-003]
+✅ Phase 2 — Critical Bug Fixes (COMPLETE)
+  ├── ✅ TASK-003: Auto DJ race conditions fixed          bd605fe
+  └── ✅ TASK-004: YouTube playback failures hardened     93ddc53
 
-Phase 3 — Reliability
+🔜 Phase 3 — Reliability (NEXT)
   ├── TASK-005: Fix silent error swallowing
   └── TASK-006: Add env validation
 
-Phase 4 — Code Quality
+⬜ Phase 4 — Code Quality
   ├── TASK-007: Refactor App.tsx
   ├── TASK-008: Remove Gemini dependency
   └── TASK-009: Add ESLint + Prettier
 
-Phase 5 — Ship It
+⬜ Phase 5 — Ship It
   └── TASK-010: Final QA & deploy v1.0.0
 ```
 

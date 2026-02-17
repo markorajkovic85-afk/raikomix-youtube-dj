@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+raikomix-youtube-dj_1.0/node_modules/
+
+# Build output
+dist/
+raikomix-youtube-dj_1.0/dist/
+
+# Environment variables (never commit secrets)
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

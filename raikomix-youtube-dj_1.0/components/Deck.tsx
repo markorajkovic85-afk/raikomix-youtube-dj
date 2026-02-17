@@ -21,6 +21,7 @@ interface DeckProps {
   onStateUpdate: (state: PlayerState) => void;
   onPlayerReady?: (player: any) => void;
   onTrackEnd?: () => void;
+  onLoadError?: (message: string) => void;
   eq: { hi: number, mid: number, low: number, filter: number };
   effect: EffectType | null;
   effectWet: number;
@@ -76,7 +77,7 @@ const MarqueeText: React.FC<{ text: string; className: string }> = ({ text, clas
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 const Deck = forwardRef<DeckHandle, DeckProps>(
-  ({ id, color, onStateUpdate, onPlayerReady, onTrackEnd, eq, effect, effectWet, effectIntensity, audioContext, masterGainNode }, ref) => {
+  ({ id, color, onStateUpdate, onPlayerReady, onTrackEnd, onLoadError, eq, effect, effectWet, effectIntensity, audioContext, masterGainNode }, ref) => {
     const [isLoading, setIsLoading] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     const [tapHistory, setTapHistory] = useState<number[]>([]);
@@ -365,6 +366,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     const loadSeqRef = useRef(0);
     const analysisAbortRef = useRef<AbortController | null>(null);
     const loadTimeoutRef = useRef<number | null>(null);
+    // YouTube-specific load tracking (separate from local audio loadSeqRef)
+    const ytLoadSeqRef = useRef(0);
+    const ytLoadTimeoutRef = useRef<number | null>(null);
     type PendingLocalLoad = {
       url: string;
       metadata?: { title?: string; author?: string };
@@ -489,10 +493,45 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       }
     }, [state.playing, state.sourceType]);
 
+    // Clear any pending YouTube load timeout
+    const clearYtLoadTimeout = useCallback(() => {
+      if (ytLoadTimeoutRef.current) {
+        window.clearTimeout(ytLoadTimeoutRef.current);
+        ytLoadTimeoutRef.current = null;
+      }
+    }, []);
+
+    // Map YouTube IFrame API error codes to readable messages
+    const ytErrorMessage = (code: number): string => {
+      switch (code) {
+        case 2:   return 'Invalid video ID';
+        case 5:   return 'Video cannot play in this browser';
+        case 100: return 'Video not found or removed';
+        case 101:
+        case 150: return 'Video not available (embedding disabled)';
+        default:  return `Playback error (code ${code})`;
+      }
+    };
+
     const initPlayer = useCallback((videoId: string, loadMode: 'load' | 'cue' = 'load') => {
       if (!window.YT || !window.YT.Player) {
         setTimeout(() => initPlayer(videoId, loadMode), 500);
         return;
+      }
+
+      // Increment load sequence — stale onReady/onStateChange callbacks will self-cancel
+      const ytSeq = ++ytLoadSeqRef.current;
+
+      // Start a load watchdog: if the video hasn't become ready in 20s, surface an error
+      clearYtLoadTimeout();
+      if (loadMode === 'load') {
+        ytLoadTimeoutRef.current = window.setTimeout(() => {
+          if (ytSeq !== ytLoadSeqRef.current) return;
+          console.warn(`[Deck ${id}] YouTube load timeout for ${videoId}`);
+          setState(s => ({ ...s, isReady: false }));
+          setIsLoading(false);
+          onLoadError?.(`Video timed out loading. It may be unavailable.`);
+        }, 20000);
       }
 
       if (playerRef.current) {
@@ -518,7 +557,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           }
           setIsLoading(loadMode !== 'cue');
         } catch (e) {
+          console.error(`[Deck ${id}] YouTube player command failed`, e);
+          setState(s => ({ ...s, isReady: false }));
           setIsLoading(false);
+          clearYtLoadTimeout();
+          onLoadError?.('Failed to load video. Please try again.');
         }
         return;
       }
@@ -528,6 +571,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         playerVars: { autoplay: 0, controls: 0, disablekb: 1, origin: window.location.origin, enablejsapi: 1, rel: 0, modestbranding: 1 },
         events: {
           onReady: (event: any) => {
+            // Ignore stale onReady from a previous load
+            if (ytSeq !== ytLoadSeqRef.current) return;
+            clearYtLoadTimeout();
             const p = event.target;
             updateMetadata(p, true);
             onPlayerReady?.({
@@ -540,12 +586,15 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             setIsLoading(false);
           },
           onStateChange: (event: any) => {
+            // Ignore stale state changes from a previous load sequence
+            if (ytSeq !== ytLoadSeqRef.current) return;
             const playerState = event.data;
             setState(s => ({ ...s, playing: playerState === window.YT.PlayerState.PLAYING }));
 
             if (playerState === window.YT.PlayerState.CUED || playerState === window.YT.PlayerState.PLAYING) {
+              clearYtLoadTimeout();
               updateMetadata(event.target, true);
-              event.target.setPlaybackRate(state.playbackRate);
+              try { event.target.setPlaybackRate(event.target.getPlaybackRate?.() ?? 1); } catch (e) { /* non-fatal */ }
               setIsLoading(false);
             }
 
@@ -553,10 +602,36 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               setState(s => ({ ...s, playing: false }));
               onTrackEnd?.();
             }
+
+            // BUFFERING for >15s without reaching PLAYING is likely a stuck load
+            if (playerState === window.YT.PlayerState.BUFFERING) {
+              clearYtLoadTimeout();
+              ytLoadTimeoutRef.current = window.setTimeout(() => {
+                if (ytSeq !== ytLoadSeqRef.current) return;
+                console.warn(`[Deck ${id}] YouTube stuck in BUFFERING for ${videoId}`);
+                setState(s => ({ ...s, isReady: false, playing: false }));
+                setIsLoading(false);
+                onLoadError?.('Video is taking too long to buffer. It may be unavailable in your region.');
+              }, 15000);
+            } else {
+              // Any non-BUFFERING state clears the buffering watchdog
+              clearYtLoadTimeout();
+            }
+          },
+          onError: (event: any) => {
+            // Ignore stale errors from previous load
+            if (ytSeq !== ytLoadSeqRef.current) return;
+            clearYtLoadTimeout();
+            const code: number = event?.data ?? -1;
+            const message = ytErrorMessage(code);
+            console.error(`[Deck ${id}] YouTube player error ${code}: ${message}`);
+            setState(s => ({ ...s, isReady: false, playing: false }));
+            setIsLoading(false);
+            onLoadError?.(message);
           },
         }
       });
-    }, [containerId, onPlayerReady, onTrackEnd, updateMetadata, state.playbackRate]);
+    }, [containerId, onPlayerReady, onTrackEnd, onLoadError, updateMetadata, clearYtLoadTimeout, id]);
 
     const pumpLocalLoad = useCallback(async () => {
       if (isLoadingRef.current || isConnectingRef.current) return;
@@ -820,6 +895,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         if (loadTimeoutRef.current) {
           window.clearTimeout(loadTimeoutRef.current);
           loadTimeoutRef.current = null;
+        }
+        if (ytLoadTimeoutRef.current) {
+          window.clearTimeout(ytLoadTimeoutRef.current);
+          ytLoadTimeoutRef.current = null;
         }
         void audioEngine.current.cleanup();
       };
