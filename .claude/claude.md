@@ -73,12 +73,18 @@
 - **BUG-001 (P0):** Auto DJ race conditions — preload invalidation & early-start failures cause dead air. See `IMPLEMENTATION_P0-1.md`. Transaction state machine partially implemented (Phase 2 in progress).
 - **BUG-002 (P1):** YouTube playback failures — videos fail to load, playback state gets stuck, search can fail silently.
 
+## Test Infrastructure (TASK-001 — COMPLETE 2026-02-17)
+- **Framework:** Vitest ^4.0.18 + jsdom + @testing-library/react
+- **Commands:** `npm run test` (CI), `npm run test:watch` (dev), `npm run test:ui` (browser)
+- **Setup file:** `setupTests.ts` — imports jest-dom matchers, clears localStorage `beforeEach`
+- **Smoke tests:** `__tests__/smoke.test.ts` — 21 tests across 7 utility functions, all green
+- **Scope:** Utilities only. Component tests (Deck, App) require Web Audio + YouTube IFrame mocks — deferred.
+
 ## Known Technical Debt
-- 25+ empty catch blocks (silent error swallowing)
-- No test framework configured
-- No linting/formatting tools
-- `@google/genai` dependency unused (deprioritized)
-- App.tsx is a 1,937-line monolith
+- 25+ empty catch blocks (silent error swallowing) → TASK-005
+- No linting/formatting tools → TASK-009
+- `@google/genai` dependency unused (deprioritized) → TASK-008
+- App.tsx is a 1,937-line monolith → TASK-007
 
 ## Conventions
 - Component files are self-contained
@@ -86,3 +92,4 @@
 - Toast notifications via `components/Toast.tsx` (`showToast(msg, type)`)
 - CSS uses design tokens from `styles/tokens.css`
 - localStorage keys prefixed with `raikomix_` (e.g., `raikomix_library`)
+- Tests live in `__tests__/` directory; reference `plan.md` for QA checklists
