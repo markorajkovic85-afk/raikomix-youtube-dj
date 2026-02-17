@@ -75,7 +75,7 @@
 - Current status: no active P0/P1 bug tickets open.
 
 ## Next Steps Status (Audited 2026-02-17)
-- **TASK-005:** Not started (empty `catch {}` blocks still present).
+- **TASK-005:** ✅ Complete in `2783999` (empty `catch {}` blocks removed from active source files, replaced with explicit recoverable logging).
 - **TASK-006:** Not started (no dedicated startup env validation module yet).
 - **TASK-007:** Not started (`App.tsx` monolith still in place).
 - **TASK-008:** Not started (`@google/genai` still present in dependencies).
@@ -90,7 +90,7 @@
 - **Scope:** Utilities only. Component tests (Deck, App) require Web Audio + YouTube IFrame mocks — deferred.
 
 ## Known Technical Debt
-- 25+ empty catch blocks (silent error swallowing) → TASK-005
+- TASK-005 completed: silent `catch {}` swallowing removed from active source files in `2783999`; continue monitoring new code for explicit handling.
 - No linting/formatting tools → TASK-009
 - `@google/genai` dependency unused (deprioritized) → TASK-008
 - App.tsx is a 1,937-line monolith → TASK-007

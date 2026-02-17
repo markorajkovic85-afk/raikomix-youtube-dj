@@ -90,6 +90,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         const v = localStorage.getItem(storageKey);
         return v === 'video' ? 'video' : 'wave';
       } catch (e) {
+        console.warn(`[Deck ${id}] failed to restore visual mode`, e);
         return 'wave';
       }
     });
@@ -97,7 +98,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     useEffect(() => {
       try {
         localStorage.setItem(storageKey, visualMode);
-      } catch (e) { }
+      } catch (e) {
+        console.warn(`[Deck ${id}] failed to persist visual mode`, e);
+      }
     }, [storageKey, visualMode]);
 
     const [state, setState] = useState<PlayerState>({
@@ -146,6 +149,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       const seconds = safeSeconds % 60;
       return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     }, []);
+
+    const logRecoverableError = useCallback((action: string, error: unknown) => {
+      console.warn(`[Deck ${id}] ${action} failed`, error);
+    }, [id]);
 
     // Audio Engine (manages all Web Audio nodes)
     const audioEngine = useRef(new DeckAudioEngine(id));
@@ -646,7 +653,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       isLoadingRef.current = true;
       const seq = ++loadSeqRef.current;
 
-      try { analysisAbortRef.current?.abort(); } catch (e) { }
+      try { analysisAbortRef.current?.abort(); } catch (e) { logRecoverableError('abort previous local audio analysis', e); }
       analysisAbortRef.current = null;
       setIsScanning(false);
 
@@ -694,8 +701,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       }, TIMEOUTS.LOCAL_AUDIO_MS);
 
       if (state.sourceType === 'youtube') {
-        try { playerRef.current?.pauseVideo(); } catch (e) { }
-        try { playerRef.current?.stopVideo(); } catch (e) { }
+        try { playerRef.current?.pauseVideo(); } catch (e) { logRecoverableError('pause YouTube before local load', e); }
+        try { playerRef.current?.stopVideo(); } catch (e) { logRecoverableError('stop YouTube before local load', e); }
       }
 
       if (state.sourceType === 'youtube') {
@@ -764,11 +771,11 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
       audio.addEventListener('error', onErrorLike, { once: true });
       audio.addEventListener('stalled', onErrorLike, { once: true });
 
-      try { audio.pause(); } catch (e) { }
+      try { audio.pause(); } catch (e) { logRecoverableError('pause local audio before source swap', e); }
       audio.src = '';
-      try { audio.load(); } catch (e) { }
+      try { audio.load(); } catch (e) { logRecoverableError('reload local audio after source clear', e); }
       audio.src = next.url;
-      try { audio.load(); } catch (e) { }
+      try { audio.load(); } catch (e) { logRecoverableError('reload local audio with next source', e); }
 
       connectAudioEngine();
     }, [connectAudioEngine, id, onPlayerReady, state.sourceType]);
@@ -801,8 +808,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         } else {
           // Stop local audio when switching to YouTube to avoid double-audio
           if (localAudioRef.current) {
-            try { localAudioRef.current.pause(); } catch (e) { }
-            try { localAudioRef.current.currentTime = 0; } catch (e) { }
+            try { localAudioRef.current.pause(); } catch (e) { logRecoverableError('pause local audio before YouTube load', e); }
+            try { localAudioRef.current.currentTime = 0; } catch (e) { logRecoverableError('reset local audio time before YouTube load', e); }
           }
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
@@ -819,8 +826,8 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         } else {
           // Stop local audio when switching to YouTube to avoid double-audio
           if (localAudioRef.current) {
-            try { localAudioRef.current.pause(); } catch (e) { }
-            try { localAudioRef.current.currentTime = 0; } catch (e) { }
+            try { localAudioRef.current.pause(); } catch (e) { logRecoverableError('pause local audio before YouTube cue', e); }
+            try { localAudioRef.current.currentTime = 0; } catch (e) { logRecoverableError('reset local audio time before YouTube cue', e); }
           }
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
@@ -855,7 +862,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
           try {
             t = playerRef.current.getCurrentTime();
             nextDuration = playerRef.current.getDuration?.() || null;
-          } catch (e) { }
+          } catch (e) {
+            logRecoverableError('read YouTube playback time', e);
+          }
         } else if (state.sourceType === 'local' && localAudioRef.current) {
           t = localAudioRef.current.currentTime;
           nextDuration = localAudioRef.current.duration || null;
@@ -885,7 +894,9 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         if (state.sourceType === 'youtube') {
           playerRef.current?.playVideo?.();
         } else {
-          localAudioRef.current?.play?.().catch(() => { });
+          localAudioRef.current?.play?.().catch((error) => {
+            logRecoverableError('resume local playback after visibility change', error);
+          });
         }
       };
       document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -895,7 +906,7 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
     // Cleanup audio engine on unmount
     useEffect(() => {
       return () => {
-        try { analysisAbortRef.current?.abort(); } catch (e) { }
+        try { analysisAbortRef.current?.abort(); } catch (e) { logRecoverableError('abort audio analysis on cleanup', e); }
         analysisAbortRef.current = null;
         if (loadTimeoutRef.current) {
           window.clearTimeout(loadTimeoutRef.current);

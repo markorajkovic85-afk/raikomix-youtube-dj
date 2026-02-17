@@ -193,14 +193,20 @@ const PerformancePads: React.FC<PerformancePadsProps> = ({
     if (!chain) return;
     try {
       chain.effectInput.disconnect();
-    } catch (error) {}
+    } catch (error) {
+      console.warn(`[PerformancePads] failed to disconnect effect input for pad ${padId}`, error);
+    }
     try {
       chain.effectOutput.disconnect();
-    } catch (error) {}
+    } catch (error) {
+      console.warn(`[PerformancePads] failed to disconnect effect output for pad ${padId}`, error);
+    }
     chain.nodes.forEach((node) => {
       try {
         node.disconnect();
-      } catch (error) {}
+      } catch (error) {
+        console.warn(`[PerformancePads] failed to disconnect effect node for pad ${padId}`, error);
+      }
     });
     chain.dispose?.();
     fxChainsRef.current[padId] = null;
