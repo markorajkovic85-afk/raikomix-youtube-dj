@@ -41,6 +41,10 @@ export class DeckAudioEngine {
     this.id = id;
   }
 
+  private logRecoverableError(action: string, error: unknown) {
+    console.warn(`[DeckAudioEngine:${this.id}] ${action} failed`, error);
+  }
+
   getContext(): AudioContext | null {
     return this.ctx;
   }
@@ -117,11 +121,15 @@ export class DeckAudioEngine {
     const { gain } = this.nodes;
     try {
       gain.disconnect();
-    } catch (e) { }
+    } catch (error) {
+      this.logRecoverableError('gain.disconnect', error);
+    }
     const destination = node ?? this.ctx.destination;
     try {
       gain.connect(destination);
-    } catch (e) { }
+    } catch (error) {
+      this.logRecoverableError('gain.connect', error);
+    }
   }
 
   private clearEffectChain() {
@@ -129,12 +137,16 @@ export class DeckAudioEngine {
     const { effectInput } = this.nodes;
     try {
       effectInput.disconnect();
-    } catch (e) { }
+    } catch (error) {
+      this.logRecoverableError('effectInput.disconnect', error);
+    }
     if (this.effectNodes) {
       this.effectNodes.nodes.forEach(node => {
         try {
           node.disconnect();
-        } catch (e) { }
+        } catch (error) {
+          this.logRecoverableError('effectNode.disconnect', error);
+        }
       });
       this.effectNodes.dispose?.();
     }
@@ -209,13 +221,17 @@ export class DeckAudioEngine {
       [low, mid, hi, filter, gain, dryGain, wetGain, mixGain, effectInput, effectOutput].forEach(node => {
         try {
           node.disconnect();
-        } catch (e) { }
+        } catch (error) {
+          this.logRecoverableError('cleanup.node.disconnect', error);
+        }
       });
     }
     if (this.sourceNode) {
       try {
         this.sourceNode.disconnect();
-      } catch (e) { }
+      } catch (error) {
+        this.logRecoverableError('cleanup.source.disconnect', error);
+      }
     }
     this.nodes = null;
     this.sourceNode = null;
@@ -223,7 +239,9 @@ export class DeckAudioEngine {
     if (this.ownsContext && this.ctx && this.ctx.state !== 'closed') {
       try {
         await this.ctx.close();
-      } catch (e) { }
+      } catch (error) {
+        this.logRecoverableError('context.close', error);
+      }
     }
     if (this.ownsContext) {
       this.ctx = null;

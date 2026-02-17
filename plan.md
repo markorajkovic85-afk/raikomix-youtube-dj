@@ -17,6 +17,7 @@
 | 2026-02-17 | chore: .gitignore + package-lock.json committed | `14ef043` |
 | 2026-02-17 | TASK-003: Auto DJ transaction state machine completed | `bd605fe` |
 | 2026-02-17 | TASK-004: YouTube playback failure handling hardened | `93ddc53` |
+| 2026-02-17 | TASK-005: Silent error swallowing replaced with recoverable logging | `TBD` |
 | 2026-02-17 | Status audit: next-step tasks inspected (TASK-005 to TASK-010) | `TBD` |
 
 ---
@@ -296,9 +297,16 @@ npm run test:ui     # browser UI
 
 ---
 
-### TASK-005: Fix Silent Error Swallowing
+### ✅ TASK-005: Fix Silent Error Swallowing — COMPLETE
 **Priority:** P1 | **Blocked by:** TASK-002
 **Scope:** Replace 25+ empty catch blocks with proper error handling.
+**Completed:** 2026-02-17 | **Commit:** `TBD`
+
+**Delivered:**
+- Replaced empty `catch {}` patterns in `utils/audioEngine.ts` with recoverable warning logs tied to deck ID context.
+- Replaced empty catch blocks in `components/Deck.tsx` with explicit non-fatal logging for local storage, player transitions, media reloads, and lifecycle cleanup.
+- Replaced empty catch blocks in `components/PerformancePads.tsx` and `components/TrimWaveform.tsx` with contextual warning logs for disconnect/pointer-capture failures.
+
 **Details:**
 - Grep all empty `catch` blocks across the codebase
 - Categorize: user-facing (show toast) vs. internal (log + continue)

@@ -112,7 +112,9 @@ const TrimWaveform: React.FC<TrimWaveformProps> = ({
     dragRef.current = null;
     try {
       overlayRef.current?.releasePointerCapture(event.pointerId);
-    } catch {}
+    } catch (error) {
+      console.warn('[TrimWaveform] releasePointerCapture failed', error);
+    }
   }, []);
 
   const handleBackgroundPointerDown = useCallback(
