@@ -324,10 +324,9 @@ const Mixer: React.FC<MixerProps> = ({
     const rect = crossfaderRef.current?.getBoundingClientRect();
     if (!rect) return;
     const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize || '16');
-    const padding = rootFont;
     const handleWidth = rootFont * 5;
-    const usable = Math.max(1, rect.width - padding * 2 - handleWidth);
-    const x = Math.min(Math.max(clientX - rect.left - padding - handleWidth / 2, 0), usable);
+    const usable = Math.max(1, rect.width - handleWidth);
+    const x = Math.min(Math.max(clientX - rect.left - handleWidth / 2, 0), usable);
     const t = x / usable;
     const newVal = t * 2 - 1;
     onCrossfaderChange(newVal);
@@ -452,7 +451,7 @@ const Mixer: React.FC<MixerProps> = ({
           {/* Redesigned Professional Crossfader with tactile feel */}
           <div 
             ref={crossfaderRef}
-                className="bg-black/80 h-14 rounded-xl relative group flex items-center px-4 border border-white/10 shadow-[inset_0_4px_12px_rgba(0,0,0,0.8)] cursor-pointer overflow-hidden transition-all hover:border-white/20 touch-none"
+            className="bg-black/80 h-14 rounded-xl relative group flex items-center border border-white/10 shadow-[inset_0_4px_12px_rgba(0,0,0,0.8)] cursor-pointer overflow-hidden transition-all hover:border-white/20 touch-none"
             onDoubleClick={() => onCrossfaderChange(0)}
             title="Scroll to Mix • Double-click to Center (50/0)"
           >
@@ -460,15 +459,15 @@ const Mixer: React.FC<MixerProps> = ({
              <div className="absolute left-1/2 -translate-x-1/2 w-[2px] h-6 bg-white/10 z-0 rounded-full" />
              
              {/* Visual track guides */}
-             <div className="absolute inset-x-8 h-[1px] bg-white/5 top-1/2 -translate-y-1/2 pointer-events-none" />
-             <div className="absolute left-10 w-[1px] h-3 bg-white/5 pointer-events-none" />
-             <div className="absolute right-10 w-[1px] h-3 bg-white/5 pointer-events-none" />
+             <div className="absolute inset-x-4 h-[1px] bg-white/5 top-1/2 -translate-y-1/2 pointer-events-none" />
+             <div className="absolute left-4 w-[1px] h-3 bg-white/5 pointer-events-none" />
+             <div className="absolute right-4 w-[1px] h-3 bg-white/5 pointer-events-none" />
 
              {/* Professional Aluminum-style Crossfader Handle */}
              <div 
                className="absolute top-1/2 -translate-y-1/2 w-20 h-11 bg-[#323038] rounded-md border border-white/20 shadow-[0_12px_24px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.1)] flex items-center justify-center transition-all duration-150 z-10 group-hover:border-[#D0BCFF]/40 active:scale-95 active:shadow-inner"
                style={{ 
-                 left: `calc(1rem + ${(crossfader + 1) / 2} * (100% - 2rem - 5rem))`,
+                 left: `calc(${(crossfader + 1) / 2} * (100% - 5rem))`,
                }}
              >
                {/* Tactile Handle Ridges */}
