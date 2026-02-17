@@ -17,7 +17,7 @@
 | 2026-02-17 | chore: .gitignore + package-lock.json committed | `14ef043` |
 | 2026-02-17 | TASK-003: Auto DJ transaction state machine completed | `bd605fe` |
 | 2026-02-17 | TASK-004: YouTube playback failure handling hardened | `93ddc53` |
-| 2026-02-17 | TASK-005: Silent error swallowing replaced with recoverable logging | `TBD` |
+| 2026-02-17 | TASK-005: Silent error swallowing replaced with recoverable logging | `2783999` |
 | 2026-02-17 | Status audit: next-step tasks inspected (TASK-005 to TASK-010) | `TBD` |
 
 ---
@@ -125,7 +125,7 @@ The `claude.md` file eliminates redundant file reads across sessions. It will co
 
 Verification pass across repository state confirms these upcoming tasks are **not yet implemented**:
 
-- **TASK-005 (Silent error swallowing):** still pending — empty `catch {}` blocks remain in `utils/audioEngine.ts`, `components/Deck.tsx`, and `components/PerformancePads.tsx`.
+- **TASK-005 (Silent error swallowing):** ✅ complete in `2783999` — empty `catch {}` blocks removed from active source files with explicit recoverable logging.
 - **TASK-006 (Environment validation):** pending — no dedicated startup env validation module has been added.
 - **TASK-007 (Refactor App.tsx):** pending — `App.tsx` remains monolithic.
 - **TASK-008 (Gemini dependency cleanup):** pending — `@google/genai` still present in `package.json`.
@@ -300,7 +300,7 @@ npm run test:ui     # browser UI
 ### ✅ TASK-005: Fix Silent Error Swallowing — COMPLETE
 **Priority:** P1 | **Blocked by:** TASK-002
 **Scope:** Replace 25+ empty catch blocks with proper error handling.
-**Completed:** 2026-02-17 | **Commit:** `TBD`
+**Completed:** 2026-02-17 | **Commit:** `2783999`
 
 **Delivered:**
 - Replaced empty `catch {}` patterns in `utils/audioEngine.ts` with recoverable warning logs tied to deck ID context.
