@@ -529,12 +529,58 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         return;
       }
 
-      // Increment load sequence — stale onReady/onStateChange callbacks will self-cancel
+      // Increment load sequence — stale callbacks will self-cancel.
       const ytSeq = ++ytLoadSeqRef.current;
 
-      // Start a load watchdog: if the video hasn't become ready in 20s, surface an error
+      // Clear any pending load watchdog from prior load.
       clearYtLoadTimeout();
-      if (loadMode === 'load') {
+
+      if (playerRef.current) {
+        try {
+          playerRef.current.stopVideo();
+        } catch (e) {
+          console.warn(`[Deck ${id}] stopVideo before reload failed`, e);
+        }
+
+        if (loadMode === 'load') {
+          ytLoadTimeoutRef.current = window.setTimeout(() => {
+            if (ytSeq !== ytLoadSeqRef.current) return;
+            console.warn(`[Deck ${id}] YouTube load timeout for ${videoId}`);
+            setState(s => ({ ...s, isReady: false }));
+            setIsLoading(false);
+            onLoadError?.(`Video timed out loading. It may be unavailable.`);
+          }, TIMEOUTS.YOUTUBE_LOAD_MS);
+        }
+
+        try {
+          setState(s => ({
+            ...s,
+            videoId,
+            isReady: loadMode === 'cue' ? true : false,
+            sourceType: 'youtube',
+            playbackRate: 1.0,
+            playing: false,
+            currentTime: 0,
+            duration: 0,
+            loopActive: false,
+            waveform: undefined,
+            waveformPeaks: undefined
+          }));
+        } catch (e) {
+          console.error(`[Deck ${id}] YouTube state reset failed`, e);
+        }
+
+        try {
+          playerRef.current.destroy();
+        } catch (e) {
+          console.warn(`[Deck ${id}] player destroy failed`, e);
+        }
+
+        playerRef.current = null;
+        setIsLoading(loadMode !== 'cue');
+      }
+
+      if (!ytLoadTimeoutRef.current && loadMode === 'load') {
         ytLoadTimeoutRef.current = window.setTimeout(() => {
           if (ytSeq !== ytLoadSeqRef.current) return;
           console.warn(`[Deck ${id}] YouTube load timeout for ${videoId}`);
@@ -544,44 +590,19 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         }, TIMEOUTS.YOUTUBE_LOAD_MS);
       }
 
-      if (playerRef.current) {
-        try {
-          // Reset state for existing player to avoid GUI freeze/glitch.
-          // Keep cue mode ready so Auto DJ can mix as soon as metadata arrives.
-          setState(s => ({
-            ...s,
-            videoId,
-            isReady: loadMode === 'cue' ? true : false,
-            sourceType: 'youtube',
-            playbackRate: 1.0,
-            playing: false,
-            currentTime: 0,
-            loopActive: false,
-            waveform: undefined,
-            waveformPeaks: undefined
-          }));
-          if (loadMode === 'cue') {
-            playerRef.current.cueVideoById(videoId);
-          } else {
-            playerRef.current.loadVideoById(videoId);
-          }
-          setIsLoading(loadMode !== 'cue');
-        } catch (e) {
-          console.error(`[Deck ${id}] YouTube player command failed`, e);
-          setState(s => ({ ...s, isReady: false }));
-          setIsLoading(false);
-          clearYtLoadTimeout();
-          onLoadError?.('Failed to load video. Please try again.');
-        }
-        return;
-      }
-
       playerRef.current = new window.YT.Player(containerId, {
         height: '1', width: '1', videoId,
-        playerVars: { autoplay: 0, controls: 0, disablekb: 1, origin: window.location.origin, enablejsapi: 1, rel: 0, modestbranding: 1 },
+        playerVars: {
+          autoplay: loadMode === 'load' ? 1 : 0,
+          controls: 0,
+          disablekb: 1,
+          origin: window.location.origin,
+          enablejsapi: 1,
+          rel: 0,
+          modestbranding: 1
+        },
         events: {
           onReady: (event: YTPlayerEvent) => {
-            // Ignore stale onReady from a previous load
             if (ytSeq !== ytLoadSeqRef.current) return;
             clearYtLoadTimeout();
             const p = event.target;
@@ -596,7 +617,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
             setIsLoading(false);
           },
           onStateChange: (event: YTPlayerEvent) => {
-            // Ignore stale state changes from a previous load sequence
             if (ytSeq !== ytLoadSeqRef.current) return;
             const playerState = event.data;
             setState(s => ({ ...s, playing: playerState === window.YT.PlayerState.PLAYING }));
@@ -613,7 +633,6 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
               onTrackEnd?.();
             }
 
-            // BUFFERING for >15s without reaching PLAYING is likely a stuck load
             if (playerState === window.YT.PlayerState.BUFFERING) {
               clearYtLoadTimeout();
               ytLoadTimeoutRef.current = window.setTimeout(() => {
@@ -624,12 +643,10 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
                 onLoadError?.('Video is taking too long to buffer. It may be unavailable in your region.');
               }, TIMEOUTS.YOUTUBE_BUFFERING_MS);
             } else {
-              // Any non-BUFFERING state clears the buffering watchdog
               clearYtLoadTimeout();
             }
           },
           onError: (event: YTPlayerEvent) => {
-            // Ignore stale errors from previous load
             if (ytSeq !== ytLoadSeqRef.current) return;
             clearYtLoadTimeout();
             const code: number = event?.data ?? -1;
@@ -806,11 +823,16 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         if (sourceType === 'local') {
           loadLocalFile(url, metadata, 'load');
         } else {
-          // Stop local audio when switching to YouTube to avoid double-audio
           if (localAudioRef.current) {
             try { localAudioRef.current.pause(); } catch (e) { logRecoverableError('pause local audio before YouTube load', e); }
-            try { localAudioRef.current.currentTime = 0; } catch (e) { logRecoverableError('reset local audio time before YouTube load', e); }
+            try { localAudioRef.current.src = ''; } catch (e) { logRecoverableError('clear local audio source before YouTube load', e); }
+            try { localAudioRef.current.load(); } catch (e) { logRecoverableError('reload local audio after clear before YouTube load', e); }
           }
+          pendingLocalLoadRef.current = null;
+          isLoadingRef.current = false;
+          void audioEngine.current.cleanup().catch((e) => {
+            logRecoverableError('cleanup local audio engine before YouTube load', e);
+          });
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
             initPlayer(vid, 'load');
@@ -824,11 +846,16 @@ const Deck = forwardRef<DeckHandle, DeckProps>(
         if (sourceType === 'local') {
           loadLocalFile(url, metadata, 'cue');
         } else {
-          // Stop local audio when switching to YouTube to avoid double-audio
           if (localAudioRef.current) {
             try { localAudioRef.current.pause(); } catch (e) { logRecoverableError('pause local audio before YouTube cue', e); }
-            try { localAudioRef.current.currentTime = 0; } catch (e) { logRecoverableError('reset local audio time before YouTube cue', e); }
+            try { localAudioRef.current.src = ''; } catch (e) { logRecoverableError('clear local audio source before YouTube cue', e); }
+            try { localAudioRef.current.load(); } catch (e) { logRecoverableError('reload local audio after clear before YouTube cue', e); }
           }
+          pendingLocalLoadRef.current = null;
+          isLoadingRef.current = false;
+          void audioEngine.current.cleanup().catch((e) => {
+            logRecoverableError('cleanup local audio engine before YouTube cue', e);
+          });
           const vid = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
           if (vid) {
             initPlayer(vid, 'cue');
